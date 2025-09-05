@@ -15,7 +15,7 @@ class DataManager:
         pass
     
     def auto_detect_start_point(self, input_csv_path, output_csv_path):
-        """기존 결과를 분석해서 시작점 자동 감지 - failure_type 기반"""
+        """기존 결과를 분석해서 시작점 자동 감지 - actual_index 기준으로 수정"""
         try:
             if not os.path.exists(output_csv_path):
                 print("  결과 파일 없음 - 처음부터 시작")
@@ -30,70 +30,45 @@ class DataManager:
             print(f"  기존 결과 파일 분석:")
             print(f"    총 레코드: {len(existing_df)}개")
             
-            if 'status' in existing_df.columns:
-                successful_count = len(existing_df[existing_df['status'] == 'success'])
+            if 'actual_index' in existing_df.columns:
+                processed_indices = set()
                 failed_indices = []
-                legitimate_failures = 0
                 
-                if 'actual_index' in existing_df.columns and 'failure_type' in existing_df.columns:
-                    # failure_type 기반으로 재시도 대상 판단
-                    for idx, row in existing_df.iterrows():
-                        if row['status'] == 'success':
-                            continue
+                # 모든 처리된 인덱스 수집
+                for idx, row in existing_df.iterrows():
+                    actual_index = row['actual_index']
+                    if pd.notna(actual_index):
+                        processed_indices.add(int(actual_index))
                         
-                        failure_type = row.get('failure_type', FailureType.UNPROCESSED)
-                        actual_index = row['actual_index']
-                        
-                        # 시스템 오류면 재시도 대상
-                        if FailureType.is_system_error(failure_type):
-                            if pd.notna(actual_index):
-                                failed_indices.append(int(actual_index))
-                        else:
-                            legitimate_failures += 1
-                    
-                    print(f"    성공한 상품: {successful_count}개")
-                    print(f"    시스템 오류로 실패: {len(failed_indices)}개 (재시도 예정)")
-                    print(f"    정당한 실패: {legitimate_failures}개 (재시도 안함)")
-                    
-                    # 시스템 오류 유형별 통계
-                    if 'failure_type' in existing_df.columns:
-                        system_errors = existing_df[existing_df['failure_type'].apply(FailureType.is_system_error)]
-                        if len(system_errors) > 0:
-                            error_counts = system_errors['failure_type'].value_counts()
-                            print(f"    시스템 오류 유형별:")
-                            for error_type, count in error_counts.items():
-                                description = FailureType.get_description(error_type)
-                                print(f"      - {description}: {count}개")
-                        
-                        # 정당한 실패 유형별 통계도 표시
-                        legitimate_errors = existing_df[~existing_df['failure_type'].apply(FailureType.is_system_error)]
-                        legitimate_errors = legitimate_errors[legitimate_errors['status'] != 'success']
-                        if len(legitimate_errors) > 0:
-                            legit_counts = legitimate_errors['failure_type'].value_counts()
-                            print(f"    정당한 실패 유형별:")
-                            for error_type, count in legit_counts.items():
-                                description = FailureType.get_description(error_type)
-                                print(f"      - {description}: {count}개")
-                    
-                    if failed_indices:
-                        print(f"    재시도 상품 인덱스: {failed_indices[:10]}{'...' if len(failed_indices) > 10 else ''}")
-                    
-                    print(f"  시작점: {successful_count}번째 상품부터 (성공 기준)")
-                    return successful_count, failed_indices
+                        # 재시도가 필요한 실패 상품만 failed_indices에 추가
+                        if 'status' in row and row['status'] != 'success':
+                            if 'failure_type' in row:
+                                failure_type = row.get('failure_type', 'UNPROCESSED')
+                                if failure_type in ['BROWSER_ERROR', 'NETWORK_ERROR', 'TIMEOUT_ERROR', 
+                                                'WEBDRIVER_ERROR', 'PROCESSING_ERROR', 'UNPROCESSED']:
+                                    failed_indices.append(int(actual_index))
                 
+                # 다음 시작점 계산: 처리된 인덱스 중 최대값 + 1
+                if processed_indices:
+                    next_start_index = max(processed_indices) + 1
                 else:
-                    print("  ⚠️  failure_type 컬럼이 없습니다 - 파일을 새로 만듭니다")
-                    return 0, []
+                    next_start_index = 0
+                
+                print(f"    처리된 인덱스 범위: {min(processed_indices) if processed_indices else 0} ~ {max(processed_indices) if processed_indices else 0}")
+                print(f"    재시도 대상: {len(failed_indices)}개")
+                print(f"  시작점: {next_start_index}번째 상품부터 (실제 인덱스 기준)")
+                
+                return next_start_index, failed_indices
             
             else:
-                print("  ⚠️  status 컬럼이 없습니다 - 파일을 새로 만듭니다")
+                print("  ⚠️  actual_index 컬럼이 없습니다 - 처음부터 시작")
                 return 0, []
         
         except Exception as e:
             print(f"  시작점 자동 감지 실패: {e}")
             print("  안전을 위해 처음부터 시작")
             return 0, []
-    
+            
     def should_retry_product(self, status, failure_type):
         """상품이 재시도 대상인지 판단 - failure_type 기반"""
         if status == 'success':

@@ -2,6 +2,7 @@
 영어 번역 기반 iHerb 스크래퍼 - 메인 실행 파일 (구조화된 실패 분류)
 """
 
+import os
 import pandas as pd
 import subprocess
 import time
@@ -83,11 +84,16 @@ class EnglishIHerbScraper:
             for process_idx, (actual_idx, process_type) in enumerate(process_list):
                 row = df.iloc[actual_idx]
                 
+                # 처리 직전에 한 번 더 중복 체크
+                if self.is_already_processed(actual_idx, output_file_path):
+                    print(f"\n[{process_idx+1}/{len(process_list)}] [{actual_idx}] 이미 처리됨 - 건너뜀")
+                    continue
+                
                 print(f"\n[{process_idx+1}/{len(process_list)}] [{actual_idx}] {row['product_name']}")
                 if process_type == "재시도":
                     print(f"  🔄 실패 상품 재시도")
                 
-                self._process_single_product(row, actual_idx, len(process_list), output_file_path, process_idx)
+                self._process_single_product(row, actual_idx, len(process_list), output_file_path, process_idx)            
             
             # 6. 최종 요약
             try:
@@ -380,7 +386,23 @@ class EnglishIHerbScraper:
     def close(self):
         """브라우저 종료"""
         self.browser_manager.close()
-
+    
+    def is_already_processed(self, actual_index, output_csv_path):
+        """특정 인덱스가 이미 처리되었는지 확인"""
+        try:
+            if not os.path.exists(output_csv_path):
+                return False
+            
+            existing_df = pd.read_csv(output_csv_path, encoding='utf-8-sig')
+            
+            if 'actual_index' in existing_df.columns:
+                processed_indices = existing_df['actual_index'].dropna().astype(int).tolist()
+                return actual_index in processed_indices
+            
+            return False
+            
+        except Exception:
+            return False
 
 # 실행
 if __name__ == "__main__":
