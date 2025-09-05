@@ -1,5 +1,5 @@
 """
-영어 번역 기반 iHerb 스크래퍼 - 메인 실행 파일 (개선된 오류 처리)
+영어 번역 기반 iHerb 스크래퍼 - 메인 실행 파일 (구조화된 실패 분류)
 """
 
 import pandas as pd
@@ -9,7 +9,7 @@ from browser_manager import BrowserManager
 from iherb_client import IHerbClient
 from product_matcher import ProductMatcher
 from data_manager import DataManager
-from config import Config
+from config import Config, FailureType
 
 
 class EnglishIHerbScraper:
@@ -123,21 +123,21 @@ class EnglishIHerbScraper:
         coupang_price_info = self.data_manager.extract_coupang_price_info(row)
         self._display_coupang_price(coupang_price_info)
         
-        # 아이허브 검색 및 정보 추출 (6개 값 반환)
-        product_url, product_code, iherb_product_name, iherb_price_info, similarity_score, matching_reason = \
+        # 아이허브 검색 및 정보 추출 (7개 값 반환 - failure_type 추가)
+        product_url, product_code, iherb_product_name, iherb_price_info, similarity_score, matching_reason, failure_type = \
             self._search_and_extract_iherb_info(korean_name, english_name)
         
         # 결과 생성 및 저장
         result = self.data_manager.create_result_record(
             row, actual_idx, english_name, product_url, similarity_score,
-            product_code, iherb_product_name, coupang_price_info, iherb_price_info, matching_reason
+            product_code, iherb_product_name, coupang_price_info, iherb_price_info, matching_reason, failure_type
         )
         
         self.data_manager.append_result_to_csv(result, output_file_path)
         
         # 결과 출력
         self._display_results(product_code, iherb_product_name, similarity_score, 
-                            coupang_price_info, iherb_price_info, matching_reason)
+                            coupang_price_info, iherb_price_info, matching_reason, failure_type)
         
         # 진행률 표시
         self._display_progress(process_idx, total_count, output_file_path)
@@ -209,13 +209,14 @@ class EnglishIHerbScraper:
         print(f"  쿠팡 가격: {' '.join(coupang_summary) if coupang_summary else '정보 없음'}")
     
     def _search_and_extract_iherb_info(self, korean_name, english_name):
-        """아이허브 검색 및 정보 추출 (개선된 오류 처리) - 6개 값 반환"""
+        """아이허브 검색 및 정보 추출 - 구조화된 실패 분류 (7개 값 반환)"""
         product_url = None
         similarity_score = 0
         product_code = None
         iherb_product_name = None
         iherb_price_info = {}
-        matching_reason = "매칭 시도되지 않음"
+        matching_reason = "처리 시작"
+        failure_type = FailureType.UNPROCESSED
         
         for retry in range(Config.MAX_RETRIES):
             try:
@@ -228,14 +229,27 @@ class EnglishIHerbScraper:
                     korean_name, english_name
                 )
                 
-                # 매칭 사유 추출
+                # 매칭 결과에 따른 분류
+                if not product_url:
+                    if match_details and match_details.get('no_results'):
+                        failure_type = FailureType.NO_SEARCH_RESULTS
+                        matching_reason = "검색 결과 없음"
+                    else:
+                        failure_type = FailureType.NO_MATCHING_PRODUCT
+                        matching_reason = "매칭되는 상품 없음"
+                    break
+                
+                # 매칭 세부 사유 분류
                 if match_details and isinstance(match_details, dict):
                     if match_details.get('rejected', False):
                         if match_details['reason'] == 'count_mismatch':
+                            failure_type = FailureType.COUNT_MISMATCH
                             matching_reason = "개수 불일치로 탈락"
                         elif match_details['reason'] == 'dosage_mismatch':
+                            failure_type = FailureType.DOSAGE_MISMATCH
                             matching_reason = "용량(mg) 불일치로 탈락"
                     elif similarity_score >= Config.MATCHING_THRESHOLDS['success_threshold']:
+                        failure_type = FailureType.SUCCESS
                         if match_details.get('exact_count_match') and match_details.get('dosage_match'):
                             matching_reason = "개수/용량 정확 매칭"
                         elif match_details.get('exact_count_match'):
@@ -246,10 +260,9 @@ class EnglishIHerbScraper:
                             eng_sim = match_details.get('english_similarity', 0)
                             matching_reason = f"높은 유사도 (영어:{eng_sim:.2f})"
                     else:
+                        failure_type = FailureType.LOW_SIMILARITY
                         eng_sim = match_details.get('english_similarity', 0)
                         matching_reason = f"낮은 유사도 (영어:{eng_sim:.2f})"
-                else:
-                    matching_reason = "매칭 상세 정보 없음"
                 
                 if product_url:
                     # 상품 정보 추출
@@ -257,12 +270,9 @@ class EnglishIHerbScraper:
                         self.iherb_client.extract_product_info_with_price(product_url)
                     
                     if product_code:
+                        failure_type = FailureType.SUCCESS
                         self.success_count += 1
-                    break  # 성공하면 재시도 루프 종료
-                else:
-                    print("  매칭된 상품 없음")
-                    matching_reason = "매칭된 상품 없음"  # 정당한 실패
-                    break  # 검색 결과가 없으면 재시도할 필요 없음
+                    break
                     
             except Exception as e:
                 error_msg = str(e)
@@ -270,12 +280,19 @@ class EnglishIHerbScraper:
                 
                 # 시스템 오류 타입별 분류
                 if "HTTPConnectionPool" in error_msg or "Connection refused" in error_msg:
-                    matching_reason = f"브라우저 연결 오류: {error_msg[:50]}"
+                    failure_type = FailureType.NETWORK_ERROR
+                    matching_reason = f"네트워크 연결 오류: {error_msg[:50]}"
                 elif "WebDriverException" in error_msg or "selenium" in error_msg.lower():
+                    failure_type = FailureType.WEBDRIVER_ERROR
                     matching_reason = f"웹드라이버 오류: {error_msg[:50]}"
                 elif "TimeoutException" in error_msg or "timeout" in error_msg.lower():
+                    failure_type = FailureType.TIMEOUT_ERROR
                     matching_reason = f"타임아웃 오류: {error_msg[:50]}"
+                elif "chrome" in error_msg.lower():
+                    failure_type = FailureType.BROWSER_ERROR
+                    matching_reason = f"브라우저 오류: {error_msg[:50]}"
                 else:
+                    failure_type = FailureType.PROCESSING_ERROR
                     matching_reason = f"처리 오류: {error_msg[:50]}"
                 
                 if retry == Config.MAX_RETRIES - 1:
@@ -288,14 +305,15 @@ class EnglishIHerbScraper:
                             self._safe_browser_restart()
                         except Exception as restart_error:
                             print(f"  브라우저 재시작 실패: {restart_error}")
+                            failure_type = FailureType.BROWSER_ERROR
                             matching_reason = f"브라우저 재시작 실패: {str(restart_error)[:50]}"
                             break
         
-        return product_url, product_code, iherb_product_name, iherb_price_info, similarity_score, matching_reason
+        return product_url, product_code, iherb_product_name, iherb_price_info, similarity_score, matching_reason, failure_type
     
     def _display_results(self, product_code, iherb_product_name, similarity_score, 
-                        coupang_price_info, iherb_price_info, matching_reason):
-        """결과 출력 (개선된 버전)"""
+                        coupang_price_info, iherb_price_info, matching_reason, failure_type):
+        """결과 출력 - failure_type 포함"""
         print()
         if product_code:
             print(f"  ✅ 매칭 성공!")
@@ -347,9 +365,11 @@ class EnglishIHerbScraper:
             print(f"     아이허브명: {iherb_product_name}")
             print(f"     유사도: {similarity_score:.3f}")
             print(f"     매칭 사유: {matching_reason}")
+            print(f"     실패 유형: {FailureType.get_description(failure_type)}")
         else:
             print(f"  ❌ 매칭된 상품 없음")
             print(f"     매칭 사유: {matching_reason}")
+            print(f"     실패 유형: {FailureType.get_description(failure_type)}")
     
     def _display_progress(self, process_idx, total_count, output_file_path):
         """진행률 표시"""
@@ -403,6 +423,7 @@ if __name__ == "__main__":
             print("- 깔끔한 코드 구조와 명확한 책임 분담")
             print("- 실패한 상품 자동 재시도 기능")
             print("- 개선된 브라우저 재시작 및 오류 처리")
+            print("- 구조화된 실패 분류 시스템")
     
     except KeyboardInterrupt:
         print("\n중단됨")

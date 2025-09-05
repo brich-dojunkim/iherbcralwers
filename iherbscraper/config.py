@@ -1,6 +1,56 @@
 """
-iHerb 스크래퍼 설정 관리
+iHerb 스크래퍼 설정 관리 - 실패 분류 시스템 포함
 """
+
+class FailureType:
+    """실패 유형 분류"""
+    
+    # 시스템 오류 (재시도 필요)
+    BROWSER_ERROR = "BROWSER_ERROR"              # 브라우저 연결/크래시 오류
+    NETWORK_ERROR = "NETWORK_ERROR"              # 네트워크 연결 오류
+    TIMEOUT_ERROR = "TIMEOUT_ERROR"              # 타임아웃 오류
+    WEBDRIVER_ERROR = "WEBDRIVER_ERROR"          # 웹드라이버 오류
+    PROCESSING_ERROR = "PROCESSING_ERROR"        # 기타 처리 오류
+    UNPROCESSED = "UNPROCESSED"                  # 처리되지 않음
+    
+    # 정당한 실패 (재시도 불필요)
+    NO_SEARCH_RESULTS = "NO_SEARCH_RESULTS"      # 검색 결과 없음
+    NO_MATCHING_PRODUCT = "NO_MATCHING_PRODUCT"  # 매칭되는 상품 없음
+    COUNT_MISMATCH = "COUNT_MISMATCH"            # 개수 불일치
+    DOSAGE_MISMATCH = "DOSAGE_MISMATCH"          # 용량 불일치
+    LOW_SIMILARITY = "LOW_SIMILARITY"            # 유사도 부족
+    
+    # 성공
+    SUCCESS = "SUCCESS"                          # 성공
+
+    @classmethod
+    def is_system_error(cls, failure_type):
+        """시스템 오류 여부 판단"""
+        system_errors = {
+            cls.BROWSER_ERROR, cls.NETWORK_ERROR, cls.TIMEOUT_ERROR,
+            cls.WEBDRIVER_ERROR, cls.PROCESSING_ERROR, cls.UNPROCESSED
+        }
+        return failure_type in system_errors
+    
+    @classmethod
+    def get_description(cls, failure_type):
+        """실패 유형 설명"""
+        descriptions = {
+            cls.BROWSER_ERROR: "브라우저 연결/크래시 오류",
+            cls.NETWORK_ERROR: "네트워크 연결 오류", 
+            cls.TIMEOUT_ERROR: "타임아웃 오류",
+            cls.WEBDRIVER_ERROR: "웹드라이버 오류",
+            cls.PROCESSING_ERROR: "처리 중 오류",
+            cls.UNPROCESSED: "처리되지 않음",
+            cls.NO_SEARCH_RESULTS: "검색 결과 없음",
+            cls.NO_MATCHING_PRODUCT: "매칭되는 상품 없음",
+            cls.COUNT_MISMATCH: "개수 불일치",
+            cls.DOSAGE_MISMATCH: "용량 불일치", 
+            cls.LOW_SIMILARITY: "유사도 부족",
+            cls.SUCCESS: "성공"
+        }
+        return descriptions.get(failure_type, "알 수 없는 오류")
+
 
 class Config:
     """스크래퍼 전역 설정"""
@@ -140,8 +190,8 @@ class Config:
     
     OUTPUT_COLUMNS = [
         'iherb_product_name', 'coupang_product_name_english', 'coupang_product_name', 
-        'similarity_score', 'matching_reason', 'coupang_url', 'iherb_product_url', 
-        'coupang_product_id', 'iherb_product_code',
+        'similarity_score', 'matching_reason', 'failure_type',  # failure_type 컬럼 추가
+        'coupang_url', 'iherb_product_url', 'coupang_product_id', 'iherb_product_code',
         'status', 'coupang_current_price_krw', 'coupang_original_price_krw', 'coupang_discount_rate',
         'iherb_list_price_krw', 'iherb_discount_price_krw', 'iherb_discount_percent',
         'iherb_subscription_discount', 'iherb_price_per_unit',

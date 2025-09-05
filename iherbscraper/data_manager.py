@@ -1,11 +1,11 @@
 """
-데이터 관리 모듈 - CSV 컬럼 순서 문제 해결 + 개선된 재시도 로직
+데이터 관리 모듈 - 구조화된 실패 분류 시스템
 """
 
 import os
 import pandas as pd
 from datetime import datetime
-from config import Config
+from config import Config, FailureType
 
 
 class DataManager:
@@ -15,13 +15,12 @@ class DataManager:
         pass
     
     def auto_detect_start_point(self, input_csv_path, output_csv_path):
-        """기존 결과를 분석해서 시작점 자동 감지 - 시스템 오류 정확히 감지"""
+        """기존 결과를 분석해서 시작점 자동 감지 - failure_type 기반"""
         try:
             if not os.path.exists(output_csv_path):
                 print("  결과 파일 없음 - 처음부터 시작")
                 return 0, []
             
-            # 기존 결과 파일 읽기
             existing_df = pd.read_csv(output_csv_path, encoding='utf-8-sig')
             
             if len(existing_df) == 0:
@@ -31,47 +30,22 @@ class DataManager:
             print(f"  기존 결과 파일 분석:")
             print(f"    총 레코드: {len(existing_df)}개")
             
-            # status 컬럼이 있는지 확인
             if 'status' in existing_df.columns:
-                # 성공한 상품 개수만 카운트해서 시작점 결정
                 successful_count = len(existing_df[existing_df['status'] == 'success'])
-                
-                # 시스템 오류로 인한 실패만 재시도 대상으로 분류 (개선된 로직)
                 failed_indices = []
                 legitimate_failures = 0
                 
-                if 'actual_index' in existing_df.columns and 'matching_reason' in existing_df.columns:
-                    # 시스템 오류 키워드 (확장됨)
-                    system_error_patterns = [
-                        # 브라우저/연결 오류
-                        'HTTPConnectionPool', 'Connection refused', 'connection error',
-                        'browser', '브라우저', '연결', 'webdriver', 'selenium',
-                        'chromedriver', 'chrome not reachable',
-                        # 타임아웃/세션 오류  
-                        'timeout', 'TimeoutException', '타임아웃', 'session', '세션',
-                        # 예외/처리 오류
-                        'Exception', 'Error', '예외', '처리 오류', '크래시',
-                        '재시작 실패', 'restart', '매칭 시도되지 않음',
-                        # 기타 시스템 오류
-                        'network', 'socket', 'refused', 'establishment failed',
-                        'max retries exceeded', 'disconnected'
-                    ]
-                    
-                    # 각 상품별로 시스템 오류 여부 판단
+                if 'actual_index' in existing_df.columns and 'failure_type' in existing_df.columns:
+                    # failure_type 기반으로 재시도 대상 판단
                     for idx, row in existing_df.iterrows():
                         if row['status'] == 'success':
                             continue
                         
-                        matching_reason = str(row['matching_reason']).lower()
+                        failure_type = row.get('failure_type', FailureType.UNPROCESSED)
                         actual_index = row['actual_index']
                         
-                        # 시스템 오류 키워드가 포함된 경우
-                        is_system_error = any(pattern.lower() in matching_reason for pattern in system_error_patterns)
-                        
-                        # 처리되지 않은 상품 (매칭 정보 없음)
-                        is_unprocessed = matching_reason in ['매칭 정보 없음', 'nan', '']
-                        
-                        if is_system_error or is_unprocessed:
+                        # 시스템 오류면 재시도 대상
+                        if FailureType.is_system_error(failure_type):
                             if pd.notna(actual_index):
                                 failed_indices.append(int(actual_index))
                         else:
@@ -80,18 +54,35 @@ class DataManager:
                     print(f"    성공한 상품: {successful_count}개")
                     print(f"    시스템 오류로 실패: {len(failed_indices)}개 (재시도 예정)")
                     print(f"    정당한 실패: {legitimate_failures}개 (재시도 안함)")
-                    print(f"      └ 검색결과 없음, 매칭 상품 없음, 개수/용량 불일치 등")
                     
-                    # 디버깅용: 시스템 오류 상품들 출력
+                    # 시스템 오류 유형별 통계
+                    if 'failure_type' in existing_df.columns:
+                        system_errors = existing_df[existing_df['failure_type'].apply(FailureType.is_system_error)]
+                        if len(system_errors) > 0:
+                            error_counts = system_errors['failure_type'].value_counts()
+                            print(f"    시스템 오류 유형별:")
+                            for error_type, count in error_counts.items():
+                                description = FailureType.get_description(error_type)
+                                print(f"      - {description}: {count}개")
+                        
+                        # 정당한 실패 유형별 통계도 표시
+                        legitimate_errors = existing_df[~existing_df['failure_type'].apply(FailureType.is_system_error)]
+                        legitimate_errors = legitimate_errors[legitimate_errors['status'] != 'success']
+                        if len(legitimate_errors) > 0:
+                            legit_counts = legitimate_errors['failure_type'].value_counts()
+                            print(f"    정당한 실패 유형별:")
+                            for error_type, count in legit_counts.items():
+                                description = FailureType.get_description(error_type)
+                                print(f"      - {description}: {count}개")
+                    
                     if failed_indices:
                         print(f"    재시도 상품 인덱스: {failed_indices[:10]}{'...' if len(failed_indices) > 10 else ''}")
                     
                     print(f"  시작점: {successful_count}번째 상품부터 (성공 기준)")
-                    
                     return successful_count, failed_indices
                 
                 else:
-                    print("  ⚠️  필요한 컬럼이 없습니다 - 파일을 새로 만듭니다")
+                    print("  ⚠️  failure_type 컬럼이 없습니다 - 파일을 새로 만듭니다")
                     return 0, []
             
             else:
@@ -103,50 +94,15 @@ class DataManager:
             print("  안전을 위해 처음부터 시작")
             return 0, []
     
-    def should_retry_product(self, status, matching_reason):
-        """상품이 재시도 대상인지 판단 (개선된 로직)"""
+    def should_retry_product(self, status, failure_type):
+        """상품이 재시도 대상인지 판단 - failure_type 기반"""
         if status == 'success':
             return False
         
-        if not matching_reason:
-            return True  # 매칭 정보가 없으면 재시도
+        if not failure_type:
+            return True  # failure_type이 없으면 재시도
         
-        matching_reason_lower = str(matching_reason).lower()
-        
-        # 시스템 오류 키워드 (확장됨)
-        system_error_keywords = [
-            # 브라우저/연결 오류
-            'httpconnectionpool', 'connection refused', 'connection error',
-            'browser', '브라우저', '연결', 'webdriver', 'selenium',
-            'chromedriver', 'chrome not reachable',
-            # 타임아웃/세션 오류  
-            'timeout', 'timeoutexception', '타임아웃', 'session', '세션',
-            # 예외/처리 오류
-            'exception', 'error', '예외', '처리 오류', '크래시',
-            '재시작 실패', 'restart', '매칭 시도되지 않음',
-            # 기타 시스템 오류
-            'network', 'socket', 'refused', 'establishment failed',
-            'max retries exceeded', 'disconnected'
-        ]
-        
-        # 정당한 실패 키워드 (재시도 불필요)
-        legitimate_failure_keywords = [
-            '검색 결과 없음', '매칭된 상품 없음', '개수 불일치로 탈락', 
-            '용량(mg) 불일치로 탈락', '낮은 유사도', '임계값 미달',
-            '개수 정확 매칭', '용량 정확 매칭', '높은 유사도',
-            '개수/용량 정확 매칭'
-        ]
-        
-        # 시스템 오류면 재시도
-        if any(keyword in matching_reason_lower for keyword in system_error_keywords):
-            return True
-        
-        # 정당한 실패면 재시도 안함
-        if any(keyword in matching_reason_lower for keyword in legitimate_failure_keywords):
-            return False
-        
-        # 기타 경우는 재시도 (안전한 선택)
-        return True
+        return FailureType.is_system_error(failure_type)
     
     def validate_input_csv(self, csv_file_path):
         """입력 CSV 파일 검증"""
@@ -175,7 +131,7 @@ class DataManager:
             raise
     
     def initialize_output_csv(self, output_file_path):
-        """CSV 파일 헤더 초기화 - 영어 번역 기반"""
+        """CSV 파일 헤더 초기화 - failure_type 컬럼 포함"""
         try:
             empty_df = pd.DataFrame(columns=Config.OUTPUT_COLUMNS)
             empty_df.to_csv(output_file_path, index=False, encoding='utf-8-sig')
@@ -305,24 +261,35 @@ class DataManager:
     
     def create_result_record(self, row, actual_idx, english_name, product_url, 
                            similarity_score, product_code, iherb_product_name, 
-                           coupang_price_info, iherb_price_info, matching_reason=None):
-        """결과 레코드 생성 - Config.OUTPUT_COLUMNS 순서 보장"""
+                           coupang_price_info, iherb_price_info, matching_reason=None, failure_type=None):
+        """결과 레코드 생성 - failure_type 컬럼 추가"""
         
         # 가격 비교 계산
         price_comparison = self.calculate_price_comparison(coupang_price_info, iherb_price_info)
         
-        # 딕셔너리로 값 저장 (순서는 append_result_to_csv에서 보장)
+        # status 결정
+        if product_code:
+            status = 'success'
+            failure_type = failure_type or FailureType.SUCCESS
+        elif product_url:
+            status = 'code_not_found'
+            failure_type = failure_type or FailureType.PROCESSING_ERROR
+        else:
+            status = 'not_found'
+            failure_type = failure_type or FailureType.NO_MATCHING_PRODUCT
+        
         result = {
             'iherb_product_name': iherb_product_name or '',
             'coupang_product_name_english': english_name or '',
             'coupang_product_name': row.get('product_name', ''),
             'similarity_score': round(similarity_score, 3) if similarity_score else 0,
             'matching_reason': matching_reason or '매칭 정보 없음',
+            'failure_type': failure_type,  # 새 컬럼 추가
             'coupang_url': coupang_price_info.get('url', ''),
             'iherb_product_url': product_url or '',
             'coupang_product_id': row.get('product_id', ''),
             'iherb_product_code': product_code or '',
-            'status': 'success' if product_code else ('code_not_found' if product_url else 'not_found'),
+            'status': status,
             'coupang_current_price_krw': coupang_price_info.get('current_price', ''),
             'coupang_original_price_krw': coupang_price_info.get('original_price', ''),
             'coupang_discount_rate': coupang_price_info.get('discount_rate', ''),
@@ -344,7 +311,7 @@ class DataManager:
         return result
     
     def print_summary(self, results_df):
-        """결과 요약 - 영어 번역 기반"""
+        """결과 요약 - failure_type 통계 포함"""
         total = len(results_df)
         successful = len(results_df[results_df['status'] == 'success'])
         price_extracted = len(results_df[
@@ -357,8 +324,32 @@ class DataManager:
         print(f"  매칭 성공: {successful}개 ({successful/total*100:.1f}%)")
         print(f"  가격 추출: {price_extracted}개 ({price_extracted/total*100:.1f}%)")
         
+        # 실패 유형별 통계
+        if 'failure_type' in results_df.columns and total > 0:
+            print(f"\n실패 유형별 통계:")
+            
+            # 시스템 오류
+            system_errors = results_df[results_df['failure_type'].apply(FailureType.is_system_error)]
+            if len(system_errors) > 0:
+                print(f"  시스템 오류 ({len(system_errors)}개, 재시도 대상):")
+                error_counts = system_errors['failure_type'].value_counts()
+                for error_type, count in error_counts.items():
+                    description = FailureType.get_description(error_type)
+                    print(f"    - {description}: {count}개")
+            
+            # 정당한 실패
+            legitimate_errors = results_df[~results_df['failure_type'].apply(FailureType.is_system_error)]
+            legitimate_errors = legitimate_errors[legitimate_errors['status'] != 'success']
+            if len(legitimate_errors) > 0:
+                print(f"  정당한 실패 ({len(legitimate_errors)}개, 재시도 불필요):")
+                legit_counts = legitimate_errors['failure_type'].value_counts()
+                for error_type, count in legit_counts.items():
+                    description = FailureType.get_description(error_type)
+                    print(f"    - {description}: {count}개")
+        
+        # 성공한 상품 샘플
         if successful > 0:
-            print(f"\n주요 결과:")
+            print(f"\n주요 성공 사례:")
             successful_df = results_df[results_df['status'] == 'success']
             
             for idx, (_, row) in enumerate(successful_df.head(5).iterrows()):

@@ -1,5 +1,5 @@
 """
-상품 매칭 로직 모듈
+상품 매칭 로직 모듈 - 실패 분류 시스템 지원
 """
 
 import re
@@ -188,7 +188,7 @@ class ProductMatcher:
         return ""
     
     def search_product_enhanced(self, korean_name, english_name):
-        """영어 상품명으로 검색 (한글명은 로깅용)"""
+        """영어 상품명으로 검색 (한글명은 로깅용) - 실패 분류 지원"""
         try:
             # 영어 이름 정리
             cleaned_english_name = re.sub(r'[^\w\s]', ' ', english_name)
@@ -202,7 +202,8 @@ class ProductMatcher:
             products = self.iherb_client.get_multiple_products(search_url)
             
             if not products:
-                return None, 0, None
+                # 검색 결과가 없을 때 no_results 정보 추가
+                return None, 0, {'no_results': True}
             
             best_product, similarity_score, match_details = self.find_best_matching_product(
                 korean_name, english_name, products
@@ -214,8 +215,8 @@ class ProductMatcher:
                 # 모든 후보가 탈락한 경우 첫 번째 상품도 반환하지 않음
                 if best_product:  # 탈락하지 않은 상품이 있다면
                     return best_product['url'], similarity_score, match_details
-                return None, 0, None
+                return None, 0, match_details or {'no_matching_products': True}
             
         except Exception as e:
             print(f"    검색 중 오류: {e}")
-            return None, 0, None
+            return None, 0, {'search_error': str(e)}
