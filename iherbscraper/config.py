@@ -53,12 +53,29 @@ class Config:
         "--page-load-strategy=eager"
     ]
     
-    # CSS 선택자
+    # CSS 선택자 - 언어 설정 개선
     SELECTORS = {
-        # 설정 관련
+        # 설정 관련 - HTML 분석 기반 업데이트
         'settings_button': '.selected-country-wrapper',
-        'english_option': '[data-val="en-US"]',  # English 옵션
-        'save_button': '.save-selection',
+        'language_dropdown': '.select-language .gh-form-control',
+        'current_language': '.select-language .dropdown-text',
+        'english_option': [
+            '.item.gh-dropdown-menu-item[data-val="en-US"]',
+            '.gh-dropdown-menu-item[data-val="en-US"]', 
+            '[data-val="en-US"]',
+            '.item[data-val="en-US"]'
+        ],
+        'english_option_xpath': [
+            '//div[contains(@class, "gh-dropdown-menu-item") and .//span[text()="English"]]',
+            '//div[contains(@class, "item") and .//span[text()="English"]]',
+            '//div[@data-val="en-US"]'
+        ],
+        'save_button': [
+            '.save-selection',
+            '.gh-btn.gh-btn-primary',
+            'button[class*="save"]',
+            '.ccl-btn button:last-child'
+        ],
         
         # 검색 결과
         'product_containers': '.product-cell-container',

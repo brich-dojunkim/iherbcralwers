@@ -19,81 +19,58 @@ class IHerbClient:
         self.driver = browser_manager.driver
     
     def set_language_to_english(self):
-        """아이허브 언어를 영어로 설정"""
-        try:
-            print("  아이허브 언어 설정을 영어로 변경 중...")
-            
-            # 1. 한국 아이허브 페이지 접속
-            if not self.browser.safe_get(Config.KOREA_URL):
-                print("  아이허브 접속 실패 - 기본 설정으로 진행")
-                return
-            
-            # 2. 설정 버튼 클릭 시도
+            """아이허브 언어를 수동으로 영어로 설정"""
             try:
-                # 설정 버튼 대기 및 클릭
-                settings_button = self.browser.wait_for_clickable(
-                    (By.CSS_SELECTOR, Config.SELECTORS['settings_button']), 10
-                )
-                if settings_button:
-                    settings_button.click()
-                    print("    설정 버튼 클릭 완료")
-                    
-                    # 모달 로딩 대기
-                    time.sleep(2)
-                    
-                    # 3. 언어 드롭다운에서 English 선택
-                    # 여러 가능한 English 선택자 시도
-                    english_selectors = [
-                        '[data-val="en-US"]',
-                        '.gh-dropdown-menu-item[data-val="en-US"]',
-                        '.item[data-val="en-US"]'
-                    ]
-                    
-                    english_option = None
-                    for selector in english_selectors:
-                        try:
-                            english_option = self.browser.wait_for_clickable((By.CSS_SELECTOR, selector), 5)
-                            if english_option:
-                                break
-                        except:
-                            continue
-                    
-                    if english_option:
-                        english_option.click()
-                        print("    영어 선택 완료")
-                        
-                        time.sleep(1)
-                        
-                        # 4. 저장하기 버튼 클릭
-                        save_button = self.browser.wait_for_clickable(
-                            (By.CSS_SELECTOR, Config.SELECTORS['save_button']), 10
-                        )
-                        if save_button:
-                            save_button.click()
-                            print("    설정 저장 완료")
-                            
-                            # 5. 설정 적용 대기
-                            time.sleep(5)
-                            
-                            # 6. 영어 사이트로 리다이렉트 확인
-                            current_url = self.browser.current_url
-                            if "iherb.com" in current_url:
-                                print("  아이허브 언어 설정: 영어로 변경 완료 ✓")
-                            else:
-                                print(f"  예상과 다른 URL: {current_url}")
-                        else:
-                            print("  저장 버튼을 찾을 수 없음")
+                print("  아이허브 언어 설정 (수동)...")
+                
+                # 1. 한국 아이허브 페이지 접속
+                if not self.browser.safe_get(Config.KOREA_URL):
+                    print("  한국 사이트 접속 실패 - 영어 사이트로 이동")
+                    if self.browser.safe_get(Config.BASE_URL):
+                        print("  영어 사이트 접속 완료 ✓")
+                        return
                     else:
-                        print("  영어 옵션을 찾을 수 없음")
+                        print("  영어 사이트 접속도 실패")
+                        return
+                
+                # 2. 현재 URL 확인
+                current_url = self.browser.current_url
+                if "kr.iherb.com" not in current_url:
+                    print("  이미 영어 사이트에 있음 ✓")
+                    return
+                
+                # 3. 수동 설정 안내
+                print("\n" + "="*60)
+                print("  수동으로 언어를 영어로 변경해주세요:")
+                print("  1. 브라우저에서 우상단 국가/언어 설정 버튼 클릭")
+                print("  2. 언어를 'English'로 선택")
+                print("  3. '저장하기' 버튼 클릭")
+                print("  4. 페이지가 영어로 변경되면 아래 Enter 키 입력")
+                print("="*60)
+                
+                # 4. 사용자 입력 대기
+                input("  언어 변경 완료 후 Enter 키를 눌러주세요...")
+                
+                # 5. 변경 확인
+                time.sleep(2)
+                final_url = self.browser.current_url
+                
+                if "kr.iherb.com" not in final_url:
+                    print("  아이허브 언어 설정: 영어로 변경 확인 ✓")
                 else:
-                    print("  설정 버튼을 찾을 수 없음 - 이미 영어일 수 있음")
+                    print("  아직 한국 사이트입니다. 영어 사이트로 직접 이동합니다.")
+                    if self.browser.safe_get(Config.BASE_URL):
+                        print("  영어 사이트 직접 접속 완료 ✓")
+                    else:
+                        print("  영어 사이트 접속 실패")
                     
             except Exception as e:
-                print(f"  설정 변경 중 오류: {e}")
-                
-        except Exception as e:
-            print(f"  언어 설정 실패: {e}")
-            print("  기본 설정으로 진행...")
+                print(f"  언어 설정 중 오류: {e}")
+                print("  영어 사이트로 직접 이동합니다.")
+                if self.browser.safe_get(Config.BASE_URL):
+                    print("  영어 사이트 직접 접속 완료 ✓")
+                else:
+                    print("  영어 사이트 접속 실패")
     
     def get_multiple_products(self, search_url):
         """검색 결과에서 여러 상품 정보 추출"""

@@ -2,6 +2,7 @@
 영어 번역 기반 iHerb 스크래퍼 - 메인 실행 파일
 """
 
+import os
 import pandas as pd
 from browser_manager import BrowserManager
 from iherb_client import IHerbClient
@@ -243,14 +244,23 @@ if __name__ == "__main__":
             max_products_to_compare=4
         )
         
-        input_csv = "coupang_products_translated.csv"
-        output_csv = "iherb_english_results_modular.csv"
+        # 절대경로로 coupang 폴더 사용
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(current_dir)
+        coupang_dir = os.path.join(project_root, "coupang")
+        
+        input_csv = os.path.join(coupang_dir, "coupang_products_translated.csv")
+        output_csv = os.path.join(coupang_dir, "iherb_english_results_modular.csv")
+        
+        print(f"입력 파일: {input_csv}")
+        print(f"출력 파일: {output_csv}")
+        print()
         
         # start_from을 None으로 설정하면 자동으로 감지
         results = scraper.process_products_complete(
             csv_file_path=input_csv,
             output_file_path=output_csv,
-            limit=20,  # 테스트용으로 20개로 감소
+            limit=5,  # 테스트용으로 5개로 설정
             start_from=None  # None이면 자동 감지, 숫자 입력시 해당 지점부터 시작
         )
         
