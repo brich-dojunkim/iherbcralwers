@@ -29,7 +29,7 @@ class EnglishIHerbScraper:
         self.iherb_client.set_language_to_english()
     
     def process_products_complete(self, csv_file_path, output_file_path, limit=None, start_from=None):
-        """완전한 상품 처리 - 영어 번역명 기반"""
+        """완전한 상품 처리 - 영어 번역명 기반 + 실패 상품 자동 재시도"""
         try:
             # 1. CSV 검증 및 로딩
             df = self.data_manager.validate_input_csv(csv_file_path)
@@ -37,30 +37,55 @@ class EnglishIHerbScraper:
             if limit:
                 df = df.head(limit)
             
-            # 2. 시작점 자동 감지
+            # 2. 시작점 자동 감지 및 실패 상품 목록 수집
             if start_from is None:
-                start_from = self.data_manager.auto_detect_start_point(csv_file_path, output_file_path)
+                start_from, failed_indices = self.data_manager.auto_detect_start_point(csv_file_path, output_file_path)
+            else:
+                failed_indices = []
             
-            # 3. 데이터 프레임 슬라이싱
+            # 3. 처리할 상품 목록 생성
+            process_list = []
+            
+            # 실패한 상품들 먼저 추가 (재시도)
+            if failed_indices:
+                for idx in failed_indices:
+                    if idx < len(df):
+                        process_list.append((idx, "재시도"))
+            
+            # 새로 처리할 상품들 추가
             original_df_length = len(df)
-            if start_from > 0:
-                df = df.iloc[start_from:].reset_index(drop=True)
-                if start_from >= original_df_length:
-                    print("  모든 상품이 이미 처리되었습니다!")
-                    return output_file_path
-                print(f"  {start_from+1}번째 상품부터 재시작")
+            if start_from < original_df_length:
+                for idx in range(start_from, original_df_length):
+                    process_list.append((idx, "신규"))
+            
+            if not process_list:
+                print("  처리할 상품이 없습니다!")
+                return output_file_path
             
             print("영어 번역 기반 iHerb 가격 비교 스크래퍼 시작")
-            print(f"  총 처리 상품: {len(df)}개 (전체: {original_df_length}개)")
+            print(f"  총 처리 상품: {len(process_list)}개")
             
-            # 4. CSV 헤더 초기화 (새로 시작하는 경우만)
-            if start_from == 0:
+            retry_count = len([x for x in process_list if x[1] == "재시도"])
+            new_count = len([x for x in process_list if x[1] == "신규"])
+            
+            if retry_count > 0:
+                print(f"  - 재시도 상품: {retry_count}개")
+            if new_count > 0:
+                print(f"  - 신규 상품: {new_count}개")
+            
+            # 4. CSV 헤더 초기화 (완전히 새로 시작하는 경우만)
+            if start_from == 0 and not failed_indices:
                 self.data_manager.initialize_output_csv(output_file_path)
             
             # 5. 메인 처리 루프
-            for idx, (index, row) in enumerate(df.iterrows()):
-                actual_idx = idx + start_from
-                self._process_single_product(row, actual_idx, original_df_length, output_file_path)
+            for process_idx, (actual_idx, process_type) in enumerate(process_list):
+                row = df.iloc[actual_idx]
+                
+                print(f"\n[{process_idx+1}/{len(process_list)}] [{actual_idx}] {row['product_name']}")
+                if process_type == "재시도":
+                    print(f"  🔄 실패 상품 재시도")
+                
+                self._process_single_product(row, actual_idx, len(process_list), output_file_path, process_idx)
             
             # 6. 최종 요약
             try:
@@ -81,16 +106,15 @@ class EnglishIHerbScraper:
             print(f"현재까지 결과는 {output_file_path}에 저장되어 있습니다.")
             return output_file_path
     
-    def _process_single_product(self, row, actual_idx, total_count, output_file_path):
+    def _process_single_product(self, row, actual_idx, total_count, output_file_path, process_idx):
         """단일 상품 처리"""
         korean_name = row['product_name']
         english_name = row['product_name_english']
         
-        print(f"\n[{actual_idx+1}/{total_count}] {korean_name}")
         print(f"  영어명: {english_name}")
         
         # 브라우저 재시작 체크
-        if actual_idx > 0 and actual_idx % Config.BROWSER_RESTART_INTERVAL == 0:
+        if process_idx > 0 and process_idx % Config.BROWSER_RESTART_INTERVAL == 0:
             self._restart_browser_if_needed()
         
         # 쿠팡 가격 정보 표시
@@ -114,7 +138,7 @@ class EnglishIHerbScraper:
                             coupang_price_info, iherb_price_info, matching_reason)
         
         # 진행률 표시
-        self._display_progress(actual_idx, total_count, output_file_path)
+        self._display_progress(process_idx, total_count, output_file_path)
         
         # 딜레이
         self.browser_manager.random_delay()
@@ -273,10 +297,10 @@ class EnglishIHerbScraper:
             print(f"  ❌ 매칭된 상품 없음")
             print(f"     매칭 사유: {matching_reason}")
     
-    def _display_progress(self, actual_idx, total_count, output_file_path):
+    def _display_progress(self, process_idx, total_count, output_file_path):
         """진행률 표시"""
-        print(f"  📊 진행률: {actual_idx+1}/{total_count} ({(actual_idx+1)/total_count*100:.1f}%)")
-        print(f"     성공률: {self.success_count}/{actual_idx+1} ({self.success_count/(actual_idx+1)*100:.1f}%)")
+        print(f"  📊 진행률: {process_idx+1}/{total_count} ({(process_idx+1)/total_count*100:.1f}%)")
+        print(f"     성공률: {self.success_count}/{process_idx+1} ({self.success_count/(process_idx+1)*100:.1f}%)")
         print(f"     결과 저장: {output_file_path} (실시간 누적)")
     
     def close(self):
@@ -307,12 +331,12 @@ if __name__ == "__main__":
         input_csv = "/Users/brich/Desktop/iherb_price/coupang/coupang_products_translated.csv"
         output_csv = "/Users/brich/Desktop/iherb_price/coupang/iherb_english_results_modular.csv"
         
-        # start_from을 None으로 설정하면 자동으로 감지
+        # 간단한 처리 (실패 상품 자동 재시도 포함)
         results = scraper.process_products_complete(
             csv_file_path=input_csv,
             output_file_path=output_csv,
-            limit=None,  # 테스트용으로 5개로 제한
-            start_from=None  # None이면 자동 감지, 숫자 입력시 해당 지점부터 시작
+            limit=None,  # 전체 처리
+            start_from=None  # 자동 감지
         )
         
         if results is not None:
@@ -323,6 +347,7 @@ if __name__ == "__main__":
             print("- 각 모듈별 단위 테스트 가능")
             print("- 재사용 가능한 컴포넌트 구조")
             print("- 깔끔한 코드 구조와 명확한 책임 분담")
+            print("- 실패한 상품 자동 재시도 기능")
     
     except KeyboardInterrupt:
         print("\n중단됨")

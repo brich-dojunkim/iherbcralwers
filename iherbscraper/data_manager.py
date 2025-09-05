@@ -15,55 +15,53 @@ class DataManager:
         pass
     
     def auto_detect_start_point(self, input_csv_path, output_csv_path):
-        """기존 결과를 분석해서 시작점 자동 감지"""
+        """기존 결과를 분석해서 시작점 자동 감지 (성공한 상품 개수 기준)"""
         try:
             if not os.path.exists(output_csv_path):
                 print("  결과 파일 없음 - 처음부터 시작")
-                return 0
+                return 0, []
             
             # 기존 결과 파일 읽기
             existing_df = pd.read_csv(output_csv_path)
             
             if len(existing_df) == 0:
                 print("  빈 결과 파일 - 처음부터 시작")
-                return 0
+                return 0, []
             
-            # 원본 CSV와 비교해서 시작점 찾기
+            # 원본 CSV 읽기
             input_df = pd.read_csv(input_csv_path)
+            total_products = len(input_df)
             
-            # actual_index 컬럼이 있으면 그것을 사용
-            if 'actual_index' in existing_df.columns:
-                last_processed_index = existing_df['actual_index'].max()
-                start_from = last_processed_index + 1
+            # 성공한 상품 개수만 카운트해서 시작점 결정
+            if 'status' in existing_df.columns:
+                successful_count = len(existing_df[existing_df['status'] == 'success'])
+                failed_indices = []
                 
-                print(f"  마지막 처리: {last_processed_index}번째 상품")
-                print(f"  자동 시작점: {start_from}번째 상품부터")
+                # 실패한 상품들의 인덱스 수집 (재시도용)
+                if 'actual_index' in existing_df.columns:
+                    failed_mask = existing_df['status'] != 'success'
+                    failed_indices = existing_df[failed_mask]['actual_index'].tolist()
                 
-                # 전체 대비 진행률 표시
-                total_count = len(input_df)
-                progress = (last_processed_index + 1) / total_count * 100
-                print(f"  진행률: {last_processed_index + 1}/{total_count} ({progress:.1f}%)")
+                print(f"  성공한 상품: {successful_count}개")
+                print(f"  실패한 상품: {len(failed_indices)}개 (재시도 예정)")
+                print(f"  시작점: {successful_count}번째 상품부터 (성공 기준)")
                 
-                return start_from
+                return successful_count, failed_indices
             
-            # actual_index가 없으면 상품명으로 매칭해서 찾기
+            # 기존 방식 (호환성)
             else:
                 processed_products = set(existing_df['coupang_product_name'].tolist())
+                processed_count = len(processed_products)
                 
-                for idx, row in input_df.iterrows():
-                    if row['product_name'] not in processed_products:
-                        print(f"  마지막 처리: {idx-1}번째 상품")
-                        print(f"  자동 시작점: {idx}번째 상품부터")
-                        return idx
+                print(f"  처리된 상품: {processed_count}개")
+                print(f"  시작점: {processed_count}번째 상품부터")
                 
-                # 모든 상품이 처리되었다면
-                print("  모든 상품 처리 완료")
-                return len(input_df)
+                return processed_count, []
         
         except Exception as e:
             print(f"  시작점 자동 감지 실패: {e}")
             print("  안전을 위해 처음부터 시작")
-            return 0
+            return 0, []
     
     def validate_input_csv(self, csv_file_path):
         """입력 CSV 파일 검증"""
@@ -226,19 +224,19 @@ class DataManager:
         price_comparison = self.calculate_price_comparison(coupang_price_info, iherb_price_info)
         
         return {
-            # 1. 기본 식별 정보
-            'coupang_product_id': row['product_id'],
-            'coupang_product_name': row['product_name'],
-            'coupang_product_name_english': english_name,
+            # 1. 기본 식별 정보 (순서 변경됨)
             'iherb_product_name': iherb_product_name,
-            'iherb_product_code': product_code,
-            'status': 'success' if product_code else ('not_found' if not product_url else 'code_not_found'),
+            'coupang_product_name_english': english_name,
+            'coupang_product_name': row['product_name'],
             'similarity_score': round(similarity_score, 3) if similarity_score else 0,
             'matching_reason': matching_reason or '매칭 정보 없음',
-            
-            # 2. URL 정보  
             'coupang_url': coupang_price_info.get('url', ''),
             'iherb_product_url': product_url,
+            'coupang_product_id': row['product_id'],
+            'iherb_product_code': product_code,
+            
+            # 2. 상태 정보
+            'status': 'success' if product_code else ('not_found' if not product_url else 'code_not_found'),
             
             # 3. 쿠팡 가격 정보 (KRW)
             'coupang_current_price_krw': coupang_price_info.get('current_price', ''),
@@ -252,7 +250,7 @@ class DataManager:
             'iherb_subscription_discount': iherb_price_info.get('subscription_discount', ''),
             'iherb_price_per_unit': iherb_price_info.get('price_per_unit', ''),
             
-            # 5. 가격 비교 (새로 추가된 컬럼들)
+            # 5. 가격 비교
             'price_difference_krw': price_comparison['price_difference_krw'],
             'cheaper_platform': price_comparison['cheaper_platform'],
             'savings_amount': price_comparison['savings_amount'],
