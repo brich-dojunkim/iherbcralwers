@@ -154,7 +154,7 @@ class DataManager:
     def create_result_record(self, row, actual_idx, english_name, product_url, 
                            similarity_score, product_code, iherb_product_name, 
                            coupang_price_info, iherb_price_info):
-        """결과 레코드 생성"""
+        """결과 레코드 생성 (원화 기준)"""
         return {
             # 1. 기본 식별 정보
             'coupang_product_id': row['product_id'],
@@ -174,15 +174,15 @@ class DataManager:
             'coupang_original_price_krw': coupang_price_info.get('original_price', ''),
             'coupang_discount_rate': coupang_price_info.get('discount_rate', ''),
             
-            # 4. 아이허브 가격 정보 (USD)
-            'iherb_list_price_usd': iherb_price_info.get('list_price', ''),
-            'iherb_discount_price_usd': iherb_price_info.get('discount_price', ''),
+            # 4. 아이허브 가격 정보 (KRW로 변경)
+            'iherb_list_price_krw': iherb_price_info.get('list_price', ''),  # 원화
+            'iherb_discount_price_krw': iherb_price_info.get('discount_price', ''),  # 원화
             'iherb_discount_percent': iherb_price_info.get('discount_percent', ''),
             'iherb_subscription_discount': iherb_price_info.get('subscription_discount', ''),
             'iherb_price_per_unit': iherb_price_info.get('price_per_unit', ''),
             
-            # 5. 가격 비교 (환율 적용 필요)
-            'price_difference_note': 'USD-KRW 환율 적용 필요',
+            # 5. 가격 비교 (동일 통화)
+            'price_difference_note': '원화 기준 직접 비교 가능',
             
             # 6. 메타데이터
             'processed_at': datetime.now().isoformat(),
@@ -195,8 +195,8 @@ class DataManager:
         total = len(results_df)
         successful = len(results_df[results_df['status'] == 'success'])
         price_extracted = len(results_df[
-            (results_df['iherb_discount_price_usd'] != '') | 
-            (results_df['iherb_list_price_usd'] != '')
+            (results_df['iherb_discount_price_krw'] != '') | 
+            (results_df['iherb_list_price_krw'] != '')
         ])
         
         print(f"\n처리 완료")
@@ -213,21 +213,21 @@ class DataManager:
                 english_name = row.get('coupang_product_name_english', '')[:30] + "..."
                 
                 coupang_price = row.get('coupang_current_price_krw', '')
-                iherb_price = row.get('iherb_discount_price_usd', '')
+                iherb_price = row.get('iherb_discount_price_krw', '')
                 
                 print(f"  {idx+1}. {korean_name}")
                 print(f"     영어: {english_name}")
                 
                 if coupang_price and iherb_price:
                     try:
-                        print(f"     가격: {int(coupang_price):,}원 vs ${float(iherb_price):.2f}")
+                        print(f"     가격: {int(coupang_price):,}원 vs {int(iherb_price):,}원")
                     except:
-                        print(f"     가격: {coupang_price}원 vs ${iherb_price}")
+                        print(f"     가격: {coupang_price}원 vs {iherb_price}원")
                 
                 print()
     
     def format_price_comparison(self, coupang_price_info, iherb_price_info):
-        """가격 비교 문자열 포맷팅"""
+        """가격 비교 문자열 포맷팅 (원화 기준)"""
         coupang_price_str = ""
         if coupang_price_info.get('current_price'):
             coupang_price_str = f"{int(coupang_price_info['current_price']):,}원"
@@ -236,12 +236,12 @@ class DataManager:
         
         iherb_price_str = ""
         if iherb_price_info.get('discount_price'):
-            iherb_price_str = f"${iherb_price_info['discount_price']}"
+            iherb_price_str = f"{int(iherb_price_info['discount_price']):,}원"
             if iherb_price_info.get('discount_percent'):
                 iherb_price_str += f" ({iherb_price_info['discount_percent']}% 할인)"
             if iherb_price_info.get('subscription_discount'):
                 iherb_price_str += f" + 정기배송 {iherb_price_info['subscription_discount']}% 추가할인"
         elif iherb_price_info.get('list_price'):
-            iherb_price_str = f"${iherb_price_info['list_price']} (정가)"
+            iherb_price_str = f"{int(iherb_price_info['list_price']):,}원 (정가)"
         
         return coupang_price_str, iherb_price_str
