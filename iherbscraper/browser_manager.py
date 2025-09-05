@@ -1,0 +1,204 @@
+"""
+브라우저 관리 모듈
+"""
+
+import time
+import random
+import undetected_chromedriver as uc
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException, WebDriverException
+from config import Config
+
+
+class BrowserManager:
+    """브라우저 초기화, 관리, 안전한 페이지 로딩 담당"""
+    
+    def __init__(self, headless=False, delay_range=None):
+        self.headless = headless
+        self.delay_range = delay_range or Config.DEFAULT_DELAY_RANGE
+        self.driver = None
+        
+        self._initialize_browser()
+    
+    def _initialize_browser(self):
+        """브라우저 초기화"""
+        try:
+            print("  브라우저 초기화 중...")
+            options = uc.ChromeOptions()
+            
+            if self.headless:
+                options.add_argument("--headless=new")
+            
+            # 설정에서 옵션 추가
+            for option in Config.CHROME_OPTIONS:
+                options.add_argument(option)
+            
+            self.driver = uc.Chrome(options=options, version_main=None)
+            
+            # 타임아웃 설정
+            self.driver.set_page_load_timeout(Config.PAGE_LOAD_TIMEOUT)
+            self.driver.implicitly_wait(Config.IMPLICIT_WAIT)
+            
+            # WebDriver 감지 방지
+            self.driver.execute_script("""
+                Object.defineProperty(navigator, 'webdriver', {
+                    get: () => undefined
+                });
+            """)
+            
+            print("  브라우저 초기화 완료 ✓")
+            
+        except Exception as e:
+            print(f"  브라우저 초기화 실패: {e}")
+            raise
+    
+    def safe_get(self, url, max_retries=None):
+        """안전한 페이지 로딩"""
+        max_retries = max_retries or Config.MAX_RETRIES
+        
+        for attempt in range(max_retries):
+            try:
+                if attempt > 0:
+                    print(f"    페이지 로딩 재시도 {attempt + 1}/{max_retries}")
+                
+                # 페이지 로딩
+                self.driver.get(url)
+                
+                # JavaScript 실행이 완료될 때까지 대기
+                WebDriverWait(self.driver, 15).until(
+                    lambda driver: driver.execute_script("return document.readyState") == "complete"
+                )
+                
+                # 추가 대기 시간
+                time.sleep(random.uniform(2, 4))
+                
+                # 페이지가 제대로 로딩되었는지 확인
+                if "iherb.com" in self.driver.current_url:
+                    if attempt > 0:
+                        print(f"    페이지 로딩 성공 ✓")
+                    return True
+                else:
+                    print(f"    페이지 URL 이상: {self.driver.current_url}")
+                    continue
+                    
+            except TimeoutException:
+                print(f"    타임아웃 발생 (시도 {attempt + 1})")
+                if attempt < max_retries - 1:
+                    time.sleep(5)
+                    continue
+                else:
+                    return False
+                    
+            except WebDriverException as e:
+                print(f"    WebDriver 오류: {str(e)[:100]}...")
+                if attempt < max_retries - 1:
+                    time.sleep(5)
+                    # 심각한 오류의 경우 브라우저 재시작
+                    if self._is_critical_error(str(e)):
+                        try:
+                            self.restart_with_cleanup()
+                        except:
+                            return False
+                    continue
+                else:
+                    return False
+                    
+            except Exception as e:
+                print(f"    기타 오류: {str(e)[:100]}...")
+                if attempt < max_retries - 1:
+                    time.sleep(5)
+                    continue
+                else:
+                    return False
+        
+        return False
+    
+    def _is_critical_error(self, error_message):
+        """심각한 오류 여부 판단"""
+        critical_keywords = [
+            'chrome not reachable',
+            'session deleted',
+            'connection refused',
+            'disconnected'
+        ]
+        
+        return any(keyword in error_message.lower() for keyword in critical_keywords)
+    
+    def restart_with_cleanup(self):
+        """브라우저 재시작 + 완전한 정리"""
+        try:
+            print("  브라우저 완전 재시작 중...")
+            
+            # 1. 기존 브라우저 종료
+            if self.driver:
+                try:
+                    # 모든 쿠키 및 캐시 삭제
+                    self.driver.delete_all_cookies()
+                    self.driver.execute_script("window.localStorage.clear();")
+                    self.driver.execute_script("window.sessionStorage.clear();")
+                    
+                    # 브라우저 종료
+                    self.driver.quit()
+                except:
+                    pass
+            
+            # 2. 메모리 정리를 위한 대기
+            time.sleep(5)
+            
+            # 3. 새 브라우저 시작
+            self._initialize_browser()
+            
+            # 4. 안정화 대기
+            time.sleep(3)
+            
+            print("  브라우저 완전 재시작 완료 ✓")
+            print("    - 쿠키/캐시 정리 완료")
+            print("    - 메모리 정리 완료") 
+            print("    - 새 세션 시작")
+            
+        except Exception as e:
+            print(f"  브라우저 재시작 실패: {e}")
+            raise
+    
+    def random_delay(self):
+        """랜덤 딜레이"""
+        delay = random.uniform(self.delay_range[0], self.delay_range[1])
+        time.sleep(delay)
+    
+    def wait_for_element(self, selector, timeout=10):
+        """요소 대기"""
+        try:
+            return WebDriverWait(self.driver, timeout).until(
+                EC.presence_of_element_located(selector)
+            )
+        except TimeoutException:
+            return None
+    
+    def wait_for_clickable(self, selector, timeout=10):
+        """클릭 가능한 요소 대기"""
+        try:
+            return WebDriverWait(self.driver, timeout).until(
+                EC.element_to_be_clickable(selector)
+            )
+        except TimeoutException:
+            return None
+    
+    def close(self):
+        """브라우저 종료"""
+        try:
+            if self.driver:
+                self.driver.quit()
+                print("  브라우저 종료 ✓")
+        except:
+            pass
+    
+    @property
+    def current_url(self):
+        """현재 URL"""
+        return self.driver.current_url if self.driver else None
+    
+    @property
+    def page_source(self):
+        """페이지 소스"""
+        return self.driver.page_source if self.driver else None
