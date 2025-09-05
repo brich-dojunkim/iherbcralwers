@@ -2,7 +2,6 @@
 영어 번역 기반 iHerb 스크래퍼 - 메인 실행 파일
 """
 
-import os
 import pandas as pd
 from browser_manager import BrowserManager
 from iherb_client import IHerbClient
@@ -87,8 +86,8 @@ class EnglishIHerbScraper:
         korean_name = row['product_name']
         english_name = row['product_name_english']
         
-        print(f"\n[{actual_idx+1}/{total_count}] {korean_name[:40]}...")
-        print(f"  영어명: {english_name[:50]}...")
+        print(f"\n[{actual_idx+1}/{total_count}] {korean_name}")
+        print(f"  영어명: {english_name}")
         
         # 브라우저 재시작 체크
         if actual_idx > 0 and actual_idx % Config.BROWSER_RESTART_INTERVAL == 0:
@@ -98,20 +97,21 @@ class EnglishIHerbScraper:
         coupang_price_info = self.data_manager.extract_coupang_price_info(row)
         self._display_coupang_price(coupang_price_info)
         
-        # 아이허브 검색 및 정보 추출
-        product_url, product_code, iherb_product_name, iherb_price_info, similarity_score = \
+        # 아이허브 검색 및 정보 추출 (6개 값 반환)
+        product_url, product_code, iherb_product_name, iherb_price_info, similarity_score, matching_reason = \
             self._search_and_extract_iherb_info(korean_name, english_name)
         
         # 결과 생성 및 저장
         result = self.data_manager.create_result_record(
             row, actual_idx, english_name, product_url, similarity_score,
-            product_code, iherb_product_name, coupang_price_info, iherb_price_info
+            product_code, iherb_product_name, coupang_price_info, iherb_price_info, matching_reason
         )
         
         self.data_manager.append_result_to_csv(result, output_file_path)
         
         # 결과 출력
-        self._display_results(product_code, similarity_score, coupang_price_info, iherb_price_info)
+        self._display_results(product_code, iherb_product_name, similarity_score, 
+                            coupang_price_info, iherb_price_info, matching_reason)
         
         # 진행률 표시
         self._display_progress(actual_idx, total_count, output_file_path)
@@ -141,12 +141,13 @@ class EnglishIHerbScraper:
         print(f"  쿠팡 가격: {' '.join(coupang_summary) if coupang_summary else '정보 없음'}")
     
     def _search_and_extract_iherb_info(self, korean_name, english_name):
-        """아이허브 검색 및 정보 추출 (재시도 로직 포함)"""
+        """아이허브 검색 및 정보 추출 (재시도 로직 포함) - 6개 값 반환"""
         product_url = None
         similarity_score = 0
         product_code = None
         iherb_product_name = None
         iherb_price_info = {}
+        matching_reason = "매칭 시도되지 않음"
         
         for retry in range(Config.MAX_RETRIES):
             try:
@@ -160,6 +161,29 @@ class EnglishIHerbScraper:
                     korean_name, english_name
                 )
                 
+                # 매칭 사유 추출
+                if match_details and isinstance(match_details, dict):
+                    if match_details.get('rejected', False):
+                        if match_details['reason'] == 'count_mismatch':
+                            matching_reason = "개수 불일치로 탈락"
+                        elif match_details['reason'] == 'dosage_mismatch':
+                            matching_reason = "용량(mg) 불일치로 탈락"
+                    elif similarity_score >= Config.MATCHING_THRESHOLDS['success_threshold']:
+                        if match_details.get('exact_count_match') and match_details.get('dosage_match'):
+                            matching_reason = "개수/용량 정확 매칭"
+                        elif match_details.get('exact_count_match'):
+                            matching_reason = "개수 정확 매칭"
+                        elif match_details.get('dosage_match'):
+                            matching_reason = "용량 정확 매칭"
+                        else:
+                            eng_sim = match_details.get('english_similarity', 0)
+                            matching_reason = f"높은 유사도 (영어:{eng_sim:.2f})"
+                    else:
+                        eng_sim = match_details.get('english_similarity', 0)
+                        matching_reason = f"낮은 유사도 (영어:{eng_sim:.2f})"
+                else:
+                    matching_reason = "매칭 상세 정보 없음"
+                
                 if product_url:
                     # 상품 정보 추출
                     product_code, iherb_product_name, iherb_price_info = \
@@ -170,10 +194,12 @@ class EnglishIHerbScraper:
                     break  # 성공하면 재시도 루프 종료
                 else:
                     print("  매칭된 상품 없음")
+                    matching_reason = "검색 결과 없음"
                     break  # 검색 결과가 없으면 재시도할 필요 없음
                     
             except Exception as e:
                 print(f"  처리 중 오류 (시도 {retry + 1}): {str(e)[:100]}...")
+                matching_reason = f"처리 오류: {str(e)[:50]}"
                 if retry == Config.MAX_RETRIES - 1:
                     print("  최대 재시도 횟수 초과 - 건너뜀")
                 else:
@@ -187,37 +213,71 @@ class EnglishIHerbScraper:
                             print("  브라우저 재시작 실패")
                             break
         
-        return product_url, product_code, iherb_product_name, iherb_price_info, similarity_score
+        return product_url, product_code, iherb_product_name, iherb_price_info, similarity_score, matching_reason
     
-    def _display_results(self, product_code, similarity_score, coupang_price_info, iherb_price_info):
-        """결과 출력"""
+    def _display_results(self, product_code, iherb_product_name, similarity_score, 
+                        coupang_price_info, iherb_price_info, matching_reason):
+        """결과 출력 (개선된 버전)"""
         print()
         if product_code:
-            print(f"  결과: 매칭 성공 ✓")
-            print(f"    상품코드: {product_code}")
-            print(f"    유사도: {similarity_score:.3f}")
+            print(f"  ✅ 매칭 성공!")
+            print(f"     상품코드: {product_code}")
+            print(f"     아이허브명: {iherb_product_name}")
+            print(f"     유사도: {similarity_score:.3f}")
+            print(f"     매칭 사유: {matching_reason}")
             
-            # 가격 비교 (USD vs KRW)
-            coupang_price_str, iherb_price_str = self.data_manager.format_price_comparison(
-                coupang_price_info, iherb_price_info
-            )
+            # 가격 비교 상세 정보
+            print(f"  💰 가격 정보:")
             
-            if coupang_price_str and iherb_price_str:
-                print(f"    쿠팡   : {coupang_price_str}")
-                print(f"    아이허브: {iherb_price_str}")
-                print(f"    주의   : 환율 적용하여 비교 필요")
+            # 쿠팡 가격
+            if coupang_price_info.get('current_price'):
+                coupang_price = int(coupang_price_info['current_price'])
+                coupang_discount = coupang_price_info.get('discount_rate', '')
+                discount_str = f" ({coupang_discount}% 할인)" if coupang_discount else ""
+                print(f"     쿠팡   : {coupang_price:,}원{discount_str}")
             
+            # 아이허브 가격
+            if iherb_price_info.get('discount_price'):
+                iherb_discount_price = int(iherb_price_info['discount_price'])
+                iherb_discount_percent = iherb_price_info.get('discount_percent', '')
+                subscription_discount = iherb_price_info.get('subscription_discount', '')
+                
+                discount_str = f" ({iherb_discount_percent}% 할인)" if iherb_discount_percent else ""
+                subscription_str = f" + 정기배송 {subscription_discount}% 추가할인" if subscription_discount else ""
+                
+                print(f"     아이허브: {iherb_discount_price:,}원{discount_str}{subscription_str}")
+                
+                # 가격 차이 계산
+                if coupang_price_info.get('current_price'):
+                    coupang_price = int(coupang_price_info['current_price'])
+                    price_diff = coupang_price - iherb_discount_price
+                    if price_diff > 0:
+                        print(f"     💡 아이허브가 {price_diff:,}원 더 저렴!")
+                    elif price_diff < 0:
+                        print(f"     💡 쿠팡이 {abs(price_diff):,}원 더 저렴!")
+                    else:
+                        print(f"     💡 가격 동일!")
+                        
+            elif iherb_price_info.get('list_price'):
+                iherb_list_price = int(iherb_price_info['list_price'])
+                print(f"     아이허브: {iherb_list_price:,}원 (정가)")
+            else:
+                print(f"     아이허브: 가격 정보 없음")
+                
         elif similarity_score > 0:
-            print(f"  결과: 상품은 찾았으나 상품코드 추출 실패 ✗")
-            print(f"    유사도: {similarity_score:.3f}")
+            print(f"  ⚠️  상품은 찾았으나 상품코드 추출 실패")
+            print(f"     아이허브명: {iherb_product_name}")
+            print(f"     유사도: {similarity_score:.3f}")
+            print(f"     매칭 사유: {matching_reason}")
         else:
-            print(f"  결과: 매칭된 상품 없음 ✗")
+            print(f"  ❌ 매칭된 상품 없음")
+            print(f"     매칭 사유: {matching_reason}")
     
     def _display_progress(self, actual_idx, total_count, output_file_path):
         """진행률 표시"""
-        print(f"  진행률: {actual_idx+1}/{total_count} ({(actual_idx+1)/total_count*100:.1f}%)")
-        print(f"  성공률: {self.success_count}/{actual_idx+1} ({self.success_count/(actual_idx+1)*100:.1f}%)")
-        print(f"  결과 저장: {output_file_path} (실시간 누적)")
+        print(f"  📊 진행률: {actual_idx+1}/{total_count} ({(actual_idx+1)/total_count*100:.1f}%)")
+        print(f"     성공률: {self.success_count}/{actual_idx+1} ({self.success_count/(actual_idx+1)*100:.1f}%)")
+        print(f"     결과 저장: {output_file_path} (실시간 누적)")
     
     def close(self):
         """브라우저 종료"""
@@ -244,28 +304,19 @@ if __name__ == "__main__":
             max_products_to_compare=4
         )
         
-        # 절대경로로 coupang 폴더 사용
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        project_root = os.path.dirname(current_dir)
-        coupang_dir = os.path.join(project_root, "coupang")
-        
-        input_csv = os.path.join(coupang_dir, "coupang_products_translated.csv")
-        output_csv = os.path.join(coupang_dir, "iherb_english_results_modular.csv")
-        
-        print(f"입력 파일: {input_csv}")
-        print(f"출력 파일: {output_csv}")
-        print()
+        input_csv = "/Users/brich/Desktop/iherb_price/coupang/coupang_products_translated.csv"
+        output_csv = "/Users/brich/Desktop/iherb_price/coupang/iherb_english_results_modular.csv"
         
         # start_from을 None으로 설정하면 자동으로 감지
         results = scraper.process_products_complete(
             csv_file_path=input_csv,
             output_file_path=output_csv,
-            limit=5,  # 테스트용으로 5개로 설정
+            limit=None,  # 테스트용으로 5개로 제한
             start_from=None  # None이면 자동 감지, 숫자 입력시 해당 지점부터 시작
         )
         
         if results is not None:
-            print(f"\n최종 결과: {results} ✓")
+            print(f"\n최종 결과: {results}")
             print("\n모듈화 완료 기능:")
             print("- 기능별 모듈 분리로 유지보수성 향상")
             print("- 설정 파일을 통한 중앙화된 관리")

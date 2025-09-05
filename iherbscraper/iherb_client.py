@@ -19,58 +19,46 @@ class IHerbClient:
         self.driver = browser_manager.driver
     
     def set_language_to_english(self):
-            """아이허브 언어를 수동으로 영어로 설정"""
-            try:
-                print("  아이허브 언어 설정 (수동)...")
-                
-                # 1. 한국 아이허브 페이지 접속
-                if not self.browser.safe_get(Config.KOREA_URL):
-                    print("  한국 사이트 접속 실패 - 영어 사이트로 이동")
-                    if self.browser.safe_get(Config.BASE_URL):
-                        print("  영어 사이트 접속 완료 ✓")
-                        return
-                    else:
-                        print("  영어 사이트 접속도 실패")
-                        return
-                
-                # 2. 현재 URL 확인
-                current_url = self.browser.current_url
-                if "kr.iherb.com" not in current_url:
-                    print("  이미 영어 사이트에 있음 ✓")
-                    return
-                
-                # 3. 수동 설정 안내
-                print("\n" + "="*60)
-                print("  수동으로 언어를 영어로 변경해주세요:")
-                print("  1. 브라우저에서 우상단 국가/언어 설정 버튼 클릭")
-                print("  2. 언어를 'English'로 선택")
-                print("  3. '저장하기' 버튼 클릭")
-                print("  4. 페이지가 영어로 변경되면 아래 Enter 키 입력")
-                print("="*60)
-                
-                # 4. 사용자 입력 대기
-                input("  언어 변경 완료 후 Enter 키를 눌러주세요...")
-                
-                # 5. 변경 확인
-                time.sleep(2)
-                final_url = self.browser.current_url
-                
-                if "kr.iherb.com" not in final_url:
-                    print("  아이허브 언어 설정: 영어로 변경 확인 ✓")
-                else:
-                    print("  아직 한국 사이트입니다. 영어 사이트로 직접 이동합니다.")
-                    if self.browser.safe_get(Config.BASE_URL):
-                        print("  영어 사이트 직접 접속 완료 ✓")
-                    else:
-                        print("  영어 사이트 접속 실패")
-                    
-            except Exception as e:
-                print(f"  언어 설정 중 오류: {e}")
-                print("  영어 사이트로 직접 이동합니다.")
-                if self.browser.safe_get(Config.BASE_URL):
+        """아이허브 언어를 영어로 설정"""
+        try:
+            print("  아이허브 언어 설정 (수동)...")
+            
+            # 1. 한국 아이허브 페이지 접속
+            if not self.browser.safe_get(Config.KOREA_URL):
+                print("  아이허브 접속 실패 - 기본 설정으로 진행")
+                return
+            
+            # 2. 현재 URL 확인 - 이미 영어 사이트인지 체크
+            current_url = self.browser.current_url
+            if "iherb.com" in current_url and "kr.iherb.com" not in current_url:
+                print("  이미 영어 사이트입니다 ✓")
+                return
+            
+            # 3. 수동 설정 안내
+            print("\n" + "="*60)
+            print("  수동으로 언어를 영어로 변경해주세요:")
+            print("  1. 브라우저에서 우상단 국가/언어 설정 버튼 클릭")
+            print("  2. 언어를 'English'로 선택")
+            print("  3. '저장하기' 버튼 클릭")
+            print("  4. 페이지가 영어로 변경되면 아래 Enter 키 입력")
+            print("="*60)
+            
+            input("  언어 변경 완료 후 Enter 키를 눌러주세요...")
+            
+            # 4. 변경 확인
+            current_url = self.browser.current_url
+            if "kr.iherb.com" in current_url:
+                print("  아직 한국 사이트입니다. 영어 사이트로 직접 이동합니다.")
+                if self.browser.safe_get("https://www.iherb.com"):
                     print("  영어 사이트 직접 접속 완료 ✓")
                 else:
                     print("  영어 사이트 접속 실패")
+            else:
+                print("  언어 변경 완료 ✓")
+                
+        except Exception as e:
+            print(f"  언어 설정 실패: {e}")
+            print("  기본 설정으로 진행...")
     
     def get_multiple_products(self, search_url):
         """검색 결과에서 여러 상품 정보 추출"""
@@ -168,81 +156,121 @@ class IHerbClient:
         return None
     
     def extract_price_info(self):
-        """아이허브 가격 정보 추출 (영어 사이트 기준)"""
+        """아이허브 가격 정보 추출 (한국 사이트 기준, 원화 표시)"""
         try:
             price_info = {}
             extracted_items = []
             
-            # 정가 추출
-            for selector in Config.SELECTORS['list_price']:
-                try:
-                    element = self.driver.find_element(By.CSS_SELECTOR, selector)
-                    price_text = element.text.strip()
-                    if price_text and '$' in price_text:
-                        price_clean = re.sub(r'[^\d.]', '', price_text)
-                        if price_clean:
-                            price_info['list_price'] = price_clean
-                            extracted_items.append('정가')
-                            break
-                except:
-                    continue
+            # 1. 구독 옵션의 할인가 추출 (우선순위 높음)
+            subscription_selectors = [
+                '.strike-through-price-wrapper.show .discount-price',
+                '.discount-price-wrapper .discount-price',
+                'b.discount-price[style*="color: rgb(211, 47, 47)"]',
+                '.auto-ship-first .discount-price'
+            ]
             
-            # 할인가 추출
-            for selector in Config.SELECTORS['discount_price']:
+            for selector in subscription_selectors:
                 try:
                     element = self.driver.find_element(By.CSS_SELECTOR, selector)
                     price_text = element.text.strip()
-                    if price_text and '$' in price_text:
-                        price_clean = re.sub(r'[^\d.]', '', price_text)
-                        if price_clean:
+                    if price_text and '₩' in price_text:
+                        # ₩25,048 -> 25048
+                        price_clean = re.sub(r'[^\d]', '', price_text)
+                        if price_clean and len(price_clean) >= 4:
                             price_info['discount_price'] = price_clean
-                            extracted_items.append('할인가')
+                            extracted_items.append('할인가(구독)')
                             break
                 except:
                     continue
             
-            # 할인율 추출
-            try:
-                element = self.driver.find_element(By.CSS_SELECTOR, Config.SELECTORS['discount_percent'])
-                percent_text = element.text.strip()
-                if percent_text and '%' in percent_text:
-                    percent_match = re.search(Config.PATTERNS['discount_percent'], percent_text)
-                    if percent_match:
-                        price_info['discount_percent'] = percent_match.group(1)
-                        extracted_items.append('할인율')
-            except:
-                pass
+            # 2. 일회성 구매 정가 추출
+            onetime_selectors = [
+                '.original-price-config.show .list-price',
+                '.one-time-second .list-price',
+                'span.list-price'
+            ]
             
-            # 정기배송 할인 정보 추출
-            try:
-                elements = self.driver.find_elements(By.CSS_SELECTOR, Config.SELECTORS['subscription_discount'])
-                for element in elements:
-                    text = element.text.lower()
-                    subscription_match = re.search(Config.PATTERNS['subscription_discount'], text)
-                    if subscription_match:
-                        price_info['subscription_discount'] = subscription_match.group(1)
-                        extracted_items.append('정기배송할인')
+            for selector in onetime_selectors:
+                try:
+                    element = self.driver.find_element(By.CSS_SELECTOR, selector)
+                    price_text = element.text.strip()
+                    if price_text and '₩' in price_text:
+                        # ₩35,278 -> 35278
+                        price_clean = re.sub(r'[^\d]', '', price_text)
+                        if price_clean and len(price_clean) >= 4:
+                            price_info['list_price'] = price_clean
+                            extracted_items.append('정가(일회성)')
+                            break
+                except:
+                    continue
+            
+            # 3. 할인율 추출
+            discount_percent_selectors = [
+                '.percent-off',
+                'span.percent-off',
+                '.strike-through-price-wrapper .percent-off'
+            ]
+            
+            for selector in discount_percent_selectors:
+                try:
+                    element = self.driver.find_element(By.CSS_SELECTOR, selector)
+                    percent_text = element.text.strip()
+                    if percent_text and '%' in percent_text:
+                        # (29% off) -> 29
+                        percent_match = re.search(r'(\d+)%', percent_text)
+                        if percent_match:
+                            price_info['discount_percent'] = percent_match.group(1)
+                            extracted_items.append('할인율')
+                            break
+                except:
+                    continue
+            
+            # 4. 정기배송 추가 할인 정보 추출
+            subscription_message_selectors = [
+                '.auto-ship-message-item',
+                '.subscription-off-message',
+                '.auto-ship-message'
+            ]
+            
+            for selector in subscription_message_selectors:
+                try:
+                    elements = self.driver.find_elements(By.CSS_SELECTOR, selector)
+                    for element in elements:
+                        text = element.text.lower()
+                        # "29% off your first order, and 10% off on future orders" 패턴
+                        subscription_matches = re.findall(r'(\d+)%\s*off', text)
+                        if subscription_matches:
+                            # 첫 번째 할인율이 구독 할인
+                            price_info['subscription_discount'] = subscription_matches[0]
+                            extracted_items.append('정기배송할인')
+                            break
+                except:
+                    continue
+            
+            # 5. 단위당 가격 (serving 당 가격)
+            unit_price_selectors = [
+                '.discount-price-per-unit',
+                '.list-price-per-unit',
+                'span[class*="per-unit"]'
+            ]
+            
+            for selector in unit_price_selectors:
+                try:
+                    element = self.driver.find_element(By.CSS_SELECTOR, selector)
+                    unit_price_text = element.text.strip()
+                    if unit_price_text and ('₩' in unit_price_text or '/serving' in unit_price_text):
+                        price_info['price_per_unit'] = unit_price_text
+                        extracted_items.append('단위당가격')
                         break
-            except:
-                pass
+                except:
+                    continue
             
-            # 단위당 가격
-            try:
-                element = self.driver.find_element(By.CSS_SELECTOR, Config.SELECTORS['price_per_unit'])
-                price_per_unit = element.text.strip()
-                if price_per_unit:
-                    price_info['price_per_unit'] = price_per_unit
-                    extracted_items.append('단위당가격')
-            except:
-                pass
-            
-            # 추가 시도: 페이지 소스에서 가격 패턴 검색
+            # 6. 백업: 페이지 소스에서 패턴 검색
             if not price_info.get('discount_price') and not price_info.get('list_price'):
-                price_info.update(self._extract_prices_from_source())
-                if price_info.get('list_price'):
-                    extracted_items.append('정가(패턴)')
-                if price_info.get('discount_price'):
-                    extracted_items.append('할인가(패턴)')
+                backup_prices = self._extract_krw_prices_from_source()
+                price_info.update(backup_prices)
+                if backup_prices:
+                    extracted_items.append('패턴추출')
             
             if extracted_items:
                 print(f"    가격 정보: ✓ {len(extracted_items)}개 항목 ({', '.join(extracted_items)})")
@@ -255,30 +283,38 @@ class IHerbClient:
             print(f"    가격 정보 추출 중 오류: {e}")
             return {}
     
-    def _extract_prices_from_source(self):
-        """페이지 소스에서 가격 패턴 검색"""
+    def _extract_krw_prices_from_source(self):
+        """페이지 소스에서 원화 가격 패턴 검색"""
         price_info = {}
         
         try:
             page_source = self.browser.page_source
-            price_patterns = [
-                Config.PATTERNS['price_usd'], 
-                Config.PATTERNS['price_pattern']
+            
+            # 원화 패턴들
+            krw_patterns = [
+                r'₩([\d,]+)',  # ₩25,048
+                r'"₩([\d,]+)"',  # "₩25,048"
+                r'₩\s*([\d,]+)',  # ₩ 25,048
             ]
             
-            for pattern in price_patterns:
+            all_prices = []
+            for pattern in krw_patterns:
                 matches = re.findall(pattern, page_source)
-                if matches:
-                    prices = [re.sub(r'[^\d.]', '', match) for match in matches[:3]]
-                    prices = [p for p in prices if len(p) >= 3 and '.' in p]
-                    
-                    if prices:
-                        if not price_info.get('list_price'):
-                            price_info['list_price'] = max(prices, key=float)
-                        if len(prices) > 1 and not price_info.get('discount_price'):
-                            sorted_prices = sorted(prices, key=float, reverse=True)
-                            price_info['discount_price'] = sorted_prices[1] if len(sorted_prices) > 1 else sorted_prices[0]
-                        break
+                for match in matches:
+                    clean_price = re.sub(r'[^\d]', '', match)
+                    if len(clean_price) >= 4:  # 최소 4자리
+                        all_prices.append(int(clean_price))
+            
+            if all_prices:
+                # 중복 제거 후 정렬
+                unique_prices = sorted(list(set(all_prices)), reverse=True)
+                
+                if len(unique_prices) >= 2:
+                    # 가장 높은 가격을 정가, 두 번째를 할인가로
+                    price_info['list_price'] = str(unique_prices[0])
+                    price_info['discount_price'] = str(unique_prices[1])
+                elif len(unique_prices) == 1:
+                    price_info['list_price'] = str(unique_prices[0])
         except:
             pass
         

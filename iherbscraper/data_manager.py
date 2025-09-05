@@ -151,10 +151,80 @@ class DataManager:
         except Exception as e:
             return {}
     
+    def calculate_price_comparison(self, coupang_price_info, iherb_price_info):
+        """플랫폼 간 가격 비교 계산"""
+        comparison_result = {
+            'price_difference_krw': '',
+            'cheaper_platform': '',
+            'savings_amount': '',
+            'savings_percentage': '',
+            'price_difference_note': '원화 기준 직접 비교 가능'
+        }
+        
+        try:
+            # 쿠팡 가격 (현재 가격 우선, 없으면 원가)
+            coupang_price = None
+            if coupang_price_info.get('current_price'):
+                coupang_price = int(coupang_price_info['current_price'])
+            elif coupang_price_info.get('original_price'):
+                coupang_price = int(coupang_price_info['original_price'])
+            
+            # 아이허브 가격 (할인가 우선, 없으면 정가)
+            iherb_price = None
+            if iherb_price_info.get('discount_price'):
+                iherb_price = int(iherb_price_info['discount_price'])
+            elif iherb_price_info.get('list_price'):
+                iherb_price = int(iherb_price_info['list_price'])
+            
+            # 두 가격이 모두 있을 때만 비교
+            if coupang_price and iherb_price:
+                price_diff = coupang_price - iherb_price
+                comparison_result['price_difference_krw'] = str(price_diff)
+                
+                if price_diff > 0:
+                    # 아이허브가 더 저렴
+                    comparison_result['cheaper_platform'] = '아이허브'
+                    comparison_result['savings_amount'] = str(price_diff)
+                    savings_pct = round((price_diff / coupang_price) * 100, 1)
+                    comparison_result['savings_percentage'] = str(savings_pct)
+                    comparison_result['price_difference_note'] = f'아이허브가 {price_diff:,}원 ({savings_pct}%) 더 저렴'
+                    
+                elif price_diff < 0:
+                    # 쿠팡이 더 저렴
+                    abs_diff = abs(price_diff)
+                    comparison_result['cheaper_platform'] = '쿠팡'
+                    comparison_result['savings_amount'] = str(abs_diff)
+                    savings_pct = round((abs_diff / iherb_price) * 100, 1)
+                    comparison_result['savings_percentage'] = str(savings_pct)
+                    comparison_result['price_difference_note'] = f'쿠팡이 {abs_diff:,}원 ({savings_pct}%) 더 저렴'
+                    
+                else:
+                    # 가격 동일
+                    comparison_result['cheaper_platform'] = '동일'
+                    comparison_result['savings_amount'] = '0'
+                    comparison_result['savings_percentage'] = '0'
+                    comparison_result['price_difference_note'] = '두 플랫폼 가격 동일'
+            
+            elif coupang_price and not iherb_price:
+                comparison_result['price_difference_note'] = '아이허브 가격 정보 없음'
+            elif not coupang_price and iherb_price:
+                comparison_result['price_difference_note'] = '쿠팡 가격 정보 없음'
+            else:
+                comparison_result['price_difference_note'] = '양쪽 플랫폼 가격 정보 없음'
+                
+        except Exception as e:
+            comparison_result['price_difference_note'] = f'가격 비교 계산 오류: {str(e)}'
+        
+        return comparison_result
+    
     def create_result_record(self, row, actual_idx, english_name, product_url, 
                            similarity_score, product_code, iherb_product_name, 
-                           coupang_price_info, iherb_price_info):
-        """결과 레코드 생성 (원화 기준)"""
+                           coupang_price_info, iherb_price_info, matching_reason=None):
+        """결과 레코드 생성 (원화 기준 + 가격 비교 + 매칭 사유 포함)"""
+        
+        # 가격 비교 계산
+        price_comparison = self.calculate_price_comparison(coupang_price_info, iherb_price_info)
+        
         return {
             # 1. 기본 식별 정보
             'coupang_product_id': row['product_id'],
@@ -164,6 +234,7 @@ class DataManager:
             'iherb_product_code': product_code,
             'status': 'success' if product_code else ('not_found' if not product_url else 'code_not_found'),
             'similarity_score': round(similarity_score, 3) if similarity_score else 0,
+            'matching_reason': matching_reason or '매칭 정보 없음',
             
             # 2. URL 정보  
             'coupang_url': coupang_price_info.get('url', ''),
@@ -174,15 +245,19 @@ class DataManager:
             'coupang_original_price_krw': coupang_price_info.get('original_price', ''),
             'coupang_discount_rate': coupang_price_info.get('discount_rate', ''),
             
-            # 4. 아이허브 가격 정보 (KRW로 변경)
-            'iherb_list_price_krw': iherb_price_info.get('list_price', ''),  # 원화
-            'iherb_discount_price_krw': iherb_price_info.get('discount_price', ''),  # 원화
+            # 4. 아이허브 가격 정보 (KRW)
+            'iherb_list_price_krw': iherb_price_info.get('list_price', ''),
+            'iherb_discount_price_krw': iherb_price_info.get('discount_price', ''),
             'iherb_discount_percent': iherb_price_info.get('discount_percent', ''),
             'iherb_subscription_discount': iherb_price_info.get('subscription_discount', ''),
             'iherb_price_per_unit': iherb_price_info.get('price_per_unit', ''),
             
-            # 5. 가격 비교 (동일 통화)
-            'price_difference_note': '원화 기준 직접 비교 가능',
+            # 5. 가격 비교 (새로 추가된 컬럼들)
+            'price_difference_krw': price_comparison['price_difference_krw'],
+            'cheaper_platform': price_comparison['cheaper_platform'],
+            'savings_amount': price_comparison['savings_amount'],
+            'savings_percentage': price_comparison['savings_percentage'],
+            'price_difference_note': price_comparison['price_difference_note'],
             
             # 6. 메타데이터
             'processed_at': datetime.now().isoformat(),

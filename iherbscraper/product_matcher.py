@@ -194,8 +194,8 @@ class ProductMatcher:
             cleaned_english_name = re.sub(r'[^\w\s]', ' ', english_name)
             cleaned_english_name = re.sub(r'\s+', ' ', cleaned_english_name).strip()
             
-            print(f"  검색어: {english_name[:50]}...")
-            print(f"  원본 한글: {korean_name[:40]}...")
+            print(f"  검색어: {english_name}")
+            print(f"  원본 한글: {korean_name}")
             
             search_url = f"{Config.BASE_URL}/search?kw={urllib.parse.quote(cleaned_english_name)}"
             

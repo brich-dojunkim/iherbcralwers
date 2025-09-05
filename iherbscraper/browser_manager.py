@@ -62,6 +62,11 @@ class BrowserManager:
                 if attempt > 0:
                     print(f"    페이지 로딩 재시도 {attempt + 1}/{max_retries}")
                 
+                # 브라우저가 죽었는지 확인
+                if not self._is_browser_alive():
+                    print("    브라우저 세션이 끊어짐 - 재시작")
+                    self._initialize_browser()
+                
                 # 페이지 로딩
                 self.driver.get(url)
                 
@@ -97,7 +102,7 @@ class BrowserManager:
                     # 심각한 오류의 경우 브라우저 재시작
                     if self._is_critical_error(str(e)):
                         try:
-                            self.restart_with_cleanup()
+                            self._safe_restart_browser()
                         except:
                             return False
                     continue
@@ -114,43 +119,86 @@ class BrowserManager:
         
         return False
     
+    def _is_browser_alive(self):
+        """브라우저가 살아있는지 확인"""
+        try:
+            if self.driver is None:
+                return False
+            # 간단한 명령으로 브라우저 상태 확인
+            self.driver.current_url
+            return True
+        except:
+            return False
+    
+    def _safe_restart_browser(self):
+        """안전한 브라우저 재시작"""
+        try:
+            print("    브라우저 안전 재시작 중...")
+            
+            # 기존 브라우저 종료
+            if self.driver:
+                try:
+                    self.driver.quit()
+                except:
+                    pass
+                self.driver = None
+            
+            # 메모리 정리 대기
+            time.sleep(3)
+            
+            # 새 브라우저 시작
+            self._initialize_browser()
+            
+            print("    브라우저 안전 재시작 완료 ✓")
+            
+        except Exception as e:
+            print(f"    브라우저 재시작 실패: {e}")
+            raise
+    
     def _is_critical_error(self, error_message):
         """심각한 오류 여부 판단"""
         critical_keywords = [
             'chrome not reachable',
             'session deleted',
             'connection refused',
-            'disconnected'
+            'disconnected',
+            'max retries exceeded',
+            'failed to establish a new connection'
         ]
         
         return any(keyword in error_message.lower() for keyword in critical_keywords)
     
     def restart_with_cleanup(self):
-        """브라우저 재시작 + 완전한 정리"""
+        """브라우저 재시작 + 완전한 정리 (개선된 버전)"""
         try:
             print("  브라우저 완전 재시작 중...")
             
-            # 1. 기존 브라우저 종료
+            # 1. 기존 브라우저 안전 종료
             if self.driver:
                 try:
                     # 모든 쿠키 및 캐시 삭제
                     self.driver.delete_all_cookies()
                     self.driver.execute_script("window.localStorage.clear();")
                     self.driver.execute_script("window.sessionStorage.clear();")
-                    
+                except:
+                    pass
+                
+                try:
                     # 브라우저 종료
                     self.driver.quit()
                 except:
                     pass
+                
+                self.driver = None
             
-            # 2. 메모리 정리를 위한 대기
-            time.sleep(5)
+            # 2. 메모리 정리를 위한 충분한 대기
+            time.sleep(8)
             
             # 3. 새 브라우저 시작
             self._initialize_browser()
             
             # 4. 안정화 대기
-            time.sleep(3)
+            time.sleep(5)
             
             print("  브라우저 완전 재시작 완료 ✓")
             print("    - 쿠키/캐시 정리 완료")
@@ -196,9 +244,15 @@ class BrowserManager:
     @property
     def current_url(self):
         """현재 URL"""
-        return self.driver.current_url if self.driver else None
+        try:
+            return self.driver.current_url if self.driver else None
+        except:
+            return None
     
     @property
     def page_source(self):
         """페이지 소스"""
-        return self.driver.page_source if self.driver else None
+        try:
+            return self.driver.page_source if self.driver else None
+        except:
+            return None

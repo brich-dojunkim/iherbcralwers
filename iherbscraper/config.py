@@ -107,7 +107,7 @@ class Config:
     PATTERNS = {
         'item_code': r'item\s*code:\s*([A-Z0-9-]+)',
         'product_code_url': r'/pr/([A-Z0-9-]+)',
-        'english_count': r'(\d+)\s*(?:count|ct|tablets?|capsules?|softgels?)',
+        'english_count': r'(\d+)\s*(?:count|ct|tablets?|capsules?|softgels?|veg\s*capsules?|vcaps?|pieces?|servings?)',
         'dosage_mg': r'(\d+(?:,\d+)*)\s*mg',
         'discount_percent': r'(\d+)%',
         'subscription_discount': r'(\d+)%.*?off',
@@ -138,13 +138,13 @@ class Config:
         'nordic naturals'
     ]
     
-    # CSV 컬럼 구조
     OUTPUT_COLUMNS = [
-        'coupang_product_id', 'coupang_product_name', 'coupang_product_name_english',
-        'iherb_product_name', 'iherb_product_code', 'status', 'similarity_score',
-        'coupang_url', 'iherb_product_url',
-        'coupang_current_price_krw', 'coupang_original_price_krw', 'coupang_discount_rate',
+        'iherb_product_name', 'coupang_product_name_english', 'coupang_product_name', 
+        'similarity_score', 'matching_reason', 'coupang_url', 'iherb_product_url', 
+        'coupang_product_id', 'iherb_product_code',
+        'status', 'coupang_current_price_krw', 'coupang_original_price_krw', 'coupang_discount_rate',
         'iherb_list_price_krw', 'iherb_discount_price_krw', 'iherb_discount_percent',
         'iherb_subscription_discount', 'iherb_price_per_unit',
+        'price_difference_krw', 'cheaper_platform', 'savings_amount', 'savings_percentage',
         'price_difference_note', 'processed_at', 'actual_index', 'search_language'
     ]
