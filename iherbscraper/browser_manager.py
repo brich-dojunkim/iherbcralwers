@@ -1,9 +1,10 @@
 """
-브라우저 관리 모듈
+브라우저 관리 모듈 - 개선된 재시작 및 오류 처리
 """
 
 import time
 import random
+import subprocess
 import undetected_chromedriver as uc
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -163,17 +164,18 @@ class BrowserManager:
             'connection refused',
             'disconnected',
             'max retries exceeded',
-            'failed to establish a new connection'
+            'failed to establish a new connection',
+            'httpconnectionpool'
         ]
         
         return any(keyword in error_message.lower() for keyword in critical_keywords)
     
     def restart_with_cleanup(self):
-        """브라우저 재시작 + 완전한 정리 (개선된 버전)"""
+        """브라우저 재시작 + 완전한 정리 (강화된 버전)"""
         try:
             print("  브라우저 완전 재시작 중...")
             
-            # 1. 기존 브라우저 안전 종료
+            # 1. 현재 브라우저 안전 종료
             if self.driver:
                 try:
                     # 모든 쿠키 및 캐시 삭제
@@ -191,19 +193,27 @@ class BrowserManager:
                 
                 self.driver = None
             
-            # 2. 메모리 정리를 위한 충분한 대기
-            time.sleep(8)
+            # 2. Chrome 프로세스 강제 종료 (macOS)
+            try:
+                subprocess.run(['pkill', '-f', 'chrome'], check=False, capture_output=True)
+                subprocess.run(['pkill', '-f', 'chromedriver'], check=False, capture_output=True)
+                print("    Chrome 프로세스 정리 완료")
+            except:
+                pass
             
-            # 3. 새 브라우저 시작
+            # 3. 충분한 대기 (포트 해제 대기)
+            time.sleep(12)  # 8초 -> 12초로 증가
+            
+            # 4. 새 브라우저 시작
             self._initialize_browser()
             
-            # 4. 안정화 대기
-            time.sleep(5)
+            # 5. 안정화 대기
+            time.sleep(8)  # 5초 -> 8초로 증가
             
             print("  브라우저 완전 재시작 완료 ✓")
-            print("    - 쿠키/캐시 정리 완료")
-            print("    - 메모리 정리 완료") 
-            print("    - 새 세션 시작")
+            print("    - Chrome 프로세스 완전 정리")
+            print("    - 포트 충돌 해결")
+            print("    - 새 세션 안정화")
             
         except Exception as e:
             print(f"  브라우저 재시작 실패: {e}")

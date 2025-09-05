@@ -1,8 +1,10 @@
 """
-영어 번역 기반 iHerb 스크래퍼 - 메인 실행 파일
+영어 번역 기반 iHerb 스크래퍼 - 메인 실행 파일 (개선된 오류 처리)
 """
 
 import pandas as pd
+import subprocess
+import time
 from browser_manager import BrowserManager
 from iherb_client import IHerbClient
 from product_matcher import ProductMatcher
@@ -144,12 +146,54 @@ class EnglishIHerbScraper:
         self.browser_manager.random_delay()
     
     def _restart_browser_if_needed(self):
-        """브라우저 재시작 처리"""
+        """브라우저 재시작 처리 (개선된 버전)"""
         print(f"\n  === 브라우저 완전 재시작 (매 {Config.BROWSER_RESTART_INTERVAL}개마다) ===")
         try:
-            self.browser_manager.restart_with_cleanup()
-            # 재시작 후 언어 설정 다시 적용
+            self._safe_browser_restart()
+        except Exception as e:
+            print(f"  브라우저 재시작 실패: {e}")
+            raise
+    
+    def _safe_browser_restart(self):
+        """안전한 브라우저 재시작 (개선된 버전)"""
+        try:
+            print("  브라우저 안전 재시작 중...")
+            
+            # 1. 현재 브라우저 강제 종료
+            if self.browser_manager.driver:
+                try:
+                    self.browser_manager.driver.quit()
+                except:
+                    pass
+                self.browser_manager.driver = None
+            
+            # 2. Chrome 프로세스 완전 정리 (macOS)
+            try:
+                subprocess.run(['pkill', '-f', 'chrome'], check=False, capture_output=True)
+                subprocess.run(['pkill', '-f', 'chromedriver'], check=False, capture_output=True)
+                print("    Chrome 프로세스 정리 완료")
+            except:
+                pass
+            
+            # 3. 충분한 대기 시간 (포트 해제 대기)
+            time.sleep(12)
+            
+            # 4. 새 브라우저 인스턴스 생성
+            self.browser_manager = BrowserManager(headless=False, delay_range=self.delay_range)
+            self.iherb_client = IHerbClient(self.browser_manager)
+            self.product_matcher = ProductMatcher(self.iherb_client)
+            
+            # 5. 언어 설정 재적용
             self.iherb_client.set_language_to_english()
+            
+            # 6. 안정화 대기
+            time.sleep(8)
+            
+            print("  브라우저 안전 재시작 완료 ✓")
+            print("    - Chrome 프로세스 완전 정리")
+            print("    - 포트 충돌 해결")
+            print("    - 새 세션 안정화")
+            
         except Exception as e:
             print(f"  브라우저 재시작 실패: {e}")
             raise
@@ -165,7 +209,7 @@ class EnglishIHerbScraper:
         print(f"  쿠팡 가격: {' '.join(coupang_summary) if coupang_summary else '정보 없음'}")
     
     def _search_and_extract_iherb_info(self, korean_name, english_name):
-        """아이허브 검색 및 정보 추출 (재시도 로직 포함) - 6개 값 반환"""
+        """아이허브 검색 및 정보 추출 (개선된 오류 처리) - 6개 값 반환"""
         product_url = None
         similarity_score = 0
         product_code = None
@@ -177,7 +221,6 @@ class EnglishIHerbScraper:
             try:
                 if retry > 0:
                     print(f"  재시도 {retry + 1}/{Config.MAX_RETRIES}")
-                    import time
                     time.sleep(5)
                 
                 # 검색 실행
@@ -218,23 +261,34 @@ class EnglishIHerbScraper:
                     break  # 성공하면 재시도 루프 종료
                 else:
                     print("  매칭된 상품 없음")
-                    matching_reason = "검색 결과 없음"
+                    matching_reason = "매칭된 상품 없음"  # 정당한 실패
                     break  # 검색 결과가 없으면 재시도할 필요 없음
                     
             except Exception as e:
-                print(f"  처리 중 오류 (시도 {retry + 1}): {str(e)[:100]}...")
-                matching_reason = f"처리 오류: {str(e)[:50]}"
+                error_msg = str(e)
+                print(f"  처리 중 오류 (시도 {retry + 1}): {error_msg[:100]}...")
+                
+                # 시스템 오류 타입별 분류
+                if "HTTPConnectionPool" in error_msg or "Connection refused" in error_msg:
+                    matching_reason = f"브라우저 연결 오류: {error_msg[:50]}"
+                elif "WebDriverException" in error_msg or "selenium" in error_msg.lower():
+                    matching_reason = f"웹드라이버 오류: {error_msg[:50]}"
+                elif "TimeoutException" in error_msg or "timeout" in error_msg.lower():
+                    matching_reason = f"타임아웃 오류: {error_msg[:50]}"
+                else:
+                    matching_reason = f"처리 오류: {error_msg[:50]}"
+                
                 if retry == Config.MAX_RETRIES - 1:
                     print("  최대 재시도 횟수 초과 - 건너뜀")
                 else:
                     # 심각한 오류의 경우 브라우저 재시작
-                    if self.browser_manager._is_critical_error(str(e)):
+                    if self.browser_manager._is_critical_error(error_msg):
                         try:
                             print("  심각한 오류 감지 - 브라우저 완전 재시작")
-                            self.browser_manager.restart_with_cleanup()
-                            self.iherb_client.set_language_to_english()  # 언어 설정 재적용
-                        except:
-                            print("  브라우저 재시작 실패")
+                            self._safe_browser_restart()
+                        except Exception as restart_error:
+                            print(f"  브라우저 재시작 실패: {restart_error}")
+                            matching_reason = f"브라우저 재시작 실패: {str(restart_error)[:50]}"
                             break
         
         return product_url, product_code, iherb_product_name, iherb_price_info, similarity_score, matching_reason
@@ -348,6 +402,7 @@ if __name__ == "__main__":
             print("- 재사용 가능한 컴포넌트 구조")
             print("- 깔끔한 코드 구조와 명확한 책임 분담")
             print("- 실패한 상품 자동 재시도 기능")
+            print("- 개선된 브라우저 재시작 및 오류 처리")
     
     except KeyboardInterrupt:
         print("\n중단됨")
