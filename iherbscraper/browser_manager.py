@@ -72,12 +72,12 @@ class BrowserManager:
                 self.driver.get(url)
                 
                 # JavaScript 실행이 완료될 때까지 대기
-                WebDriverWait(self.driver, 15).until(
+                WebDriverWait(self.driver, 8).until(
                     lambda driver: driver.execute_script("return document.readyState") == "complete"
                 )
                 
                 # 추가 대기 시간
-                time.sleep(random.uniform(2, 4))
+                time.sleep(random.uniform(0.5, 1))
                 
                 # 페이지가 제대로 로딩되었는지 확인
                 if "iherb.com" in self.driver.current_url:
@@ -221,7 +221,7 @@ class BrowserManager:
     
     def random_delay(self):
         """랜덤 딜레이"""
-        delay = random.uniform(self.delay_range[0], self.delay_range[1])
+        delay = random.uniform(0.3, 0.8)
         time.sleep(delay)
     
     def wait_for_element(self, selector, timeout=10):

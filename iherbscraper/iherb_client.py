@@ -1,5 +1,5 @@
 """
-아이허브 사이트 상호작용 모듈
+아이허브 사이트 상호작용 모듈 - 최적화된 가격 추출 포함
 """
 
 import time
@@ -19,47 +19,117 @@ class IHerbClient:
         self.driver = browser_manager.driver
     
     def set_language_to_english(self):
-        """아이허브 언어를 영어로 설정"""
+        """아이허브 언어를 영어로 자동 설정 - 빠른 버전"""
         try:
-            print("  아이허브 언어 설정 (수동)...")
+            print("  아이허브 언어 설정 (자동)...")
             
             # 1. 한국 아이허브 페이지 접속
             if not self.browser.safe_get(Config.KOREA_URL):
                 print("  아이허브 접속 실패 - 기본 설정으로 진행")
-                return
+                return False
             
-            # 2. 현재 URL 확인 - 이미 영어 사이트인지 체크
-            current_url = self.browser.current_url
-            if "iherb.com" in current_url and "kr.iherb.com" not in current_url:
-                print("  이미 영어 사이트입니다 ✓")
-                return
+            # 2. 설정 버튼 클릭 (타임아웃 단축: 10초 → 3초)
+            try:
+                setting_button = WebDriverWait(self.driver, 3).until(
+                    EC.element_to_be_clickable((By.CSS_SELECTOR, '.selected-country-wrapper'))
+                )
+                setting_button.click()
+                print("    설정 버튼 클릭 완료")
+            except TimeoutException:
+                print("  설정 버튼을 찾을 수 없습니다 - 수동 설정으로 진행")
+                return self._manual_language_setting()
             
-            # 3. 수동 설정 안내
-            print("\n" + "="*60)
-            print("  수동으로 언어를 영어로 변경해주세요:")
-            print("  1. 브라우저에서 우상단 국가/언어 설정 버튼 클릭")
-            print("  2. 언어를 'English'로 선택")
-            print("  3. '저장하기' 버튼 클릭")
-            print("  4. 페이지가 영어로 변경되면 아래 Enter 키 입력")
-            print("="*60)
+            # 짧은 대기 (기존: 2-4초 → 0.5초)
+            time.sleep(0.5)
             
-            input("  언어 변경 완료 후 Enter 키를 눌러주세요...")
+            # 3. 모달 열림 확인 (타임아웃 단축: 10초 → 2초)
+            try:
+                WebDriverWait(self.driver, 2).until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, '.selection-list-wrapper'))
+                )
+                print("    설정 모달 열림 확인")
+            except TimeoutException:
+                print("  설정 모달이 열리지 않음 - 수동 설정으로 진행")
+                return self._manual_language_setting()
             
-            # 4. 변경 확인
-            current_url = self.browser.current_url
-            if "kr.iherb.com" in current_url:
-                print("  아직 한국 사이트입니다. 영어 사이트로 직접 이동합니다.")
-                if self.browser.safe_get("https://www.iherb.com"):
-                    print("  영어 사이트 직접 접속 완료 ✓")
-                else:
-                    print("  영어 사이트 접속 실패")
-            else:
+            # 4. 언어 드롭다운 클릭 (타임아웃 단축: 5초 → 2초)
+            try:
+                language_dropdown = WebDriverWait(self.driver, 2).until(
+                    EC.element_to_be_clickable((By.CSS_SELECTOR, '.select-language'))
+                )
+                language_dropdown.click()
+                print("    언어 드롭다운 클릭 완료")
+            except TimeoutException:
+                print("  언어 드롭다운을 찾을 수 없음 - 수동 설정으로 진행")
+                return self._manual_language_setting()
+            
+            # 짧은 대기
+            time.sleep(0.3)
+            
+            # 5. English 옵션 선택 (타임아웃 단축: 5초 → 2초)
+            try:
+                english_option = WebDriverWait(self.driver, 2).until(
+                    EC.element_to_be_clickable((By.CSS_SELECTOR, '[data-val="en-US"]'))
+                )
+                english_option.click()
+                print("    English 옵션 선택 완료")
+            except TimeoutException:
+                print("  English 옵션을 찾을 수 없음 - 수동 설정으로 진행")
+                return self._manual_language_setting()
+            
+            # 짧은 대기
+            time.sleep(0.3)
+            
+            # 6. 저장 버튼 클릭 (타임아웃 단축: 5초 → 2초)
+            try:
+                save_button = WebDriverWait(self.driver, 2).until(
+                    EC.element_to_be_clickable((By.CSS_SELECTOR, '.save-selection'))
+                )
+                save_button.click()
+                print("    저장 버튼 클릭 완료")
+            except TimeoutException:
+                print("  저장 버튼을 찾을 수 없음 - 수동 설정으로 진행")
+                return self._manual_language_setting()
+            
+            # 페이지 리로드 대기 (기존: 10초 → 5초)
+            print("  페이지 변경 대기 중...")
+            time.sleep(2)  # 기존: 5초 → 2초
+            
+            # 7. 영어 사이트 변경 확인 (타임아웃 단축: 10초 → 3초)
+            try:
+                WebDriverWait(self.driver, 3).until(
+                    lambda driver: "kr.iherb.com" not in driver.current_url
+                )
                 print("  언어 변경 완료 ✓")
+                return True
+            except TimeoutException:
+                print("  URL 변경이 감지되지 않음")
+                # URL이 변경되지 않아도 성공으로 간주 (언어만 변경된 경우)
+                return True
                 
         except Exception as e:
-            print(f"  언어 설정 실패: {e}")
-            print("  기본 설정으로 진행...")
-    
+            print(f"  자동 언어 설정 실패: {e}")
+            return self._manual_language_setting()
+
+    def _manual_language_setting(self):
+        """수동 언어 설정 안내 (폴백)"""
+        print("\n" + "="*50)
+        print("  수동으로 언어를 영어로 변경해주세요:")
+        print("  1. 우상단 설정 버튼 클릭")
+        print("  2. 언어를 'English'로 선택")
+        print("  3. '저장하기' 버튼 클릭")
+        print("="*50)
+        
+        input("  언어 변경 완료 후 Enter 키를 눌러주세요...")
+        
+        # 영어 사이트로 직접 이동
+        if self.browser.safe_get("https://www.iherb.com"):
+            print("  영어 사이트 직접 접속 완료 ✓")
+            return True
+        else:
+            print("  영어 사이트 접속 실패")
+            return False
+        
     def get_multiple_products(self, search_url):
         """검색 결과에서 여러 상품 정보 추출"""
         try:
@@ -70,7 +140,7 @@ class IHerbClient:
             
             # 검색 결과 로딩 대기
             try:
-                WebDriverWait(self.driver, 10).until(
+                WebDriverWait(self.driver, 5).until(
                     EC.presence_of_element_located((By.CSS_SELECTOR, Config.SELECTORS['product_containers']))
                 )
             except TimeoutException:
@@ -156,7 +226,226 @@ class IHerbClient:
         return None
     
     def extract_price_info(self):
-        """아이허브 가격 정보 추출 (한국 사이트 기준, 원화 표시)"""
+        """최적화된 아이허브 가격 정보 추출"""
+        try:
+            # 먼저 빠른 추출 방법 시도
+            fast_result = self._extract_price_info_fast()
+            if fast_result:
+                return fast_result
+            
+            # 빠른 방법이 실패하면 기존 방법으로 폴백
+            print("    빠른 추출 실패 - 기존 방식으로 진행")
+            return self._extract_price_info_original()
+            
+        except Exception as e:
+            print(f"    가격 정보 추출 중 오류: {e}")
+            return {}
+    
+    def _extract_price_info_fast(self):
+        """빠른 가격 정보 추출 - 우선순위 기반 접근"""
+        price_info = {}
+        extraction_start = time.time()
+        
+        try:
+            # 1단계: 가장 가능성 높은 선택자부터 시도 (병렬적 접근)
+            price_data = self._extract_all_prices_at_once()
+            
+            if price_data:
+                price_info.update(price_data)
+                print(f"    가격 정보: ✓ CSS 선택자 방식 ({time.time() - extraction_start:.2f}초)")
+                return price_info
+            
+            # 2단계: JavaScript 실행으로 즉시 가격 데이터 추출
+            js_price_data = self._extract_prices_with_javascript()
+            
+            if js_price_data:
+                price_info.update(js_price_data)
+                print(f"    가격 정보: ✓ JavaScript 방식 ({time.time() - extraction_start:.2f}초)")
+                return price_info
+            
+            # 3단계: 페이지 소스 정규식 검색 (최후 수단)
+            regex_price_data = self._extract_prices_from_source_optimized()
+            
+            if regex_price_data:
+                price_info.update(regex_price_data)
+                print(f"    가격 정보: ✓ 정규식 방식 ({time.time() - extraction_start:.2f}초)")
+                return price_info
+            
+            return None
+            
+        except Exception as e:
+            print(f"    빠른 가격 추출 중 오류: {e}")
+            return None
+    
+    def _extract_all_prices_at_once(self):
+        """한 번에 모든 가격 정보 추출 시도"""
+        try:
+            # 모든 가격 관련 요소를 한 번에 찾기
+            price_elements = self.driver.find_elements(
+                By.CSS_SELECTOR, 
+                '.price-inner-text, .discount-price, .list-price, .percent-off, .price-per-unit, [data-testid="product-price"]'
+            )
+            
+            price_info = {}
+            
+            for element in price_elements:
+                try:
+                    text = element.text.strip()
+                    class_names = element.get_attribute('class') or ''
+                    testid = element.get_attribute('data-testid') or ''
+                    
+                    # 원화 가격 패턴 체크
+                    if '₩' in text:
+                        # 숫자만 추출
+                        price_clean = re.sub(r'[^\d]', '', text)
+                        if len(price_clean) >= 4:
+                            
+                            # data-testid가 있는 경우 우선 처리
+                            if 'product-price' in testid:
+                                price_info['discount_price'] = price_clean
+                            # 클래스명으로 가격 유형 판단
+                            elif 'discount' in class_names.lower():
+                                price_info['discount_price'] = price_clean
+                            elif 'list' in class_names.lower():
+                                price_info['list_price'] = price_clean
+                            elif 'price-inner-text' in class_names:
+                                # 기본 가격으로 사용
+                                if not price_info.get('discount_price'):
+                                    price_info['discount_price'] = price_clean
+                    
+                    # 할인율 체크
+                    elif '%' in text and 'off' in text.lower():
+                        percent_match = re.search(r'(\d+)%', text)
+                        if percent_match:
+                            price_info['discount_percent'] = percent_match.group(1)
+                    
+                    # 단위당 가격 체크
+                    elif '/serving' in text.lower() or ('₩' in text and '/unit' in text.lower()):
+                        price_info['price_per_unit'] = text
+                        
+                except Exception:
+                    continue
+            
+            return price_info if price_info else None
+            
+        except Exception:
+            return None
+    
+    def _extract_prices_with_javascript(self):
+        """JavaScript로 가격 정보 즉시 추출"""
+        try:
+            # JavaScript로 가격 정보를 한 번에 수집
+            js_script = """
+            var priceData = {};
+            
+            // 모든 가격 텍스트 수집
+            var allElements = document.querySelectorAll('*');
+            var krwPrices = [];
+            
+            for (var i = 0; i < allElements.length; i++) {
+                var text = allElements[i].textContent || '';
+                if (text.includes('₩') && text.match(/₩[\\d,]+/)) {
+                    var matches = text.match(/₩([\\d,]+)/g);
+                    if (matches) {
+                        matches.forEach(function(match) {
+                            var cleanPrice = match.replace(/[^\\d]/g, '');
+                            if (cleanPrice.length >= 4) {
+                                krwPrices.push(parseInt(cleanPrice));
+                            }
+                        });
+                    }
+                }
+            }
+            
+            // 중복 제거 후 정렬
+            krwPrices = [...new Set(krwPrices)].sort(function(a, b) { return b - a; });
+            
+            if (krwPrices.length >= 2) {
+                priceData.list_price = krwPrices[0].toString();
+                priceData.discount_price = krwPrices[1].toString();
+            } else if (krwPrices.length === 1) {
+                priceData.discount_price = krwPrices[0].toString();
+            }
+            
+            // 할인율 찾기
+            var percentElements = document.querySelectorAll('*');
+            for (var j = 0; j < percentElements.length; j++) {
+                var percentText = percentElements[j].textContent || '';
+                if (percentText.includes('%') && percentText.includes('off')) {
+                    var percentMatch = percentText.match(/(\\d+)%/);
+                    if (percentMatch) {
+                        priceData.discount_percent = percentMatch[1];
+                        break;
+                    }
+                }
+            }
+            
+            return priceData;
+            """
+            
+            result = self.driver.execute_script(js_script)
+            return result if result and len(result) > 0 else None
+            
+        except Exception:
+            return None
+    
+    def _extract_prices_from_source_optimized(self):
+        """최적화된 페이지 소스 정규식 검색"""
+        try:
+            page_source = self.driver.page_source
+            price_info = {}
+            
+            # 더 정확한 정규식 패턴들
+            patterns = {
+                'krw_in_data_testid': r'data-testid="product-price"[^>]*>\s*<p>\s*₩([\d,]+)',
+                'krw_general': r'₩([\d,]+)',
+                'krw_quoted': r'"₩([\d,]+)"',
+                'discount_percent': r'(\d+)%\s*off',
+                'price_per_serving': r'₩(\d+)/serving'
+            }
+            
+            # 첨부된 HTML 구조에 맞는 특별 패턴
+            testid_match = re.search(patterns['krw_in_data_testid'], page_source)
+            if testid_match:
+                price_info['discount_price'] = testid_match.group(1).replace(',', '')
+            
+            # 일반 원화 패턴으로 모든 가격 수집
+            krw_matches = re.findall(patterns['krw_general'], page_source)
+            if krw_matches:
+                clean_prices = []
+                for match in krw_matches:
+                    clean_price = match.replace(',', '')
+                    if len(clean_price) >= 4:
+                        clean_prices.append(int(clean_price))
+                
+                if clean_prices:
+                    unique_prices = sorted(list(set(clean_prices)), reverse=True)
+                    
+                    if not price_info.get('discount_price') and len(unique_prices) >= 1:
+                        price_info['discount_price'] = str(unique_prices[0])
+                    
+                    if len(unique_prices) >= 2:
+                        price_info['list_price'] = str(unique_prices[0])
+                        if not price_info.get('discount_price'):
+                            price_info['discount_price'] = str(unique_prices[1])
+            
+            # 할인율 패턴
+            discount_match = re.search(patterns['discount_percent'], page_source, re.IGNORECASE)
+            if discount_match:
+                price_info['discount_percent'] = discount_match.group(1)
+            
+            # 단위당 가격 패턴
+            per_serving_match = re.search(patterns['price_per_serving'], page_source)
+            if per_serving_match:
+                price_info['price_per_unit'] = f"₩{per_serving_match.group(1)}/serving"
+            
+            return price_info if price_info else None
+            
+        except Exception:
+            return None
+    
+    def _extract_price_info_original(self):
+        """아이허브 가격 정보 추출 (기존 방식 - 한국 사이트 기준, 원화 표시)"""
         try:
             price_info = {}
             extracted_items = []
@@ -331,7 +620,7 @@ class IHerbClient:
             
             # 페이지 로딩 대기
             try:
-                WebDriverWait(self.driver, 10).until(
+                WebDriverWait(self.driver, 5).until(
                     EC.presence_of_element_located((By.CSS_SELECTOR, "h1"))
                 )
             except TimeoutException:
@@ -351,7 +640,7 @@ class IHerbClient:
             else:
                 print(f"    상품코드: ✗ 추출 실패")
             
-            # 가격 정보 추출
+            # 가격 정보 추출 (최적화된 방식)
             price_info = self.extract_price_info()
             
             return product_code, iherb_product_name, price_info

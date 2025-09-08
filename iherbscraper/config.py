@@ -56,11 +56,11 @@ class Config:
     """스크래퍼 전역 설정"""
     
     # 브라우저 설정
-    DEFAULT_DELAY_RANGE = (1, 2)
+    DEFAULT_DELAY_RANGE = (0.5, 1)
     MAX_RETRIES = 3
     BROWSER_RESTART_INTERVAL = 30
-    PAGE_LOAD_TIMEOUT = 30
-    IMPLICIT_WAIT = 3
+    PAGE_LOAD_TIMEOUT = 15
+    IMPLICIT_WAIT = 2
     
     # 검색 설정
     MAX_PRODUCTS_TO_COMPARE = 4
@@ -157,7 +157,7 @@ class Config:
     PATTERNS = {
         'item_code': r'item\s*code:\s*([A-Z0-9-]+)',
         'product_code_url': r'/pr/([A-Z0-9-]+)',
-        'english_count': r'(\d+)\s*(?:count|ct|tablets?|capsules?|softgels?|veg\s*capsules?|vcaps?|pieces?|servings?)',
+        'english_count': r'(\d+)\s+(?:count|ct|tablets?|capsules?|softgels?|veg\s*capsules?|vcaps?|pieces?|servings?|tab)(?!\w)',
         'dosage_mg': r'(\d+(?:,\d+)*)\s*mg',
         'discount_percent': r'(\d+)%',
         'subscription_discount': r'(\d+)%.*?off',

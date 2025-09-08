@@ -141,7 +141,8 @@ class ProductMatcher:
             status = "매칭 불가" if (score < Config.MATCHING_THRESHOLDS['success_threshold'] or is_rejected) else "매칭 가능"
             reason = self._get_matching_reason(score, details)
             
-            print(f"    후보 {idx+1}: {status} ({score:.3f}) - {product['title'][:60]}...")
+            # 상품명 전체 표시 (줄이지 않음)
+            print(f"    후보 {idx+1}: {status} ({score:.3f}) - {product['title']}")
             if reason:
                 print(f"      └ {reason}")
             
@@ -154,11 +155,13 @@ class ProductMatcher:
         print()
         if best_match and best_score >= Config.MATCHING_THRESHOLDS['success_threshold']:
             print(f"  최종 매칭: 성공 ({best_score:.3f})")
-            print(f"    선택된 상품: {best_match['title'][:60]}...")
+            # 최종 선택된 상품명도 전체 표시
+            print(f"    선택된 상품: {best_match['title']}")
         else:
             print(f"  최종 매칭: 실패 (최고점수: {best_score:.3f})")
             if best_match:
-                print(f"    가장 유사한 상품: {best_match['title'][:60]}...")
+                # 가장 유사한 상품명도 전체 표시
+                print(f"    가장 유사한 상품: {best_match['title']}")
         
         return best_match, best_score, best_details
     
