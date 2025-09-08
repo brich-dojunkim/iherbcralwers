@@ -1,5 +1,5 @@
 """
-iHerb 스크래퍼 설정 관리 - 실패 분류 시스템 포함
+iHerb 스크래퍼 설정 관리 - 품절/단위가격 수집 개선
 """
 
 class FailureType:
@@ -102,7 +102,7 @@ class Config:
         "--page-load-strategy=eager"
     ]
     
-    # CSS 선택자
+    # CSS 선택자 - 품절/단위가격 수집 개선
     SELECTORS = {
         # 설정 관련
         'settings_button': '.selected-country-wrapper',
@@ -124,17 +124,19 @@ class Config:
         'product_specs': '#product-specs-list',
         'part_number': '[data-part-number]',
         
-        # 가격 정보 (원화 기준)
-        'subscription_discount_price': [
+        # 가격 정보 (원화 기준) - 개선된 선택자
+        'discount_price': [
+            'b.discount-price[style*="color: rgb(211, 47, 47)"]',  # 빨간색 할인가
             '.strike-through-price-wrapper.show .discount-price',
             '.discount-price-wrapper .discount-price',
-            'b.discount-price[style*="color: rgb(211, 47, 47)"]',
-            '.auto-ship-first .discount-price'
+            '.auto-ship-first .discount-price',
+            '[data-testid="product-price"] p'  # 품절 상품 가격
         ],
-        'onetime_list_price': [
-            '.original-price-config.show .list-price',
-            '.one-time-second .list-price',
-            'span.list-price'
+        'list_price': [
+            '.original-price-config.show .list-price',  # 일회성 구매 정가
+            '.one-time-second .list-price',             # 하단 일회성 옵션
+            '.list-price-content .list-price',          # 백업 정가
+            '.discount-price-unit .list-price'          # 할인 블록 내 정가
         ],
         'discount_percent': [
             '.percent-off',
@@ -149,21 +151,44 @@ class Config:
         'price_per_unit': [
             '.discount-price-per-unit',
             '.list-price-per-unit',
+            '.price-per-unit',              # 새로 추가
+            '.small.price-per-unit',        # 새로 추가 - 품절 상품용
             'span[class*="per-unit"]'
-        ]
+        ],
+        # 품절 상태 - 개선된 선택자
+        'stock_status': [
+            '[data-testid="product-stock-status"]',    # 최우선
+            '#product-stock-status',                   # 백업
+            '.out-of-stock'                           # 컨테이너
+        ],
+        'stock_message': '[data-testid="product-stock-status-text"]'
     }
     
-    # 정규표현식 패턴
+    # 정규표현식 패턴 - 품절/단위가격 패턴 개선
     PATTERNS = {
         'item_code': r'item\s*code:\s*([A-Z0-9-]+)',
         'product_code_url': r'/pr/([A-Z0-9-]+)',
         'english_count': r'(\d+)\s+(?:count|ct|tablets?|capsules?|softgels?|veg\s*capsules?|vcaps?|pieces?|servings?|tab)(?!\w)',
         'dosage_mg': r'(\d+(?:,\d+)*)\s*mg',
         'discount_percent': r'(\d+)%',
-        'subscription_discount': r'(\d+)%.*?off',
-        'krw_price': r'₩([\d,]+)',  # 원화 패턴
-        'krw_price_quoted': r'"₩([\d,]+)"',  # 따옴표 있는 원화
-        'krw_price_spaced': r'₩\s*([\d,]+)'  # 공백 있는 원화
+        'subscription_discount': r'(\d+)%\s*off\s+on.*?future.*?orders',  # 개선된 패턴
+        
+        # 원화 패턴
+        'krw_price': r'₩([\d,]+)',
+        'krw_price_quoted': r'"₩([\d,]+)"',
+        'krw_price_spaced': r'₩\s*([\d,]+)',
+        'krw_in_testid': r'data-testid="product-price"[^>]*>\s*<p>\s*₩([\d,]+)',
+        'krw_discount_price': r'<b[^>]*discount-price[^>]*>₩([\d,]+)',
+        'krw_list_price': r'<span[^>]*list-price[^>]*>₩([\d,]+)',
+        
+        # 품절 관련 - 개선된 패턴
+        'out_of_stock': r'out\s+of\s+stock',
+        'back_in_stock': r'back\s+in\s+stock\s+date',
+        'notify_me': r'notify\s+me',
+        
+        # 단위당 가격 - 새로 추가
+        'price_per_serving': r'₩(\d+)/serving',
+        'price_per_unit_general': r'₩(\d+)/(serving|unit|tablet|capsule)'
     }
     
     # 제형 매핑
@@ -188,13 +213,15 @@ class Config:
         'nordic naturals'
     ]
     
+    # 출력 컬럼 - 모든 컬럼 유지
     OUTPUT_COLUMNS = [
         'iherb_product_name', 'coupang_product_name_english', 'coupang_product_name', 
-        'similarity_score', 'matching_reason', 'failure_type',  # failure_type 컬럼 추가
+        'similarity_score', 'matching_reason', 'failure_type',
         'coupang_url', 'iherb_product_url', 'coupang_product_id', 'iherb_product_code',
         'status', 'coupang_current_price_krw', 'coupang_original_price_krw', 'coupang_discount_rate',
         'iherb_list_price_krw', 'iherb_discount_price_krw', 'iherb_discount_percent',
         'iherb_subscription_discount', 'iherb_price_per_unit',
+        'is_in_stock', 'stock_message', 'back_in_stock_date',
         'price_difference_krw', 'cheaper_platform', 'savings_amount', 'savings_percentage',
         'price_difference_note', 'processed_at', 'actual_index', 'search_language'
     ]
