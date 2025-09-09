@@ -12,16 +12,23 @@ import re
 from datetime import datetime
 import os
 import platform
+import requests
+from PIL import Image
 
 class CoupangCrawlerMacOS:
     def __init__(self, headless=False, delay_range=(2, 5)):
         """
-        macOS 최적화 쿠팡 크롤러
+        macOS 최적화 쿠팡 크롤러 - 이미지 수집 기능 추가
         """
         self.headless = headless
         self.delay_range = delay_range
         self.driver = None
         self.products = []
+        
+        # 이미지 저장 디렉토리 설정
+        self.images_dir = "coupang_images"
+        os.makedirs(self.images_dir, exist_ok=True)
+        self.downloaded_images = {}  # product_id -> image_path
         
         # Chrome 옵션 설정 (macOS 최적화)
         self.options = uc.ChromeOptions()
@@ -32,9 +39,6 @@ class CoupangCrawlerMacOS:
         self.options.add_argument('--disable-blink-features=AutomationControlled')
         self.options.add_argument('--disable-extensions')
         self.options.add_argument('--disable-plugins-discovery')
-        
-        # macOS에서 문제를 일으킬 수 있는 옵션들 제외
-        # --disable-web-security, --disable-features 등은 제외
         
         # 실험적 옵션 (macOS 호환)
         self.options.add_experimental_option("excludeSwitches", ["enable-automation"])
@@ -163,13 +167,78 @@ class CoupangCrawlerMacOS:
             print("페이지 로딩 시간 초과")
             return False
     
+    def extract_image_url_from_element(self, product_item):
+        """상품 항목에서 이미지 URL 추출"""
+        try:
+            # 여러 이미지 선택자 시도
+            image_selectors = [
+                "figure.ProductUnit_productImage__Mqcg1 img",
+                ".ProductUnit_productImage img",
+                "img[src*='thumbnail']",
+                "img[src*='coupangcdn.com']",
+                "img"
+            ]
+            
+            for selector in image_selectors:
+                try:
+                    img_element = product_item.find(selector)
+                    if img_element:
+                        img_url = img_element.get('src')
+                        if img_url and img_url.startswith('http') and 'coupangcdn.com' in img_url:
+                            return img_url
+                except:
+                    continue
+            
+            return None
+            
+        except Exception as e:
+            print(f"이미지 URL 추출 오류: {e}")
+            return None
+    
+    def download_product_image(self, product_id, image_url):
+        """상품 이미지 다운로드"""
+        try:
+            if not image_url:
+                return None
+            
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+                'Referer': 'https://www.coupang.com/'
+            }
+            
+            response = requests.get(image_url, headers=headers, timeout=10)
+            response.raise_for_status()
+            
+            # 파일명 생성
+            filename = f"coupang_{product_id}.jpg"
+            filepath = os.path.join(self.images_dir, filename)
+            
+            with open(filepath, 'wb') as f:
+                f.write(response.content)
+            
+            # 이미지 유효성 검사
+            try:
+                with Image.open(filepath) as img:
+                    img.verify()
+                return filepath
+            except:
+                # 손상된 파일 삭제
+                if os.path.exists(filepath):
+                    os.remove(filepath)
+                return None
+                
+        except Exception as e:
+            print(f"이미지 다운로드 실패 ({product_id}): {e}")
+            return None
+    
     def extract_product_info(self, product_item):
-        """개별 상품 정보 추출"""
+        """개별 상품 정보 추출 + 이미지 다운로드"""
         try:
             product = {}
             
             # 상품 ID
-            product['product_id'] = product_item.get('data-id', '')
+            product_id = product_item.get('data-id', '')
+            product['product_id'] = product_id
             
             # 상품 링크
             link_element = product_item.find('a')
@@ -224,6 +293,23 @@ class CoupangCrawlerMacOS:
             rocket_img = product_item.find('img', alt='로켓직구')
             product['is_rocket'] = rocket_img is not None
             
+            # 이미지 URL 추출 및 다운로드
+            image_url = self.extract_image_url_from_element(product_item)
+            product['image_url'] = image_url if image_url else ''
+            
+            # 이미지 다운로드 시도
+            if image_url and product_id:
+                image_path = self.download_product_image(product_id, image_url)
+                if image_path:
+                    product['image_path'] = image_path
+                    self.downloaded_images[product_id] = image_path
+                    print(f"    이미지 다운로드 성공: {product_id}")
+                else:
+                    product['image_path'] = ''
+                    print(f"    이미지 다운로드 실패: {product_id}")
+            else:
+                product['image_path'] = ''
+            
             # 크롤링 시간
             product['crawled_at'] = datetime.now().isoformat()
             
@@ -234,7 +320,7 @@ class CoupangCrawlerMacOS:
             return {}
     
     def extract_products_from_current_page(self):
-        """현재 페이지의 모든 상품 추출"""
+        """현재 페이지의 모든 상품 추출 + 이미지 다운로드"""
         try:
             # 차단 확인
             if "차단" in self.driver.title.lower():
@@ -264,10 +350,16 @@ class CoupangCrawlerMacOS:
             product_items = product_list.find_all('li', class_='ProductUnit_productUnit__Qd6sv')
             page_products = []
             
-            for item in product_items:
+            print(f"    페이지에서 {len(product_items)}개 상품 발견")
+            
+            for idx, item in enumerate(product_items):
                 product = self.extract_product_info(item)
                 if product and product.get('product_name'):
                     page_products.append(product)
+                    
+                # 이미지 다운로드 간격 조절
+                if idx % 5 == 0:
+                    time.sleep(random.uniform(0.5, 1.0))
             
             return page_products
             
@@ -308,13 +400,14 @@ class CoupangCrawlerMacOS:
             return False
     
     def crawl_all_pages(self, start_url, max_pages=None):
-        """모든 페이지 크롤링"""
+        """모든 페이지 크롤링 + 이미지 수집"""
         if not self.start_driver():
             return []
         
         try:
             print(f"크롤링 시작: {start_url}")
             print("(macOS에서는 약간의 추가 대기시간이 필요할 수 있습니다)")
+            print(f"이미지 저장 폴더: {self.images_dir}")
             
             # 첫 페이지 로드
             self.driver.get(start_url)
@@ -324,12 +417,13 @@ class CoupangCrawlerMacOS:
                 return []
             
             page_count = 0
+            total_images_downloaded = 0
             
             while True:
                 page_count += 1
                 print(f"\n=== 페이지 {page_count} 크롤링 중 ===")
                 
-                # 현재 페이지 상품 추출
+                # 현재 페이지 상품 추출 (이미지 포함)
                 page_products = self.extract_products_from_current_page()
                 
                 if not page_products and page_count == 1:
@@ -342,8 +436,13 @@ class CoupangCrawlerMacOS:
                     page_products = self.extract_products_from_current_page()
                 
                 self.products.extend(page_products)
-                print(f"페이지 {page_count}에서 {len(page_products)}개 상품 추출")
-                print(f"총 누적 상품 수: {len(self.products)}개")
+                
+                # 이미지 다운로드 통계
+                page_images = len([p for p in page_products if p.get('image_path')])
+                total_images_downloaded += page_images
+                
+                print(f"페이지 {page_count}에서 {len(page_products)}개 상품 추출 (이미지: {page_images}개)")
+                print(f"총 누적 상품 수: {len(self.products)}개 (이미지: {total_images_downloaded}개)")
                 
                 # 최대 페이지 확인
                 if max_pages and page_count >= max_pages:
@@ -370,7 +469,10 @@ class CoupangCrawlerMacOS:
                 print(f"{wait_time:.1f}초 대기 중...")
                 time.sleep(wait_time)
             
-            print(f"\n크롤링 완료! 총 {len(self.products)}개 상품 수집")
+            print(f"\n크롤링 완료!")
+            print(f"총 {len(self.products)}개 상품 수집")
+            print(f"총 {total_images_downloaded}개 이미지 다운로드")
+            
             return self.products
             
         except KeyboardInterrupt:
@@ -390,7 +492,7 @@ class CoupangCrawlerMacOS:
                 pass
     
     def save_to_csv(self, filename=None):
-        """CSV 저장"""
+        """CSV 저장 - 이미지 정보 포함"""
         if not self.products:
             print("저장할 상품이 없습니다.")
             return
@@ -403,7 +505,7 @@ class CoupangCrawlerMacOS:
             'product_id', 'product_name', 'product_url',
             'current_price', 'original_price', 'discount_rate',
             'rating', 'review_count', 'delivery_badge',
-            'is_rocket', 'crawled_at'
+            'is_rocket', 'image_url', 'image_path', 'crawled_at'
         ]
         
         try:
@@ -417,17 +519,31 @@ class CoupangCrawlerMacOS:
             
             print(f"✅ CSV 파일 저장 완료: {filename}")
             
+            # 이미지 매핑 JSON 저장
+            if self.downloaded_images:
+                mapping_filename = f'coupang_image_mapping_{datetime.now().strftime("%Y%m%d_%H%M%S")}.json'
+                with open(mapping_filename, 'w', encoding='utf-8') as f:
+                    json.dump(self.downloaded_images, f, ensure_ascii=False, indent=2)
+                print(f"✅ 이미지 매핑 저장 완료: {mapping_filename}")
+            
+            return filename
+            
         except Exception as e:
             print(f"CSV 저장 오류: {e}")
+            return None
     
     def print_summary(self):
-        """결과 요약"""
+        """결과 요약 - 이미지 정보 포함"""
         if not self.products:
             print("수집된 상품이 없습니다.")
             return
         
         print(f"\n=== 크롤링 결과 요약 ===")
         print(f"총 상품 수: {len(self.products)}개")
+        
+        # 이미지 다운로드 통계
+        products_with_images = len([p for p in self.products if p.get('image_path')])
+        print(f"이미지 다운로드 성공: {products_with_images}개 ({products_with_images/len(self.products)*100:.1f}%)")
         
         # 평점 통계
         rated_products = [p for p in self.products if p.get('rating') and isinstance(p.get('rating'), (int, float))]
@@ -442,11 +558,13 @@ class CoupangCrawlerMacOS:
         # 무료배송 상품
         free_shipping = sum(1 for p in self.products if '무료배송' in str(p.get('delivery_badge', '')))
         print(f"무료배송 상품: {free_shipping}개")
+        
+        print(f"이미지 저장 폴더: {self.images_dir}")
 
 
 # 실행 부분
 if __name__ == "__main__":
-    print("🍎 macOS용 쿠팡 크롤러를 시작합니다...")
+    print("🍎 macOS용 쿠팡 크롤러 (이미지 수집 포함)를 시작합니다...")
     
     # 크롤러 생성
     crawler = CoupangCrawlerMacOS(
@@ -461,18 +579,27 @@ if __name__ == "__main__":
     print("Ctrl+C로 언제든지 중단할 수 있습니다.")
     
     try:
-        # 크롤링 실행 (최대 5페이지로 테스트)
+        # 크롤링 실행 (이미지 수집 포함)
         products = crawler.crawl_all_pages(search_url, max_pages=None)
         
         # 결과 저장
         if products:
-            crawler.save_to_csv()
+            csv_filename = crawler.save_to_csv()
             crawler.print_summary()
+            
+            print(f"\n🎉 작업 완료!")
+            print(f"CSV 파일: {csv_filename}")
+            print(f"이미지 폴더: {crawler.images_dir}")
+            print("이제 image_experiment_runner.py를 실행할 수 있습니다.")
         else:
             print("❌ 크롤링된 상품이 없습니다.")
             print("브라우저에서 페이지 상태를 확인해주세요.")
     
     except KeyboardInterrupt:
         print("\n👋 크롤링을 중단했습니다.")
+        # 중단된 상태에서도 지금까지 수집한 데이터 저장
+        if crawler.products:
+            crawler.save_to_csv()
+            print("지금까지 수집한 데이터를 저장했습니다.")
     
     print("🎉 작업 완료!")
