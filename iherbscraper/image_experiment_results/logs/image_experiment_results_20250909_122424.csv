@@ -1,0 +1,956 @@
+﻿sample_id,coupang_product_id,iherb_product_code,coupang_product_name,iherb_product_name,original_similarity_score,coupang_image_path,iherb_image_path,both_images_available,processed_at,image_comparison_success,image_match_result,image_match_reason,coupang_ocr_text,iherb_ocr_text,coupang_extracted_fields,iherb_extracted_fields
+1,3272617402,NOW-02926,"나우푸드 프로바이오틱-10 유산균 250억 베지 캡슐, 50정","NOW Foods, Probiotic-10, 25 Billion, 50 Veg Capsules",1.053,../coupang_images/coupang_3272617402.jpg,image_experiment_results/iherb_images/iherb_01_NOW-02926.jpg,True,2025-09-09T12:16:36.704189,True,True,텍스트 충돌 없음(브랜드/계열/함량/제형/수량 기준),"nour
+4 a
+ro
+PaProbioticzi0mnH
+25Billionin1
+x-
+
+Ne
+A i
+Probiotic-10
+25Billion 5
+eles
+a
+","T)
+ee
+i
+ee 3
+PAProbioticgOmmae
+25)Billion) oF
+O-ProbloticStrains)
+Bc2ithyntestinalFlieg
+SDairvroov NT w
+
+f .
+4 4 s
+Probiotic-10
+25Billion a
+i 10ProbioticStrains
+HealthyIntestinalFlora
+Dairy.SoyGlutenF...","Fields(brand='', core='probiotic', strength='25 billion', form='', count='', strength_val=25.0, strength_unit='billion')","Fields(brand='', core='probiotic', strength='25 billion', form='', count='', strength_val=25.0, strength_unit='billion')"
+2,3276044404,NOW-01486,"나우푸드 셀레늄 200mcg 베지 캡슐, 180정","NOW Foods, Selenium, 200 mcg, 180 Veg Capsules",0.9,../coupang_images/coupang_3276044404.jpg,image_experiment_results/iherb_images/iherb_02_NOW-01486.jpg,True,2025-09-09T12:16:46.083293,True,False,함량/수치 다름 (200 mcg vs 2001 mcg),"00.med
+EE
+
+new
+Selenium
+200mcg
+Geet
+180vonCapuss
+","Ve 7
+Be Ca
+2001McG)
+
+) sh) be
+Selenium
+200mcg
+ential Mineral)
+YeastFree
+180VegCapsules
+ADietarySupplementVegetarian/Vege
+al
+","Fields(brand='', core='', strength='200 mcg', form='', count='', strength_val=200.0, strength_unit='mcg')","Fields(brand='', core='', strength='2001 mcg', form='', count='', strength_val=2001.0, strength_unit='mcg')"
+3,3088278161,NOW-02970,"나우푸드 츄어블 파파야 효소 로젠지, 180정","NOW Foods, Chewable Papaya Enzymes, 180 Lozenges",1.013,,image_experiment_results/iherb_images/iherb_03_NOW-02970.jpg,False,2025-09-09T12:16:55.982815,,,,,,,
+4,72406188389,NOW-08062,"나우푸드 솔루션 글루타티온 스킨 브라이트너 크림, 59ml","NOW Foods, Solutions, Glutathione Skin Brightener Cream, 2 fl oz (59 ml)",1.001,../coupang_images/coupang_72406188389.jpg,image_experiment_results/iherb_images/iherb_04_NOW-08062.jpg,True,2025-09-09T12:17:03.451601,True,True,텍스트 충돌 없음(브랜드/계열/함량/제형/수량 기준),"
+","ronowS
+solutians wi
+Ewe
+ito
+co
+ea)
+O%
+eesnt
+
+u
+pnowy
++(eeyririm
+","Fields(brand='', core='', strength='', form='', count='', strength_val=None, strength_unit=None)","Fields(brand='', core='', strength='', form='', count='', strength_val=None, strength_unit=None)"
+5,3272621520,NOW-07520,"나우푸드 퓨어 에센셜 아로마오일, 30ml, Camphor","NOW Foods, Essential Oils, Camphor, 1 fl oz (30 ml)",0.909,../coupang_images/coupang_3272621520.jpg,image_experiment_results/iherb_images/iherb_05_NOW-07520.jpg,True,2025-09-09T12:17:11.862980,True,True,텍스트 충돌 없음(브랜드/계열/함량/제형/수량 기준),"Row.
+rmrntiol.oth
+N
+1008%owre
+camphor
+Ll-be
+
+now
+wentialoib
+RK
+mphor
+","/mowe
+essentialoils-
+( i
+- -
+De
+CAE
+(
+100%pure
+camphor
+Cinnamomumcamphore
+i Net2f1.ox.(30mt)
+
+nou
+essentialoils
+100%pure
+camphor
+","Fields(brand='now foods', core='', strength='', form='', count='', strength_val=None, strength_unit=None)","Fields(brand='', core='', strength='', form='', count='', strength_val=None, strength_unit=None)"
+6,3086381389,NOW-02972,"나우푸드 츄어블 파파야 효소 로젠지, 360정","NOW Foods, Chewable Papaya Enzymes, 360 Lozenges",0.92,../coupang_images/coupang_3086381389.jpg,image_experiment_results/iherb_images/iherb_06_NOW-02972.jpg,True,2025-09-09T12:17:20.732171,True,True,텍스트 충돌 없음(브랜드/계열/함량/제형/수량 기준),"z nowy
+Enzymesm
+
+7.
+r Chewable q
+yPapaya
+Enzymes
+ee
+","Oe
+vaePapayame
+if
+/comeej
+Eeb
+
+E
+y
+f
+s e
+i) FA fem
+f
+ee
+bs 4
+. 5
+tf Chewable i
+wPapaya
+E
+yEnzymesj
+DigestiveSupport
+WithMintandChlorophyll
+SupportsProteinDigestion
+360Lozenges
+ADietarySupplement
+al
+","Fields(brand='', core='', strength='', form='', count='', strength_val=None, strength_unit=None)","Fields(brand='', core='', strength='', form='', count='', strength_val=None, strength_unit=None)"
+7,3086380672,NOW-02171,"Now Foods 스포츠 트리뷸러스 1000mg 타블렛, One Size","NOW Foods, Sports, Tribulus, 1,000 mg, 90 Tablets",0.999,../coupang_images/coupang_3086380672.jpg,image_experiment_results/iherb_images/iherb_07_NOW-02171.jpg,True,2025-09-09T12:17:28.280319,True,True,텍스트 충돌 없음(브랜드/계열/함량/제형/수량 기준),"f
+j 1000mg..
+StandardinedExtret
+LS Minimas45%Sepenit
+S.1e0Tabiets
+
+ripull
+","BD
+SSROETS
+BeRMENSHEALTHSIR
+S8
+90TABLETS 4
+ADietarySupplement i
+
+f 4
+f J
+a
+TRIBULUG-
+g
+UOC) an)
+x
+30TABLETS g
+ADietarySupplement
+","Fields(brand='', core='', strength='1000 mg', form='', count='', strength_val=1000.0, strength_unit='mg')","Fields(brand='', core='', strength='', form='', count='90 tablets', strength_val=None, strength_unit=None)"
+8,3086430229,NOW-04970,"나우푸드 바레리안 루트 추출물, 60ml","NOW Foods, Valerian Root Extract, 2 fl oz (59 ml)",0.914,,image_experiment_results/iherb_images/iherb_08_NOW-04970.jpg,False,2025-09-09T12:17:35.425986,,,,,,,
+9,3086436879,NOW-02137,"나우푸드 스포츠 D-리보스 파우더, 113g","NOW Foods, Sports, D-Ribose Powder, 1 lb (454 g)",0.937,,image_experiment_results/iherb_images/iherb_09_NOW-02137.jpg,False,2025-09-09T12:17:44.384747,,,,,,,
+10,3086644711,NOW-04706,"나우푸드 그린 티 추출물 400mg 베지 캡슐, 250정","NOW Foods, Green Tea Extract, 400 mg, 250 Veg Capsules",0.929,../coupang_images/coupang_3086644711.jpg,image_experiment_results/iherb_images/iherb_10_NOW-04706.jpg,True,2025-09-09T12:17:52.472421,True,True,텍스트 충돌 없음(브랜드/계열/함량/제형/수량 기준),"es
+fyaGreenTealal
+Extract
+
+5now
+ton
+yGreenTea
+Extract
+400.mg
+en 2
+We
+","( noni
+uN - nos alee
+Ma Greeniledmae
+4005ma)
+PRESET
+Bi250.VegCopsclesimmmrg
+
+ney
+Rs S
+Is is
+N -
+ri)
+GreenTea
+Extract
+400mg
+CellularProtection
+-PotentFreeRadicalScavenger
+AntioxidantPowerofVitaminC
+250...","Fields(brand='', core='', strength='', form='', count='', strength_val=None, strength_unit=None)","Fields(brand='', core='', strength='400 mg', form='', count='', strength_val=400.0, strength_unit='mg')"
+11,3087575926,NOW-00528,"나우푸드 이노시톨 파우더 비건, 227g","NOW Foods, Inositol Powder, 8 oz (227 g)",0.905,../coupang_images/coupang_3087575926.jpg,image_experiment_results/iherb_images/iherb_11_NOW-00528.jpg,True,2025-09-09T12:18:00.878905,True,True,텍스트 충돌 없음(브랜드/계열/함량/제형/수량 기준),"(
+row.
+po
+Owe
+2
+
+7Inositol
+yPowder
+","SS
+Inosito
+Powder
+
+5 1
+I 6
+yInositol
+Powder
+CellularHealth
+Supports HealthyMembraneFunction
+Myo-InositolForm
+NETWT.8OZ.(227g)
+ADietarySupplementVegetarian/Veg2
+","Fields(brand='', core='', strength='', form='', count='', strength_val=None, strength_unit=None)","Fields(brand='', core='', strength='227 g', form='', count='', strength_val=227.0, strength_unit='g')"
+12,3086380672,NOW-02171,"Now Foods 스포츠 트리뷸러스 1000mg 타블렛, One Size","NOW Foods, Sports, Tribulus, 1,000 mg, 90 Tablets",0.908,../coupang_images/coupang_3086380672.jpg,image_experiment_results/iherb_images/iherb_12_NOW-02171.jpg,True,2025-09-09T12:18:07.153898,True,True,텍스트 충돌 없음(브랜드/계열/함량/제형/수량 기준),"f
+j 1000mg..
+StandardinedExtret
+LS Minimas45%Sepenit
+S.1e0Tabiets
+
+ripull
+","BD
+SSROETS
+BeRMENSHEALTHSIR
+S8
+90TABLETS 4
+ADietarySupplement i
+
+f 4
+f J
+a
+TRIBULUG-
+g
+UOC) an)
+x
+30TABLETS g
+ADietarySupplement
+","Fields(brand='', core='', strength='1000 mg', form='', count='', strength_val=1000.0, strength_unit='mg')","Fields(brand='', core='', strength='', form='', count='90 tablets', strength_val=None, strength_unit=None)"
+13,3086579151,NOW-00260,"나우푸드 타우린 퓨어 파우더, 227g","NOW Foods, Taurine Pure Powder, 8 oz (227 g)",0.986,../coupang_images/coupang_3086579151.jpg,image_experiment_results/iherb_images/iherb_13_NOW-00260.jpg,True,2025-09-09T12:18:14.679099,True,True,텍스트 충돌 없음(브랜드/계열/함량/제형/수량 기준),"Aoki
+Ser.
+ey)
+
+5)now
+
+ut
+
+be
+Taurine
+","soRQr
+Reale
+
+I j
+Cee e
+j e a bem
+Hy
+eae
+e4 i
+ad
+e
+yTaurine
+PurePowder
+(NeroussystemHealth)
+HealthyVisualFunction
+NetWt.8oz.(227g)
+ADietarySupplementVegetarian/Veg2
+ad
+","Fields(brand='now foods', core='', strength='', form='', count='', strength_val=None, strength_unit=None)","Fields(brand='', core='', strength='227 g', form='', count='', strength_val=227.0, strength_unit='g')"
+14,88992899099,NOW-04791,"나우푸드 사프론 50mg 베지 캡슐, 60정","NOW Foods, Saffron, 50 mg, 60 Veg Capsules",0.905,../coupang_images/coupang_88992899099.jpg,image_experiment_results/iherb_images/iherb_14_NOW-04791.jpg,True,2025-09-09T12:18:23.389269,True,False,함량/수치 다름 (60 mg vs 502 mg),"eo
+Saffron
+60mg)
+a
+Na
+
+.AOWwW
+ste
+Saffron
+50mg
+a
+","1 at a
+3 )
+yROUW
+K Ve
+hae
+(/SEVTON
+502mg
+
+ney
+50mg
+
+MoodSupport
+MayHelpMaintainaPositive
+MoodandRelaxedAttitude
+WholeStigma10%Crocins
+
+60VegCapsules
+ADietarySupplementVegetarisn/Veoot
+
+at
+","Fields(brand='', core='', strength='60 mg', form='', count='', strength_val=60.0, strength_unit='mg')","Fields(brand='', core='', strength='502 mg', form='', count='', strength_val=502.0, strength_unit='mg')"
+15,3087575908,NOW-00529,"나우푸드 이노시톨 파우더 비건, 454g","NOW Foods, Inositol Powder, 1 lb (454 g)",0.921,../coupang_images/coupang_3087575908.jpg,image_experiment_results/iherb_images/iherb_15_NOW-00529.jpg,True,2025-09-09T12:18:32.197296,True,True,텍스트 충돌 없음(브랜드/계열/함량/제형/수량 기준),"ty
+Lg
+Ss
+nosito))
+Powder
+
+wwInositol
+t Powder
+","/ROSK
+weemPowde
+Sam SAE ction
+
+ad
+
+i Es
+
+k iss
+
+j d
+
+s
+
+wInosito
+
+N
+
+wPowder
+
+CellularHealth
+
+SupportsHealthyMembraneFunction
+Myo-InositolForm
+NETWT.1LB.(454g)
+ADietarySupplementVegetariaa/Vepan
+","Fields(brand='', core='', strength='', form='', count='', strength_val=None, strength_unit=None)","Fields(brand='', core='', strength='454 g', form='', count='', strength_val=454.0, strength_unit='g')"
+16,88994202134,NOW-02226,"나우푸드 스포츠 베타인 파우더, 170g","NOW Foods, Sports, Betaine Powder, 6 oz (170 g)",0.981,,image_experiment_results/iherb_images/iherb_16_NOW-02226.jpg,False,2025-09-09T12:18:41.123929,,,,,,,
+17,3086587278,NOW-00145,"나우푸드 L-테아닌 100mg 베지 캡슐 비건, 90정","NOW Foods, L-Theanine, 100 mg, 90 Veg Capsules",0.996,../coupang_images/coupang_3086587278.jpg,image_experiment_results/iherb_images/iherb_17_NOW-00145.jpg,True,2025-09-09T12:18:49.395855,True,True,텍스트 충돌 없음(브랜드/계열/함량/제형/수량 기준),"a
+
+(
+
+4 (
+
+Lyemouy
+
+KEAN
+
+Ay)
+
+)
+4
+
+enow
+Ne
+i) .
+L-Theanine
+100mg
+Seen
+","10MM
+iy
+CoTheanine
+iOOfmG)
+x Rodigum
+
+l
+t 9
+t
+(OX
+s
+.
+L-Theanine
+100mg
+StressManagement
++PromotesRelaxation
+HealthyVascularFunction
+WithDecafGreenTea
+90VegCapsules
+ACletarySupplementVegetarian/Vegs
+Ot...","Fields(brand='', core='', strength='100 mg', form='', count='', strength_val=100.0, strength_unit='mg')","Fields(brand='', core='', strength='100 mg', form='', count='', strength_val=100.0, strength_unit='mg')"
+18,3086381328,NOW-03054,"나우푸드 베타-1:3/1:6-D-글루칸 100mg 베지 캡슐, 90정","NOW Foods, Beta-1,3/1,6-D-Glucan, 100 mg, 90 Veg Capsules",0.913,,image_experiment_results/iherb_images/iherb_18_NOW-03054.jpg,False,2025-09-09T12:18:57.543049,,,,,,,
+19,3113962231,NOW-02305,"나우푸드 아스타잔틴 4mg 소프트젤, 90정","NOW Foods, Astaxanthin, 4 mg, 90 Softgels",0.9,../coupang_images/coupang_3113962231.jpg,image_experiment_results/iherb_images/iherb_19_NOW-02305.jpg,True,2025-09-09T12:19:05.085758,True,True,텍스트 충돌 없음(브랜드/계열/함량/제형/수량 기준),". now.
+
+new
+Ri
+Astaxanthin
+4mg
+90Softgels
+","oo iY
+
+ey i
+OG)
+205oftgels
+
+f i
+t
+A er e
+a nem
+t -
+yAstaxanthin
+CellularProtection
+PotentFreeRadicalNeutralizer
+SupportsBalancedImmune
+SystemResponses
+90Softgels
+ADietarySupplement
+","Fields(brand='now foods', core='', strength='4 mg', form='', count='90 softgels', strength_val=4.0, strength_unit='mg')","Fields(brand='', core='', strength='', form='', count='90 softgels', strength_val=None, strength_unit=None)"
+20,3216110985,NOW-00265,"나우푸드 L-티로신 퓨어 파우더, 113g","NOW Foods, L-Tyrosine Pure Powder, 4 oz (113 g)",0.994,,image_experiment_results/iherb_images/iherb_20_NOW-00265.jpg,False,2025-09-09T12:19:14.206213,,,,,,,
+21,3086435609,NOW-04612,"나우푸드 빌베리 컴플렉스 80mg 베지 캡슐 글루텐 프리, 100정","NOW Foods, Bilberry Complex, 100 Veg Capsules",0.807,../coupang_images/coupang_3086435609.jpg,image_experiment_results/iherb_images/iherb_21_NOW-04612.jpg,True,2025-09-09T12:19:21.868036,True,True,텍스트 충돌 없음(브랜드/계열/함량/제형/수량 기준),"yMOU
+
+VABilberryal
+Comple
+
+t )
+
+we
+
+cS
+Bilberry
+Complex
+","an F
+
+C5
+
+sd
+f .
+a avs a f
+Veciny
+Consinx
+BNC...
+
+f .
+y
+f
+e
+q i.
+Bilberry
+FreeRadicalScavenger
+80mgStandardizedExtract
+WithBeta-CaroteneRiboflevin
+100VegCapsules
+ADietarySupplementVagetarian/Veg
+","Fields(brand='', core='', strength='', form='', count='', strength_val=None, strength_unit=None)","Fields(brand='', core='', strength='', form='veg capsules', count='', strength_val=None, strength_unit=None)"
+22,4503689317,NOW-04593,"나우푸드 아슈와간다 450mg 베지 캡슐, 180정","NOW Foods, Standardized Extract Ashwagandha, 450 mg, 180 Veg Capsules",0.889,../coupang_images/coupang_4503689317.jpg,image_experiment_results/iherb_images/iherb_22_NOW-04593.jpg,True,2025-09-09T12:19:30.814748,True,True,텍스트 충돌 없음(브랜드/계열/함량/제형/수량 기준),"Sat
+t
+Ashwagandha
+
+Le
+new
+ts
+Wy
+StandardizedExtract
+Ashwagandha
+450mg
+","Ps
+a9/MStandardizedExtract i
+f (Ashwagandha
+lf G 450-ma 5)
+moves psulesaany
+
+ney
+q
+A we
+/StandardizedExtract
+Ashwagandha
+450mg
+Giirvedic Adaptogenl)
++FreeRadicalScavenger
++ImmuneSystemSupport
+180VegCa...","Fields(brand='', core='', strength='450 mg', form='', count='', strength_val=450.0, strength_unit='mg')","Fields(brand='', core='', strength='450 mg', form='', count='', strength_val=450.0, strength_unit='mg')"
+23,3191886200,NOW-00013,나우푸드 아미노 컴플릿 캡슐,"NOW Foods, Sports, Amino Complete, 360 Veg Capsules",0.886,../coupang_images/coupang_3191886200.jpg,image_experiment_results/iherb_images/iherb_23_NOW-00013.jpg,True,2025-09-09T12:19:37.461070,True,True,텍스트 충돌 없음(브랜드/계열/함량/제형/수량 기준),"TY
+CINE
+ADetarySenpneert
+
+AMINO
+vr
+See)
+","-
+ong
+
+AMINO
+COMPLETE
+/OOQe
+P28. i
+
+Pow
+
+SF Ss
+i ETE
+ie AMINOACIDS ei
+Qe)
+","Fields(brand='', core='', strength='', form='', count='', strength_val=None, strength_unit=None)","Fields(brand='', core='', strength='', form='', count='', strength_val=None, strength_unit=None)"
+24,70393847050,NOW-04786,"나우푸드 타르트 체리 500mg 베지 캡슐 비건, 90정","NOW Foods, Tart Cherry, 500 mg, 90 Veg Capsules",0.834,../coupang_images/coupang_70393847050.jpg,image_experiment_results/iherb_images/iherb_24_NOW-04786.jpg,True,2025-09-09T12:19:46.395715,True,True,텍스트 충돌 없음(브랜드/계열/함량/제형/수량 기준),"Nate
+
+ee
+Cherry)
+
+NT
+
+2
+yJlart
+Cherry
+",".-or.ett a .
+a 3
+jn
+
+Nii
+eoornG
+
+d
+% aay
+h Ne T 4
+art
+500mg
+HerbalSupplement
++501Concentrate
++GrownintheUSA
+90VegCapsules
+ADietarySupplementVegetarian/Veg
+OO
+","Fields(brand='', core='', strength='', form='', count='', strength_val=None, strength_unit=None)","Fields(brand='', core='', strength='500 mg', form='veg capsules', count='', strength_val=500.0, strength_unit='mg')"
+25,3087751301,DRB-00286,"닥터스베스트 풀리 액티브 B12 1500mcg 베지 캡, 60개입, 60정","Doctor's Best, Fully Active B12, 1,500 mcg, 60 Veggie Caps",0.847,,image_experiment_results/iherb_images/iherb_25_DRB-00286.jpg,False,2025-09-09T12:19:53.956558,,,,,,,
+26,3870204820,NOW-02108,"나우푸드 피 프로틴 파우더 언플레이버드, 680g","NOW Foods, Sports, Organic Pea Protein Powder, Pure Unflavored, 1.5 lbs (680 g)",0.836,,image_experiment_results/iherb_images/iherb_26_NOW-02108.jpg,False,2025-09-09T12:20:01.571640,,,,,,,
+27,3276044404,NOW-01486,"나우푸드 셀레늄 200mcg 베지 캡슐, 180정","NOW Foods, Selenium, 200 mcg, 180 Veg Capsules",0.876,../coupang_images/coupang_3276044404.jpg,image_experiment_results/iherb_images/iherb_27_NOW-01486.jpg,True,2025-09-09T12:20:09.293464,True,False,함량/수치 다름 (200 mcg vs 2001 mcg),"00.med
+EE
+
+new
+Selenium
+200mcg
+Geet
+180vonCapuss
+","Ve 7
+Be Ca
+2001McG)
+
+) sh) be
+Selenium
+200mcg
+ential Mineral)
+YeastFree
+180VegCapsules
+ADietarySupplementVegetarian/Vege
+al
+","Fields(brand='', core='', strength='200 mcg', form='', count='', strength_val=200.0, strength_unit='mcg')","Fields(brand='', core='', strength='2001 mcg', form='', count='', strength_val=2001.0, strength_unit='mcg')"
+28,3275509624,NOW-02381,"나우푸드 포스파티딜 세린 100mg 베지 캡슐 비건, 120정","NOW Foods, Phosphatidyl Serine, 100 mg, 120 Veg Capsules",0.887,../coupang_images/coupang_3275509624.jpg,image_experiment_results/iherb_images/iherb_28_NOW-02381.jpg,True,2025-09-09T12:20:16.919246,True,False,함량/수치 다름 (4100 mg vs 100 mg),"MOUS
+e
+Phosphati
+Serine)
+00.
+nnercaihdar
+
+neu
+
+Y
+
+%4
+
+e
+Phosphatidy
+Serine
+4100mg
+CogatveHoaktht
+
+merMlemoryandoesnF
+Ee
+","/iaenn . a
+4Phosphatidylmm
+Serine
+oan)
+ive
+. aK S ae psulesaaaan
+
+uy 1
+Phosphatidy
+Serine
+100mg
+CognitiveHealth
+SupportsMemoryandBrainFunction
+PromotesIntercellularCommunication
+120VegCapsules
+ADietar...","Fields(brand='', core='', strength='4100 mg', form='', count='', strength_val=4100.0, strength_unit='mg')","Fields(brand='', core='', strength='100 mg', form='', count='', strength_val=100.0, strength_unit='mg')"
+29,3213996807,NOW-01276,"나우푸드 코랄 칼슘 플러스 베지 캡슐 글루텐 프리, 알약/캡슐, 범용, 100정","NOW Foods, Coral Calcium Plus, 100 Veg Capsules",0.819,,image_experiment_results/iherb_images/iherb_29_NOW-01276.jpg,False,2025-09-09T12:20:23.640349,,,,,,,
+30,3265968717,NOW-07540,"나우푸드 에센셜 방향아로마오일, 30ml","NOW Foods, Essential Oils, Clove, 1 fl oz (30 ml)",0.844,../coupang_images/coupang_3265968717.jpg,image_experiment_results/iherb_images/iherb_30_NOW-07540.jpg,True,2025-09-09T12:20:32.663919,True,True,텍스트 충돌 없음(브랜드/계열/함량/제형/수량 기준),"eucalyptus
+Lad-mbe
+
+Row
+sentially
+FE
+OO%pure
+eucalyptus
+adiata
+","/rowe
+l essentialoils j
+1
+lw
+fs al
+n
+
+100%pure
+clove
+Eugemacaryophyttus
+16oz.(30mt)
+
+rou
+essentialoils
+t
+as
+100%pure
+clove
+","Fields(brand='', core='', strength='', form='', count='', strength_val=None, strength_unit=None)","Fields(brand='', core='', strength='', form='', count='', strength_val=None, strength_unit=None)"
+31,4503644869,NOW-03376,"나우푸드 사과 식초 750mg 타블렛 비건, 180정","NOW Foods, Apple Cider Vinegar, 750 mg, 180 Tablets",0.861,../coupang_images/coupang_4503644869.jpg,image_experiment_results/iherb_images/iherb_31_NOW-03376.jpg,True,2025-09-09T12:20:40.371184,True,True,텍스트 충돌 없음(브랜드/계열/함량/제형/수량 기준),"now.
+ae
+
+A now
+u4
+yy ExtroStrongth
+AppleCider
+Vinegar
+750mg
+od
+","who
+
+Vinegar
+
+.
+BeoeOREID.n8
+
+e
+
+i
+
+ExtraStrength i
+AppleCider
+
+Vinegar
+750mg
+NutritionalSupplement
+Pele
+NN
+","Fields(brand='now foods', core='', strength='750 mg', form='', count='', strength_val=750.0, strength_unit='mg')","Fields(brand='', core='', strength='750 mg', form='', count='', strength_val=750.0, strength_unit='mg')"
+32,3113938835,NOW-04852,"나우푸드 엘더베리 리퀴드, 237ml","NOW Foods, Elderberry Liquid, 500 mg, 8 fl oz (237 ml)",0.887,,image_experiment_results/iherb_images/iherb_32_NOW-04852.jpg,False,2025-09-09T12:20:49.095686,,,,,,,
+33,3392993451,NOW-07577,"나우푸드 에센셜 방향아로마오일 오레가노, 30ml","NOW Foods, Essential Oils, Oil of Oregano, 1 fl oz (30 ml)",0.879,,image_experiment_results/iherb_images/iherb_33_NOW-07577.jpg,False,2025-09-09T12:20:56.715973,,,,,,,
+34,3086191674,NOW-00260,"나우푸드 이눌린 퓨어 파우더, 227g","NOW Foods, Taurine Pure Powder, 8 oz (227 g)",0.869,../coupang_images/coupang_3086191674.jpg,image_experiment_results/iherb_images/iherb_34_NOW-00260.jpg,True,2025-09-09T12:21:04.452402,True,True,텍스트 충돌 없음(브랜드/계열/함량/제형/수량 기준),"4 nour
+td .
+
+sS
+K
+YCertified
+Inulin
+PrebioticPurePowder
+Itestinalsupport
+NoutlthesFriendbyGacter
+0)WeYkew-Gtycemicindo
+NETWT.8O2.(2279)o
+","soRQr
+Reale
+
+I j
+Cee e
+j e a bem
+Hy
+eae
+e4 i
+ad
+e
+yTaurine
+PurePowder
+(NeroussystemHealth)
+HealthyVisualFunction
+NetWt.8oz.(227g)
+ADietarySupplementVegetarian/Veg2
+ad
+","Fields(brand='', core='', strength='', form='', count='', strength_val=None, strength_unit=None)","Fields(brand='', core='', strength='227 g', form='', count='', strength_val=227.0, strength_unit='g')"
+35,92075675751,NOW-00995,"나우푸드 MK-7 비타민 K-2 엑스트라 스트렝스 300mcg 베지 캡슐, 120정","NOW Foods, MK-7, Vitamin K-2, 300 mcg, 120 Veg Capsules",0.808,../coupang_images/coupang_92075675751.jpg,image_experiment_results/iherb_images/iherb_35_NOW-00995.jpg,True,2025-09-09T12:21:13.456880,True,True,텍스트 충돌 없음(브랜드/계열/함량/제형/수량 기준),"yoo
+2
+ee
+
+neu
+MK-7
+VitaminK-2
+buvaStrength-300t
+es
+ed
+","a
+
+ee
+WARNIKAA
+
+ExtraStrenathac0o.nes)
+
+Fe e
+MK-7
+VitaminK-2
+ExtraStrength-300mcg
+SupportsBoneHealth
+CardiovascularSupport
+120VegCapsules
+ADietarySupplementVegetarian/Vege
+","Fields(brand='', core='', strength='', form='', count='', strength_val=None, strength_unit=None)","Fields(brand='', core='', strength='300 mcg', form='', count='', strength_val=300.0, strength_unit='mcg')"
+36,3392995044,NOW-07482,"나우푸드 퓨어 에센셜 캐롯 씨드 오일, 30ml","NOW Foods, Essential Oils, Carrot Seed Oil, 1 fl. oz. (30 ml)",0.866,../coupang_images/coupang_3392995044.jpg,image_experiment_results/iherb_images/iherb_36_NOW-07482.jpg,True,2025-09-09T12:21:22.714790,True,True,텍스트 충돌 없음(브랜드/계열/함량/제형/수량 기준),"few).
+eovemcsal-onle
+- 100%pure
+carrot
+seedoil
+ce
+
+now
+watialoil
+4
+20%pure
+arrot
+eedoil
+","Tl
+J
+
+a
+(
+nows
+essentialoils
+. i
+FINSN
+(Jo pi
+1009%pure
+carrot.
+seedoil
+Daucuscarota 4
+1fi.oz.(30mL)
+
+.
+
+essentialoils t
+Z
+
+Ya
+100%pure
+carrot3
+seedoil
+Daucuscarota 4
+oe
+","Fields(brand='now foods', core='', strength='', form='', count='', strength_val=None, strength_unit=None)","Fields(brand='', core='', strength='', form='', count='', strength_val=None, strength_unit=None)"
+37,3214136429,NOW-00094,"나우푸드 L-글루타민 1000mg 베지 캡슐, 120정","NOW Foods, Sports, L-Glutamine, 1,000 mg, 120 Veg Capsules",0.845,../coupang_images/coupang_3214136429.jpg,image_experiment_results/iherb_images/iherb_37_NOW-00094.jpg,True,2025-09-09T12:22:10.826150,True,True,텍스트 충돌 없음(브랜드/계열/함량/제형/수량 기준),"L-GLUTAMINE
+OOMG.
+OSs
+
+2a
+GL Ml E
+1
+ea
+ADetatyGopplene 4
+","a
+SPORTS
+L-GLUTAMINE
+1000MG
+
+a
+6
+SI Ss
+Bianveetarsuces s
+Sur ADietarySupplement
+","Fields(brand='', core='', strength='', form='', count='', strength_val=None, strength_unit=None)","Fields(brand='', core='', strength='1000 mg', form='', count='', strength_val=1000.0, strength_unit='mg')"
+38,3213914307,NOW-02957,"나우푸드 츄이자임 내추럴 베리 츄어블 비건, 90정","NOW Foods, ChewyZymes, Natural Berry Flavor, 90 Chewables",0.807,../coupang_images/coupang_3213914307.jpg,image_experiment_results/iherb_images/iherb_38_NOW-02957.jpg,True,2025-09-09T12:22:19.561908,True,True,텍스트 충돌 없음(브랜드/계열/함량/제형/수량 기준),"C )
+5 now.
+
+i i
+ChewyZymes 1
+","re - a
+(
+( . e
+ay
+ENaurlconysted
+
+t .
+a nowy
+ft
+. FA i
+t .
+Hi A
+.
+6
+)So
+1 .
+t iF
+ChewyZymesj
+BroadSpectrumChewableEnzymes 1
+DigestiveHealth
+-NaturalBerryFlavor j
++GreatforAdultsKids y
+90Chewables
+ADie...","Fields(brand='now foods', core='', strength='', form='', count='', strength_val=None, strength_unit=None)","Fields(brand='', core='', strength='', form='', count='', strength_val=None, strength_unit=None)"
+39,3086593697,NOW-02631,나우푸드 클로렐라 500mg 타블렛,"NOW Foods, Certified Organic Chlorella, 500 mg, 200 Tablets",0.817,,image_experiment_results/iherb_images/iherb_39_NOW-02631.jpg,False,2025-09-09T12:22:26.871554,,,,,,,
+40,3272576656,NOW-07570,"나우푸드 퓨어 에센셜 아로마오일 오렌지, 30ml","NOW Foods, Essential Oils, Orange, 1 fl oz (30 ml)",0.891,../coupang_images/coupang_3272576656.jpg,image_experiment_results/iherb_images/iherb_40_NOW-07570.jpg,True,2025-09-09T12:22:35.003234,True,True,텍스트 충돌 없음(브랜드/계열/함량/제형/수량 기준),"eential.osh
+100%pure
+orange
+
+now
+exsensialovls
+
+G
+.
+
+orange
+","j
+
+7
+PTT
+ole
+essentialoils
+7 4
+mc 4
+g aa
+eee
+ep)
+. i
+100%pure
+Orange
+Cittussinensis i
+11.oz.(30mL) 4
+
+now
+essentialoils
+100%pure
+Orange
+Citrussinensis
+1fl.o2.(30mt
+","Fields(brand='now foods', core='', strength='', form='', count='', strength_val=None, strength_unit=None)","Fields(brand='now foods', core='', strength='4 g', form='', count='', strength_val=4.0, strength_unit='g')"
+41,3272570501,NOW-07576,"나우푸드 퓨어 에센셜 아로마오일 파출리, 30ml","NOW Foods, Essential Oils, Neroli, 1 fl oz (30 ml)",0.717,,image_experiment_results/iherb_images/iherb_41_NOW-07576.jpg,False,2025-09-09T12:22:44.008615,,,,,,,
+42,3392995041,NOW-07545,"나우푸드 에센셜 아로마오일 유칼립투스, 118ml","NOW Foods, Essential Oils, Eucalyptus, 1 fl oz (30 ml)",0.345,,image_experiment_results/iherb_images/iherb_42_NOW-07545.jpg,False,2025-09-09T12:22:50.772367,,,,,,,
+43,3143424306,NOW-04703,"나우푸드 그라비올라 500mg 베지 캡슐 비건 글루텐 프리, 100정","NOW Foods, Graviola, 500 mg, 100 Veg Capsules",0.738,../coupang_images/coupang_3143424306.jpg,image_experiment_results/iherb_images/iherb_43_NOW-04703.jpg,True,2025-09-09T12:22:57.787205,True,True,텍스트 충돌 없음(브랜드/계열/함량/제형/수량 기준),"eS
+(ase
+
+.AoUw
+toe
+Graviola
+500mg .
+et
+","a
+T4
+He
+YCranfol
+Ry
+
+ney
+1 % Bey
+ed
+Graviola
+500mg
+HealthyCellFunction
+Dyce) FreeRadicalScavenger
+to 100V I
+Mneacytgdeepeern
+","Fields(brand='', core='', strength='500 mg', form='', count='', strength_val=500.0, strength_unit='mg')","Fields(brand='', core='', strength='500 mg', form='', count='', strength_val=500.0, strength_unit='mg')"
+44,3085663865,NOW-02008,"나우푸드 베타 알라닌 750mg 베지 캡슐, 120정","NOW Foods, Sports, Beta-Alanine, Endurance, 750 mg, 120 Veg Capsules",0.767,../coupang_images/coupang_3085663865.jpg,image_experiment_results/iherb_images/iherb_44_NOW-02008.jpg,True,2025-09-09T12:23:04.440045,True,True,텍스트 충돌 없음(브랜드/계열/함량/제형/수량 기준),"(ss)
+AY
+BETA
+ALANINE
+
+EHIURAACES a
+Bee
+SExeRavesCaPsues975
+Sv
+
+","BETAj
+ALANINE
+ReaeICaNa
+
+eae
+i
+noe
+j S Ss
+BETA
+ST.
+eves a
+","Fields(brand='', core='', strength='', form='', count='', strength_val=None, strength_unit=None)","Fields(brand='', core='', strength='', form='', count='', strength_val=None, strength_unit=None)"
+45,3086572412,NOW-00068,"나우푸드 TMG 베타인 1000mg 타블렛, 100정","NOW Foods, L-Carnitine, 1000 mg, 100 Tablets",0.737,../coupang_images/coupang_3086572412.jpg,image_experiment_results/iherb_images/iherb_45_NOW-00068.jpg,True,2025-09-09T12:23:11.094892,True,True,텍스트 충돌 없음(브랜드/계열/함량/제형/수량 기준),"a
+a sf now
+2p
+
+TNVIGH
+a
+
+Betaine-1.000m9
+100Tablets
+","T.-Y
+(- ba
+eyonou4
+
+4U-Carnitineme
+(ees)
+PurestForm Snes os
+
+74 e
+id
+be
+me) e nem su
+We f
+at ne es
+e . od
+S I
+t me
+5 . .
+wyL-Carnitine
+I 1000mg
+PurestForm.ClinicallyTested
+FitnessSupport
++BoostsCellul...","Fields(brand='now foods', core='', strength='', form='', count='100 tablets', strength_val=None, strength_unit=None)","Fields(brand='', core='', strength='1000 mg', form='', count='100 tablets', strength_val=1000.0, strength_unit='mg')"
+46,3265963332,NOW-07612,"나우푸드 에센셜 방향아로마오일 프로텍티브 블렌드, Nature's Shield","NOW Foods, Essential Oils, Nature's Shield, 1 fl oz (30 ml)",0.79,../coupang_images/coupang_3265963332.jpg,image_experiment_results/iherb_images/iherb_46_NOW-07612.jpg,True,2025-09-09T12:23:17.867453,True,True,텍스트 충돌 없음(브랜드/계열/함량/제형/수량 기준),"Shield
+
+Natures
+oe
+","a
+four.
+essentialoils
+( vo
+
+SS We
+oY. ees.
+Protectiveblend 4
+
+j 1H02.(30mt)
+
+essentialoils
+-
+
+t
+Natures
+Shield
+Protectiveblend
+","Fields(brand='', core='', strength='', form='', count='', strength_val=None, strength_unit=None)","Fields(brand='', core='', strength='', form='', count='', strength_val=None, strength_unit=None)"
+47,5118210369,NOW-03016,"나우푸드 엑스트라 스트렝스 비오틴 베지 캡슐, 120정","NOW Foods, Celadrin & MSM, 120 Capsules",0.72,../coupang_images/coupang_5118210369.jpg,image_experiment_results/iherb_images/iherb_47_NOW-03016.jpg,True,2025-09-09T12:23:26.984056,True,True,텍스트 충돌 없음(브랜드/계열/함량/제형/수량 기준),"(A
+ee
+
+ea
+7.
+
+i ExtreStrength
+Biotin
+19mg(10.000mes
+ad
+","(
+
+i 8
+
+8 io
+
+SS 3
+BO) UE Celad ie
+
+ee
+5
+j aw f
+%
+bi
+9 Nes e
+Se 3
+Celadrin
+2
+MSM
+AdvancedJointSupport
++SupportsJointMobility
++500mgCeladrin
+Ayer 120Capsules
+NEE ADietarySupplement
+","Fields(brand='', core='', strength='19 mg', form='', count='', strength_val=19.0, strength_unit='mg')","Fields(brand='', core='', strength='', form='', count='120 capsules', strength_val=None, strength_unit=None)"
+48,3214901309,NOW-07595,"나우푸드 퓨어 & 내추럴 로즈 힙 시드 오일, 30ml","NOW Foods, Solutions, Rose Hip Seed Oil, 1 fl oz (30 ml)",0.792,,image_experiment_results/iherb_images/iherb_48_NOW-07595.jpg,False,2025-09-09T12:23:34.793220,,,,,,,
+49,70393847161,LEX-23106,"나우푸드 블랙 쿠민 씨드 오일 1000mg 소프트젤, 60정","Life Extension, Black Cumin Seed Oil and Curcumin Elite™, 60 Softgels",0.32,,image_experiment_results/iherb_images/iherb_49_LEX-23106.jpg,False,2025-09-09T12:23:42.694968,,,,,,,
+50,4722785945,NCS-67937,"뉴트리코스트 L-테아닌 200mg 캡슐, 120정","Nutricost, L-Theanine, 200 mg, 120 Capsules",0.787,,image_experiment_results/iherb_images/iherb_50_NCS-67937.jpg,False,2025-09-09T12:23:50.396751,,,,,,,

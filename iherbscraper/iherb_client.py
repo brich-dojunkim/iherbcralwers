@@ -1,24 +1,27 @@
 """
-아이허브 사이트 상호작용 모듈 - 정규식 기반 가격 추출 최적화
+아이허브 사이트 상호작용 모듈 - 이미지 크롤링 기능 추가
 """
 
 import time
 import re
+import os
+import requests
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
 from config import Config
+from PIL import Image
 
 
 class IHerbClient:
-    """아이허브 사이트와의 모든 상호작용 담당 - 정규식 기반 가격 추출"""
+    """아이허브 사이트와의 모든 상호작용 담당 - 이미지 크롤링 포함"""
     
     def __init__(self, browser_manager):
         self.browser = browser_manager
         self.driver = browser_manager.driver
     
-    # ========== 언어 설정 관련 메서드 ==========
+    # ========== 기존 언어 설정 관련 메서드 ==========
     
     def set_language_to_english(self):
         """아이허브 언어를 영어로 자동 설정 - 빠른 버전"""
@@ -132,7 +135,7 @@ class IHerbClient:
             print("  영어 사이트 접속 실패")
             return False
     
-    # ========== 검색 관련 메서드 ==========
+    # ========== 기존 검색 관련 메서드 ==========
     
     def get_multiple_products(self, search_url):
         """검색 결과에서 여러 상품 정보 추출"""
@@ -180,7 +183,7 @@ class IHerbClient:
             print(f"    검색 결과 추출 실패: {e}")
             return []
     
-    # ========== 상품 정보 추출 메서드 ==========
+    # ========== 기존 상품 정보 추출 메서드 ==========
     
     def extract_product_name(self):
         """상품명 추출 - 타임아웃 단축"""
@@ -226,7 +229,7 @@ class IHerbClient:
         
         return None
     
-    # ========== 정규식 기반 가격 정보 추출 메서드 ==========
+    # ========== 기존 정규식 기반 가격 정보 추출 메서드 ==========
     
     def extract_price_info(self):
         """정규식 기반 가격 정보 추출 - 최대 속도 최적화"""
@@ -395,7 +398,96 @@ class IHerbClient:
         except Exception as e:
             print(f"    가격 정보 검증 오류: {e}")
     
-    # ========== 통합 메서드 ==========
+    # ========== 새로 추가: 이미지 크롤링 메서드 ==========
+    
+    def extract_product_image_url(self, product_url=None):
+        """아이허브 상품 이미지 URL 추출"""
+        try:
+            if product_url:
+                if not self.browser.safe_get(product_url):
+                    return None
+                time.sleep(2)
+            
+            # 실제 HTML 구조 기반 선택자 (제공된 HTML 구조 반영)
+            image_selectors = [
+                "#iherb-product-image",                                    # 메인 상품 이미지 ID
+                ".product-summary-image img",                              # 상품 요약 이미지
+                "img[src*='cloudinary.images-iherb.com']",                # 클라우드너리 이미지
+                ".product-easyzoom img",                                   # 줌 가능한 이미지
+                "img[alt*='NOW Foods']",                                   # 브랜드명 기반
+                "img[width='400'][height='400']"                          # 400x400 상품 이미지
+            ]
+            
+            for selector in image_selectors:
+                try:
+                    img_element = self.driver.find_element(By.CSS_SELECTOR, selector)
+                    img_url = img_element.get_attribute("src")
+                    if img_url and img_url.startswith("http") and "iherb.com" in img_url:
+                        print(f"    이미지 URL 추출 성공: {selector}")
+                        return img_url
+                except:
+                    continue
+            
+            print("    이미지 URL 추출 실패")
+            return None
+            
+        except Exception as e:
+            print(f"    이미지 URL 추출 오류: {e}")
+            return None
+    
+    def download_product_image(self, image_url, output_path):
+        """상품 이미지 다운로드"""
+        try:
+            if not image_url:
+                return False
+            
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+                'Referer': 'https://www.iherb.com/'
+            }
+            
+            response = requests.get(image_url, headers=headers, timeout=10)
+            response.raise_for_status()
+            
+            # 디렉토리 생성
+            os.makedirs(os.path.dirname(output_path), exist_ok=True)
+            
+            with open(output_path, 'wb') as f:
+                f.write(response.content)
+            
+            # 이미지 유효성 검사
+            try:
+                with Image.open(output_path) as img:
+                    img.verify()
+                print(f"    이미지 다운로드 성공: {os.path.basename(output_path)}")
+                return True
+            except:
+                # 손상된 파일 삭제
+                if os.path.exists(output_path):
+                    os.remove(output_path)
+                print(f"    이미지 파일 손상: {os.path.basename(output_path)}")
+                return False
+                
+        except Exception as e:
+            print(f"    이미지 다운로드 실패: {e}")
+            return False
+    
+    def extract_and_download_image(self, product_url, output_path):
+        """이미지 URL 추출 + 다운로드 통합 메서드"""
+        try:
+            # 이미지 URL 추출
+            image_url = self.extract_product_image_url(product_url)
+            if not image_url:
+                return False
+            
+            # 이미지 다운로드
+            return self.download_product_image(image_url, output_path)
+            
+        except Exception as e:
+            print(f"    이미지 추출/다운로드 실패: {e}")
+            return False
+    
+    # ========== 기존 통합 메서드 ==========
     
     def extract_product_info_with_price(self, product_url):
         """상품 정보와 가격 정보를 함께 추출 - 정규식 기반 최적화"""
