@@ -1,5 +1,5 @@
 """
-아이허브 사이트 상호작용 모듈 - 최대 속도 최적화 버전
+아이허브 사이트 상호작용 모듈 - 정규식 기반 가격 추출 최적화
 """
 
 import time
@@ -12,7 +12,7 @@ from config import Config
 
 
 class IHerbClient:
-    """아이허브 사이트와의 모든 상호작용 담당 - 최대 속도 최적화"""
+    """아이허브 사이트와의 모든 상호작용 담당 - 정규식 기반 가격 추출"""
     
     def __init__(self, browser_manager):
         self.browser = browser_manager
@@ -226,183 +226,179 @@ class IHerbClient:
         
         return None
     
-    # ========== 가격 정보 추출 메서드 (최대 속도 최적화) ==========
+    # ========== 정규식 기반 가격 정보 추출 메서드 ==========
     
     def extract_price_info(self):
-        """최대 속도 최적화 가격 정보 추출"""
+        """정규식 기반 가격 정보 추출 - 최대 속도 최적화"""
         try:
-            # JavaScript 한 번 실행으로 모든 정보 수집
-            result = self._extract_all_info_with_javascript()
-            if result:
-                return result
+            extraction_start = time.time()
             
-            # JavaScript 실패 시에만 정규식 백업 (CSS 단계 완전 생략)
-            print("    JavaScript 실패 - 정규식 백업")
-            return self._extract_with_regex_fast()
+            # 1. 페이지 소스 한 번만 가져오기
+            page_source = self.driver.page_source
+            
+            # 2. 정규식으로 모든 정보 일괄 추출
+            price_info = self._extract_with_regex_optimized(page_source)
+            
+            print(f"    가격 정보: ✓ 정규식 일괄처리 ({time.time() - extraction_start:.2f}초)")
+            
+            return price_info
             
         except Exception as e:
             print(f"    가격 정보 추출 중 오류: {e}")
             return {}
     
-    def _extract_all_info_with_javascript(self):
-        """JavaScript 한 번 실행으로 모든 정보 수집 (최고 속도)"""
+    def _extract_with_regex_optimized(self, page_source):
+        """최적화된 정규식 가격 정보 추출"""
+        price_info = {}
+        
         try:
-            extraction_start = time.time()
+            # 1. 할인가 추출 (우선순위별)
+            discount_patterns = [
+                Config.PATTERNS['krw_discount_price_red'],      # 빨간색 할인가 (가장 정확)
+                Config.PATTERNS['krw_discount_price_simple'],   # 일반 할인가
+                Config.PATTERNS['krw_out_of_stock_price'],      # 품절 상품 가격
+            ]
             
-            # 모든 정보를 한 번에 수집하는 최적화된 JavaScript
-            js_script = """
-            var result = {
-                prices: [],
-                discount_percent: '',
-                is_in_stock: true,
-                stock_message: '',
-                back_in_stock_date: '',
-                price_per_unit: '',
-                subscription_discount: ''
-            };
+            for pattern in discount_patterns:
+                match = re.search(pattern, page_source, re.IGNORECASE)
+                if match:
+                    price_info['discount_price'] = match.group(1).replace(',', '')
+                    break
             
-            // 한 번의 DOM 스캔으로 모든 정보 수집
-            var allElements = document.querySelectorAll('*');
+            # 2. 정가 추출 (모든 매치에서 최고가 선택)
+            list_patterns = [
+                Config.PATTERNS['krw_list_price_span'],      # span 태그 내 정가
+                Config.PATTERNS['krw_list_price_general'],   # 일반 정가
+            ]
             
-            for (var i = 0; i < allElements.length; i++) {
-                var el = allElements[i];
-                var text = el.textContent || '';
-                var testId = el.getAttribute('data-testid') || '';
-                var className = el.className || '';
+            all_list_prices = []
+            for pattern in list_patterns:
+                matches = re.findall(pattern, page_source, re.IGNORECASE)
+                if matches:
+                    for match in matches:
+                        try:
+                            clean_price = int(match.replace(',', ''))
+                            if clean_price >= 1000:  # 최소 1000원 이상만
+                                all_list_prices.append(clean_price)
+                        except:
+                            continue
+            
+            if all_list_prices:
+                price_info['list_price'] = str(max(all_list_prices))
+            
+            # 3. 할인율 추출
+            percent_patterns = [
+                Config.PATTERNS['percent_off_bracket'],   # (29% off) 형태
+                Config.PATTERNS['percent_off_simple'],    # 29% off 형태
+            ]
+            
+            for pattern in percent_patterns:
+                match = re.search(pattern, page_source, re.IGNORECASE)
+                if match:
+                    price_info['discount_percent'] = match.group(1)
+                    break
+            
+            # 4. 단위당 가격 추출
+            unit_patterns = [
+                Config.PATTERNS['price_per_unit_span'],      # span 태그 내
+                Config.PATTERNS['price_per_serving_direct'], # ₩xxx/serving 직접
+                Config.PATTERNS['price_per_unit_text'],      # 일반 텍스트
+            ]
+            
+            for pattern in unit_patterns:
+                match = re.search(pattern, page_source, re.IGNORECASE)
+                if match:
+                    if len(match.groups()) >= 2:
+                        price_info['price_per_unit'] = f"₩{match.group(1)}/{match.group(2)}"
+                    else:
+                        price_info['price_per_unit'] = match.group(0)
+                    break
+            
+            # 5. 정기배송 할인 추출
+            subscription_patterns = [
+                Config.PATTERNS['subscription_discount_future'],   # future orders
+                Config.PATTERNS['subscription_discount_autoship'], # autoship
+            ]
+            
+            for pattern in subscription_patterns:
+                match = re.search(pattern, page_source, re.IGNORECASE)
+                if match:
+                    price_info['subscription_discount'] = match.group(1)
+                    break
+            
+            # 6. 품절 상태 확인
+            stock_patterns = [
+                Config.PATTERNS['out_of_stock_testid'],   # data-testid 기반
+                Config.PATTERNS['out_of_stock_text'],     # 일반 텍스트
+            ]
+            
+            is_out_of_stock = False
+            for pattern in stock_patterns:
+                if re.search(pattern, page_source, re.IGNORECASE):
+                    is_out_of_stock = True
+                    break
+            
+            price_info['is_in_stock'] = not is_out_of_stock
+            price_info['stock_message'] = 'Out of stock' if is_out_of_stock else ''
+            
+            # 7. 재입고 날짜 추출 (품절인 경우만)
+            if is_out_of_stock:
+                back_stock_patterns = [
+                    Config.PATTERNS['back_in_stock_date_testid'],  # data-testid 기반
+                    Config.PATTERNS['back_in_stock_general'],      # 일반 패턴
+                ]
                 
-                // 1. 가격 수집
-                if (text.includes('₩') && text.match(/₩[\\d,]+/)) {
-                    var matches = text.match(/₩([\\d,]+)/g);
-                    if (matches) {
-                        matches.forEach(function(match) {
-                            var cleanPrice = match.replace(/[^\\d]/g, '');
-                            if (cleanPrice.length >= 4) {
-                                result.prices.push(parseInt(cleanPrice));
-                            }
-                        });
-                    }
-                }
-                
-                // 2. 품절 상태 확인
-                if (testId === 'product-stock-status' && text.toLowerCase().includes('out of stock')) {
-                    result.is_in_stock = false;
-                    result.stock_message = 'Out of stock';
-                }
-                
-                // 3. 재입고 날짜
-                if (testId === 'product-stock-status-text' && text.trim()) {
-                    result.back_in_stock_date = text.trim();
-                }
-                
-                // 4. 단위당 가격
-                if ((className.includes('price-per-unit') || className.includes('per-unit')) && 
-                    text.includes('₩') && (text.includes('/serving') || text.includes('/unit'))) {
-                    result.price_per_unit = text.trim();
-                }
-                
-                // 5. 할인율
-                if (text.includes('%') && text.includes('off') && !result.discount_percent) {
-                    var percentMatch = text.match(/(\\d+)%/);
-                    if (percentMatch) {
-                        result.discount_percent = percentMatch[1];
-                    }
-                }
-                
-                // 6. 정기배송 할인 (미래 주문)
-                if (text.toLowerCase().includes('future') && text.toLowerCase().includes('orders') && 
-                    text.includes('%') && text.includes('off')) {
-                    var futureMatch = text.match(/(\\d+)%\\s*off\\s+on.*?future/);
-                    if (futureMatch && !result.subscription_discount) {
-                        result.subscription_discount = futureMatch[1];
-                    }
-                }
-            }
+                for pattern in back_stock_patterns:
+                    match = re.search(pattern, page_source, re.IGNORECASE)
+                    if match:
+                        back_date = match.group(1).strip()
+                        if back_date and len(back_date) > 3:
+                            price_info['back_in_stock_date'] = back_date
+                        break
             
-            // 가격 정리
-            var uniquePrices = [...new Set(result.prices)].sort(function(a, b) { return b - a; });
-            var finalResult = {};
+            # 8. 데이터 검증 및 정리
+            self._validate_and_clean_price_info(price_info)
             
-            if (uniquePrices.length >= 2) {
-                finalResult.list_price = uniquePrices[0].toString();
-                finalResult.discount_price = uniquePrices[1].toString();
-            } else if (uniquePrices.length === 1) {
-                finalResult.discount_price = uniquePrices[0].toString();
-            }
-            
-            // 기타 정보 추가
-            if (result.discount_percent) finalResult.discount_percent = result.discount_percent;
-            if (result.subscription_discount) finalResult.subscription_discount = result.subscription_discount;
-            if (result.price_per_unit) finalResult.price_per_unit = result.price_per_unit;
-            
-            finalResult.is_in_stock = result.is_in_stock;
-            finalResult.stock_message = result.stock_message;
-            finalResult.back_in_stock_date = result.back_in_stock_date;
-            
-            return finalResult;
-            """
-            
-            result = self.driver.execute_script(js_script)
-            
-            if result and (result.get('discount_price') or result.get('list_price')):
-                print(f"    가격 정보: ✓ JavaScript 올인원 ({time.time() - extraction_start:.2f}초)")
-                return result
-            
-            return None
+            return price_info
             
         except Exception as e:
-            print(f"    JavaScript 올인원 추출 오류: {e}")
-            return None
+            print(f"    정규식 추출 오류: {e}")
+            return {}
     
-    def _extract_with_regex_fast(self):
-        """빠른 정규식 백업 추출"""
-        price_info = {}
-        page_source = self.driver.page_source
-        
-        # 필수 가격 정보만 빠르게 추출
-        krw_matches = re.findall(r'₩([\d,]+)', page_source)
-        if krw_matches:
-            clean_prices = []
-            for match in krw_matches:
-                clean_price = match.replace(',', '')
-                if len(clean_price) >= 4:
-                    clean_prices.append(int(clean_price))
+    def _validate_and_clean_price_info(self, price_info):
+        """가격 정보 검증 및 정리"""
+        try:
+            # 할인가와 정가 논리 검증
+            if price_info.get('discount_price') and price_info.get('list_price'):
+                discount = int(price_info['discount_price'])
+                list_price = int(price_info['list_price'])
+                
+                # 할인가가 정가보다 높으면 교환
+                if discount > list_price:
+                    price_info['discount_price'], price_info['list_price'] = \
+                        price_info['list_price'], price_info['discount_price']
+                
+                # 할인율이 없으면 계산
+                if not price_info.get('discount_percent'):
+                    discount_rate = round((list_price - discount) / list_price * 100)
+                    if discount_rate > 0:
+                        price_info['discount_percent'] = str(discount_rate)
             
-            unique_prices = sorted(list(set(clean_prices)), reverse=True)
-            if len(unique_prices) >= 2:
-                price_info['list_price'] = str(unique_prices[0])
-                price_info['discount_price'] = str(unique_prices[1])
-            elif len(unique_prices) == 1:
-                price_info['discount_price'] = str(unique_prices[0])
-        
-        # 품절 상태 빠른 확인
-        if re.search(r'out\s+of\s+stock', page_source, re.IGNORECASE):
-            price_info['is_in_stock'] = False
-            price_info['stock_message'] = 'Out of stock'
-        else:
-            price_info['is_in_stock'] = True
-            price_info['stock_message'] = ''
-        
-        # 할인율 빠른 확인
-        discount_match = re.search(r'(\d+)%.*?off', page_source, re.IGNORECASE)
-        if discount_match:
-            price_info['discount_percent'] = discount_match.group(1)
-        
-        # 단위당 가격 빠른 확인
-        unit_match = re.search(r'₩(\d+)/(serving|unit)', page_source)
-        if unit_match:
-            price_info['price_per_unit'] = f"₩{unit_match.group(1)}/{unit_match.group(2)}"
-        
-        if price_info:
-            print(f"    가격 정보: ✓ 정규식 백업 (기본 정보)")
-        else:
-            print(f"    가격 정보: ✗ 모든 방식 실패")
-        
-        return price_info
+            # 가격 필드가 없으면 기본값 설정
+            if not price_info.get('is_in_stock'):
+                price_info['is_in_stock'] = True
+            if not price_info.get('stock_message'):
+                price_info['stock_message'] = ''
+            if not price_info.get('back_in_stock_date'):
+                price_info['back_in_stock_date'] = ''
+            
+        except Exception as e:
+            print(f"    가격 정보 검증 오류: {e}")
     
     # ========== 통합 메서드 ==========
     
     def extract_product_info_with_price(self, product_url):
-        """상품 정보와 가격 정보를 함께 추출 - 최대 속도 최적화"""
+        """상품 정보와 가격 정보를 함께 추출 - 정규식 기반 최적화"""
         try:
             print("  상품 정보 추출 중...")
             
@@ -432,7 +428,7 @@ class IHerbClient:
             else:
                 print(f"    상품코드: ✗ 추출 실패")
             
-            # 가격 정보 추출 (최대 속도 최적화)
+            # 가격 정보 추출 (정규식 기반)
             price_info = self.extract_price_info()
             
             return product_code, iherb_product_name, price_info
