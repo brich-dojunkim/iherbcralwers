@@ -1,227 +1,236 @@
 """
-OCR 처리 모듈
-이미지에서 텍스트 추출 및 파싱
+OCR 처리 및 제품 정보 추출 모듈
+EasyOCR을 사용하여 이미지에서 텍스트 추출
+키워드 사전 없이 완전히 패턴 없는 방식
 """
 
 import os
-import re
-import cv2
-import pytesseract
-import numpy as np
-from PIL import Image
-from typing import Dict, Optional
-
-# OCR 설정
-# pytesseract.pytesseract.tesseract_cmd = '/opt/homebrew/bin/tesseract'
+from typing import Dict, List, Optional
+try:
+    import easyocr
+except ImportError:
+    print("EasyOCR가 설치되지 않았습니다. 다음 명령어로 설치하세요:")
+    print("pip install easyocr")
+    exit(1)
 
 
 class OCRProcessor:
-    """이미지 OCR 처리 클래스"""
+    """EasyOCR을 사용한 이미지 텍스트 추출"""
     
     def __init__(self):
-        # 브랜드 목록
-        self.brands = [
-            'now foods', 'now', 'solgar', 'life extension', 
-            'jarrow formulas', 'nature\'s way', 'nordic naturals',
-            'country life', 'source naturals', 'doctor\'s best'
-        ]
-        
-        # 정규식 패턴
-        self.patterns = {
-            'count': r'(\d+)\s*(?:count|ct|tablets?|capsules?|softgels?|pieces?|정|개)',
-            'dosage_mg': r'(\d+(?:,\d+)*)\s*mg',
-            'dosage_mcg': r'(\d+(?:,\d+)*)\s*mcg',
-            'dosage_iu': r'(\d+(?:,\d+)*)\s*iu',
-            'brand_now': r'now\s*foods?',
-            'product_code': r'[A-Z]{2,4}-\d{4,6}'
-        }
-    
-    def preprocess_image(self, image_path: str) -> np.ndarray:
-        """이미지 전처리로 OCR 정확도 향상"""
+        """EasyOCR 초기화"""
         try:
-            img = cv2.imread(image_path)
-            if img is None:
-                return None
-            
-            # 그레이스케일 변환
-            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-            
-            # 노이즈 제거
-            denoised = cv2.fastNlMeansDenoising(gray)
-            
-            # 대비 향상
-            clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
-            enhanced = clahe.apply(denoised)
-            
-            # 이진화
-            binary = cv2.adaptiveThreshold(
-                enhanced, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
-                cv2.THRESH_BINARY, 11, 2
-            )
-            
-            return binary
-            
+            # 영어와 한국어 지원
+            self.reader = easyocr.Reader(['en', 'ko'])
+            print("✅ EasyOCR 초기화 완료")
         except Exception as e:
-            print(f"❌ 이미지 전처리 실패 {image_path}: {e}")
-            return None
+            print(f"❌ EasyOCR 초기화 실패: {e}")
+            self.reader = None
     
-    def extract_text_from_image(self, image_path: str) -> Dict:
-        """이미지에서 OCR로 텍스트 추출"""
+    def extract_text(self, image_path: str) -> Dict:
+        """이미지에서 텍스트 추출"""
+        if not self.reader:
+            return {'success': False, 'error': 'OCR 초기화 실패'}
+        
+        if not os.path.exists(image_path):
+            return {'success': False, 'error': f'이미지 파일 없음: {image_path}'}
+        
         try:
-            # 전처리된 이미지와 원본 이미지 모두 시도
+            # EasyOCR 실행
+            results = self.reader.readtext(image_path)
+            
+            if not results:
+                return {'success': False, 'error': '텍스트 추출 실패'}
+            
+            # 텍스트와 신뢰도 추출
             texts = []
+            confidences = []
+            boxes = []
             
-            # 전처리된 이미지
-            processed_img = self.preprocess_image(image_path)
-            if processed_img is not None:
-                config = r'--oem 3 --psm 6 -l kor+eng'
-                texts.append(pytesseract.image_to_string(processed_img, config=config))
+            for result in results:
+                bbox, text, confidence = result
+                texts.append(text.strip())
+                confidences.append(confidence)
+                boxes.append(bbox)
             
-            # 원본 이미지
-            pil_img = Image.open(image_path)
-            config = r'--oem 3 --psm 6 -l kor+eng'
-            texts.append(pytesseract.image_to_string(pil_img, config=config))
+            # 전체 텍스트 결합
+            full_text = ' '.join(texts)
+            avg_confidence = sum(confidences) / len(confidences) if confidences else 0
             
-            # 결과 합치기
-            combined_text = ' '.join(texts).lower()
-            
-            # 텍스트 파싱
-            parsed_info = self.parse_extracted_text(combined_text)
-            parsed_info['raw_text'] = combined_text
-            parsed_info['image_path'] = image_path
-            
-            return parsed_info
+            return {
+                'success': True,
+                'texts': texts,
+                'full_text': full_text,
+                'confidences': confidences,
+                'avg_confidence': avg_confidence,
+                'boxes': boxes
+            }
             
         except Exception as e:
-            print(f"❌ OCR 추출 실패 {image_path}: {e}")
-            return {'image_path': image_path, 'error': str(e)}
+            return {'success': False, 'error': f'OCR 처리 오류: {str(e)}'}
+
+
+class ProductInfoParser:
+    """제품 정보 추출 파서 - 완전히 패턴 없는 방식"""
     
-    def parse_extracted_text(self, text: str) -> Dict:
-        """추출된 텍스트에서 정보 파싱"""
-        info = {
-            'brand': '',
-            'product_name': '',
-            'count': '',
-            'dosage_mg': '',
-            'dosage_mcg': '',
-            'dosage_iu': '',
-            'product_code': '',
-            'keywords': []
-        }
-        
-        print(f"     파싱 시작: '{text[:100]}...'")
-        
-        # 브랜드 추출 - 더 넓은 패턴으로 시도
-        for brand in self.brands:
-            if brand in text:
-                info['brand'] = brand
-                print(f"     브랜드 발견: '{brand}'")
-                break
-        
-        # NOW 브랜드 특별 처리 - 더 넓은 패턴
-        now_patterns = ['now foods', 'now', 'nowfoods']
-        for pattern in now_patterns:
-            if pattern in text and not info['brand']:
-                info['brand'] = 'now foods'
-                print(f"     NOW 브랜드 발견: '{pattern}'")
-                break
-        
-        # 패턴 매칭 - 더 관대한 패턴 사용
-        relaxed_patterns = {
-            'count': r'(\d+)\s*(?:count|ct|tablets?|capsules?|softgels?|pieces?|정|개|tab)',
-            'dosage_mg': r'(\d+(?:,\d+)*)\s*mg',
-            'dosage_mcg': r'(\d+(?:,\d+)*)\s*mcg',
-            'dosage_iu': r'(\d+(?:,\d+)*)\s*iu'
-        }
-        
-        for key, pattern in relaxed_patterns.items():
-            matches = re.findall(pattern, text, re.IGNORECASE)
-            if matches:
-                # 첫 번째 매치 사용
-                value = matches[0]
-                info[key] = value
-                print(f"     {key} 패턴 매칭: '{value}' (패턴: {pattern})")
-        
-        # 키워드 추출 (영양소명) - 더 넓은 범위
-        keyword_pattern = r'\b(?:zinc|vitamin|calcium|magnesium|omega|coq10|biotin|b12|d3|iron|probiotics?|protein|pea)\b'
-        keywords = re.findall(keyword_pattern, text, re.IGNORECASE)
-        info['keywords'] = list(set(keywords))
-        if keywords:
-            print(f"     키워드 발견: {keywords}")
-        
-        # 전체 텍스트 정리
-        clean_text = re.sub(r'[^\w\s]', ' ', text)
-        clean_text = re.sub(r'\s+', ' ', clean_text).strip()
-        info['product_name'] = clean_text
-        
-        print(f"     파싱 완료: 브랜드='{info['brand']}', 개수='{info['count']}', 용량='{info['dosage_mg']}mg'")
-        
-        return info
+    def __init__(self):
+        """파서 초기화"""
+        pass
     
-    def calculate_similarity(self, iherb_info: Dict, coupang_info: Dict) -> tuple:
-        """OCR 정보 기반 유사도 계산"""
-        from difflib import SequenceMatcher
+    def extract_brand(self, text: str) -> Optional[str]:
+        """브랜드명 추출 - 첫 번째 단어 또는 첫 두 단어"""
+        if not text:
+            return None
         
-        score = 0.0
-        details = {
-            'brand_match': False,
-            'count_match': False,
-            'dosage_match': False,
-            'keyword_match': False,
-            'text_similarity': 0.0
-        }
+        words = text.split()
+        if len(words) >= 2:
+            # 첫 두 단어 시도
+            two_words = ' '.join(words[:2])
+            if len(two_words) > 3:  # 너무 짧지 않으면
+                return two_words.title()
         
-        # 1. 브랜드 매칭 (40점)
-        if iherb_info.get('brand') and coupang_info.get('brand'):
-            if iherb_info['brand'] == coupang_info['brand']:
-                score += 0.4
-                details['brand_match'] = True
+        if words:
+            # 첫 단어
+            first_word = words[0]
+            if len(first_word) > 2:  # 너무 짧지 않으면
+                return first_word.title()
         
-        # 2. 개수 매칭 (20점)
-        if iherb_info.get('count') and coupang_info.get('count'):
-            if iherb_info['count'] == coupang_info['count']:
-                score += 0.2
-                details['count_match'] = True
-            else:
-                score -= 0.1  # 불일치 페널티
-        
-        # 3. 용량 매칭 (20점)
-        for dosage_type in ['dosage_mg', 'dosage_mcg', 'dosage_iu']:
-            if iherb_info.get(dosage_type) and coupang_info.get(dosage_type):
-                if iherb_info[dosage_type] == coupang_info[dosage_type]:
-                    score += 0.2
-                    details['dosage_match'] = True
-                    details[f'{dosage_type}_value'] = iherb_info[dosage_type]
-                else:
-                    score -= 0.1  # 불일치 페널티
-                break
-        
-        # 4. 키워드 매칭 (10점)
-        iherb_keywords = set(iherb_info.get('keywords', []))
-        coupang_keywords = set(coupang_info.get('keywords', []))
-        if iherb_keywords and coupang_keywords:
-            overlap = len(iherb_keywords & coupang_keywords)
-            total = len(iherb_keywords | coupang_keywords)
-            if total > 0:
-                keyword_score = (overlap / total) * 0.1
-                score += keyword_score
-                details['keyword_match'] = overlap > 0
-                details['keyword_overlap'] = overlap
-                details['keyword_total'] = total
-        
-        # 5. 전체 텍스트 유사도 (10점)
-        iherb_text = iherb_info.get('product_name', '')
-        coupang_text = coupang_info.get('product_name', '')
-        if iherb_text and coupang_text:
-            text_sim = SequenceMatcher(None, iherb_text, coupang_text).ratio()
-            score += text_sim * 0.1
-            details['text_similarity'] = text_sim
-        
-        final_score = max(0, min(1, score))
-        return final_score, details
+        return None
     
-    def extract_product_code_from_filename(self, filename: str) -> Optional[str]:
-        """이미지 파일명에서 상품코드 추출"""
-        # iherb_01_NOW-02926.jpg → NOW-02926
-        match = re.search(r'([A-Z]{2,4}-\d{4,6})', filename)
-        return match.group(1) if match else None
+    def extract_product_name(self, text: str) -> Optional[str]:
+        """제품명 추출 - 가장 긴 단어"""
+        if not text:
+            return None
+        
+        words = text.split()
+        if words:
+            # 가장 긴 단어 찾기
+            longest_word = max(words, key=len)
+            if len(longest_word) > 3:  # 너무 짧지 않으면
+                return longest_word.title()
+        
+        return None
+    
+    def extract_numbers_with_context(self, text: str) -> List[Dict]:
+        """숫자와 주변 컨텍스트 추출"""
+        if not text:
+            return []
+        
+        words = text.lower().split()
+        numbers_found = []
+        
+        for i, word in enumerate(words):
+            # 숫자 포함된 단어 찾기
+            if any(char.isdigit() for char in word):
+                # 앞뒤 컨텍스트 수집
+                context_before = words[max(0, i-2):i]
+                context_after = words[i+1:min(len(words), i+3)]
+                
+                numbers_found.append({
+                    'number_word': word,
+                    'context_before': context_before,
+                    'context_after': context_after,
+                    'position': i
+                })
+        
+        return numbers_found
+    
+    def extract_dosage(self, text: str) -> Optional[str]:
+        """용량 추출 - mg, mcg, iu 근처 숫자"""
+        numbers = self.extract_numbers_with_context(text)
+        
+        for num_info in numbers:
+            # 전체 컨텍스트에서 단위 찾기
+            all_context = num_info['context_before'] + num_info['context_after']
+            context_text = ' '.join(all_context)
+            
+            if any(unit in context_text for unit in ['mg', 'mcg', 'iu']):
+                return num_info['number_word']
+        
+        return None
+    
+    def extract_count(self, text: str) -> Optional[str]:
+        """개수 추출 - tablet, capsule, count 근처 숫자"""
+        numbers = self.extract_numbers_with_context(text)
+        
+        for num_info in numbers:
+            # 전체 컨텍스트에서 개수 단위 찾기
+            all_context = num_info['context_before'] + num_info['context_after']
+            context_text = ' '.join(all_context)
+            
+            if any(unit in context_text for unit in ['tablet', 'capsule', 'count', 'piece']):
+                return num_info['number_word']
+        
+        return None
+    
+    def parse_product_info(self, ocr_result: Dict) -> Dict:
+        """OCR 결과에서 4가지 제품 정보 추출"""
+        if not ocr_result.get('success', False):
+            return {
+                'brand': None,
+                'product_name': None,
+                'dosage': None,
+                'count': None,
+                'confidence': 0,
+                'error': ocr_result.get('error', '알 수 없는 오류')
+            }
+        
+        full_text = ocr_result.get('full_text', '')
+        confidence = ocr_result.get('avg_confidence', 0)
+        
+        # 디버그: 추출된 텍스트 출력
+        print(f"      추출된 텍스트: '{full_text[:100]}...'")
+        print(f"      텍스트 길이: {len(full_text)}")
+        
+        # 4가지 정보 추출
+        brand = self.extract_brand(full_text)
+        product_name = self.extract_product_name(full_text)
+        dosage = self.extract_dosage(full_text)
+        count = self.extract_count(full_text)
+        
+        # 디버그: 추출 결과 출력
+        print(f"      브랜드: {brand}, 제품명: {product_name}, 용량: {dosage}, 개수: {count}")
+        
+        return {
+            'brand': brand,
+            'product_name': product_name,
+            'dosage': dosage,
+            'count': count,
+            'confidence': confidence,
+            'raw_text': full_text
+        }
+
+
+def process_image(image_path: str) -> Dict:
+    """이미지 하나 처리하는 편의 함수"""
+    ocr_processor = OCRProcessor()
+    parser = ProductInfoParser()
+    
+    # OCR 실행
+    ocr_result = ocr_processor.extract_text(image_path)
+    
+    # 제품 정보 추출
+    product_info = parser.parse_product_info(ocr_result)
+    
+    return product_info
+
+
+# 테스트용 실행 코드
+if __name__ == "__main__":
+    test_image = "test_image.jpg"
+    
+    if os.path.exists(test_image):
+        result = process_image(test_image)
+        print("테스트 결과:")
+        print(f"브랜드: {result['brand']}")
+        print(f"제품명: {result['product_name']}")
+        print(f"용량: {result['dosage']}")
+        print(f"개수: {result['count']}")
+        print(f"신뢰도: {result['confidence']:.2f}")
+    else:
+        print("EasyOCR 기반 패턴 프리 방식:")
+        print("- 브랜드: 첫 단어 또는 첫 두 단어")
+        print("- 제품명: 가장 긴 단어")
+        print("- 용량: mg/mcg/iu 근처 숫자")
+        print("- 개수: tablet/capsule/count 근처 숫자")
+        print("- 영어 + 한국어 동시 지원")
