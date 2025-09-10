@@ -1,0 +1,11 @@
+cat > requirements.txt << 'EOF'
+numpy>=2.0,<2.3
+pandas
+requests
+selenium
+undetected-chromedriver
+opencv-python
+pillow
+pytesseract
+# onnxruntime  # 필요시 주석 해제
+EOF
