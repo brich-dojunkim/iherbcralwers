@@ -1,0 +1,39 @@
+cat > .gitignore << 'EOF'
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.dylib
+
+# Virtualenv
+.venv/
+venv/
+env/
+
+# OS / IDE
+.DS_Store
+*.log
+.vscode/
+.idea/
+
+# Data artifacts
+*.csv
+*.parquet
+*.xlsx
+*.feather
+*.db
+*.sqlite
+
+# Scrap Images & large outputs
+coupang_images/
+iherb_images/
+naver/*result*.csv
+coupang/*.csv
+
+# Models / binaries (store via LFS or external)
+*.onnx
+*.pt
+*.bin
+EOF
