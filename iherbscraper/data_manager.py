@@ -1,5 +1,5 @@
 """
-데이터 관리 모듈 - 구조화된 실패 분류 시스템
+데이터 관리 모듈 - Gemini API 사용량 추적 및 재시작 지원
 """
 
 import os
@@ -9,13 +9,13 @@ from config import Config, FailureType
 
 
 class DataManager:
-    """CSV 파일 처리, 결과 저장, 진행상황 관리 담당"""
+    """CSV 파일 처리, 결과 저장, 진행상황 관리 담당 - Gemini API 지원"""
     
     def __init__(self):
         pass
     
     def auto_detect_start_point(self, input_csv_path, output_csv_path):
-        """기존 결과를 분석해서 시작점 자동 감지 - actual_index 기준으로 수정"""
+        """기존 결과를 분석해서 시작점 자동 감지 - Gemini API 제한 고려"""
         try:
             if not os.path.exists(output_csv_path):
                 print("  결과 파일 없음 - 처음부터 시작")
@@ -29,6 +29,11 @@ class DataManager:
             
             print(f"  기존 결과 파일 분석:")
             print(f"    총 레코드: {len(existing_df)}개")
+            
+            # Gemini API 사용량 확인
+            if 'gemini_api_calls' in existing_df.columns:
+                total_api_calls = existing_df['gemini_api_calls'].fillna(0).sum()
+                print(f"    기존 Gemini API 총 호출: {int(total_api_calls)}회")
             
             if 'actual_index' in existing_df.columns:
                 processed_indices = set()
@@ -44,9 +49,10 @@ class DataManager:
                         if 'status' in row and row['status'] != 'success':
                             if 'failure_type' in row:
                                 failure_type = row.get('failure_type', 'UNPROCESSED')
-                                if failure_type in ['BROWSER_ERROR', 'NETWORK_ERROR', 'TIMEOUT_ERROR', 
-                                                'WEBDRIVER_ERROR', 'PROCESSING_ERROR', 'UNPROCESSED']:
-                                    failed_indices.append(int(actual_index))
+                                if FailureType.is_system_error(failure_type):
+                                    # Gemini API 할당량 초과는 재시도하지 않음
+                                    if failure_type != FailureType.GEMINI_QUOTA_EXCEEDED:
+                                        failed_indices.append(int(actual_index))
                 
                 # 다음 시작점 계산: 처리된 인덱스 중 최대값 + 1
                 if processed_indices:
@@ -55,7 +61,7 @@ class DataManager:
                     next_start_index = 0
                 
                 print(f"    처리된 인덱스 범위: {min(processed_indices) if processed_indices else 0} ~ {max(processed_indices) if processed_indices else 0}")
-                print(f"    재시도 대상: {len(failed_indices)}개")
+                print(f"    재시도 대상: {len(failed_indices)}개 (API 할당량 초과 제외)")
                 print(f"  시작점: {next_start_index}번째 상품부터 (실제 인덱스 기준)")
                 
                 return next_start_index, failed_indices
@@ -70,34 +76,45 @@ class DataManager:
             return 0, []
             
     def should_retry_product(self, status, failure_type):
-        """상품이 재시도 대상인지 판단 - failure_type 기반"""
+        """상품이 재시도 대상인지 판단 - Gemini API 제한 고려"""
         if status == 'success':
             return False
         
         if not failure_type:
             return True  # failure_type이 없으면 재시도
         
+        # Gemini API 할당량 초과는 재시도하지 않음
+        if failure_type == FailureType.GEMINI_QUOTA_EXCEEDED:
+            return False
+        
         return FailureType.is_system_error(failure_type)
     
     def validate_input_csv(self, csv_file_path):
-        """입력 CSV 파일 검증"""
+        """입력 CSV 파일 검증 - 영어 번역 선택적"""
         try:
             df = pd.read_csv(csv_file_path)
             
-            # 영어 번역 컬럼 확인
-            if 'product_name_english' not in df.columns:
-                raise ValueError("CSV에 'product_name_english' 컬럼이 없습니다.")
+            # 기본 제품명 확인
+            if 'product_name' not in df.columns:
+                raise ValueError("CSV에 'product_name' 컬럼이 없습니다.")
             
-            # 영어 번역이 없는 행 필터링
+            # 영어 번역 컬럼은 선택사항 (Gemini는 한글명으로 직접 검색)
             original_count = len(df)
-            df = df.dropna(subset=['product_name_english'])
-            df = df[df['product_name_english'].str.strip() != '']
+            df = df.dropna(subset=['product_name'])
+            df = df[df['product_name'].str.strip() != '']
             filtered_count = len(df)
             
             print(f"  원본 상품: {original_count}개")
-            print(f"  영어 번역된 상품: {filtered_count}개")
+            print(f"  유효한 제품명: {filtered_count}개")
             if original_count != filtered_count:
-                print(f"  번역 없는 상품: {original_count - filtered_count}개 (제외됨)")
+                print(f"  제품명 없는 상품: {original_count - filtered_count}개 (제외됨)")
+            
+            # 영어 번역 정보 확인 (있으면 참고용)
+            if 'product_name_english' in df.columns:
+                english_count = len(df[df['product_name_english'].notna() & (df['product_name_english'].str.strip() != '')])
+                print(f"  영어 번역된 상품: {english_count}개 (참고용)")
+            else:
+                print("  영어 번역 없음 - 한글명으로 직접 검색")
             
             return df
             
@@ -106,11 +123,12 @@ class DataManager:
             raise
     
     def initialize_output_csv(self, output_file_path):
-        """CSV 파일 헤더 초기화 - failure_type 컬럼 포함"""
+        """CSV 파일 헤더 초기화 - Gemini API 컬럼 포함"""
         try:
             empty_df = pd.DataFrame(columns=Config.OUTPUT_COLUMNS)
             empty_df.to_csv(output_file_path, index=False, encoding='utf-8-sig')
             print(f"  결과 파일 초기화: {output_file_path}")
+            print(f"  Gemini API 사용량 추적 컬럼 포함")
             
         except Exception as e:
             print(f"  CSV 초기화 실패: {e}")
@@ -236,8 +254,9 @@ class DataManager:
     
     def create_result_record(self, row, actual_idx, english_name, product_url, 
                            similarity_score, product_code, iherb_product_name, 
-                           coupang_price_info, iherb_price_info, matching_reason=None, failure_type=None):
-        """결과 레코드 생성 - failure_type 컬럼 추가"""
+                           coupang_price_info, iherb_price_info, matching_reason=None, 
+                           failure_type=None, gemini_api_calls=0):
+        """결과 레코드 생성 - Gemini API 사용량 추가"""
         
         # 가격 비교 계산
         price_comparison = self.calculate_price_comparison(coupang_price_info, iherb_price_info)
@@ -259,7 +278,7 @@ class DataManager:
             'coupang_product_name': row.get('product_name', ''),
             'similarity_score': round(similarity_score, 3) if similarity_score else 0,
             'matching_reason': matching_reason or '매칭 정보 없음',
-            'failure_type': failure_type,  # 새 컬럼 추가
+            'failure_type': failure_type,
             'coupang_url': coupang_price_info.get('url', ''),
             'iherb_product_url': product_url or '',
             'coupang_product_id': row.get('product_id', ''),
@@ -273,6 +292,9 @@ class DataManager:
             'iherb_discount_percent': iherb_price_info.get('discount_percent', ''),
             'iherb_subscription_discount': iherb_price_info.get('subscription_discount', ''),
             'iherb_price_per_unit': iherb_price_info.get('price_per_unit', ''),
+            'is_in_stock': iherb_price_info.get('is_in_stock', True),
+            'stock_message': iherb_price_info.get('stock_message', ''),
+            'back_in_stock_date': iherb_price_info.get('back_in_stock_date', ''),
             'price_difference_krw': price_comparison['price_difference_krw'],
             'cheaper_platform': price_comparison['cheaper_platform'],
             'savings_amount': price_comparison['savings_amount'],
@@ -280,13 +302,14 @@ class DataManager:
             'price_difference_note': price_comparison['price_difference_note'],
             'processed_at': datetime.now().isoformat(),
             'actual_index': actual_idx,
-            'search_language': 'english'
+            'search_language': 'korean_direct',  # 한글 직접 검색
+            'gemini_api_calls': gemini_api_calls  # Gemini API 사용량 추가
         }
         
         return result
     
     def print_summary(self, results_df):
-        """결과 요약 - failure_type 통계 포함"""
+        """결과 요약 - Gemini API 사용량 포함"""
         total = len(results_df)
         successful = len(results_df[results_df['status'] == 'success'])
         price_extracted = len(results_df[
@@ -299,12 +322,37 @@ class DataManager:
         print(f"  매칭 성공: {successful}개 ({successful/total*100:.1f}%)")
         print(f"  가격 추출: {price_extracted}개 ({price_extracted/total*100:.1f}%)")
         
+        # Gemini API 사용량 통계
+        if 'gemini_api_calls' in results_df.columns:
+            total_api_calls = results_df['gemini_api_calls'].fillna(0).sum()
+            avg_api_calls_per_product = total_api_calls / total if total > 0 else 0
+            print(f"  Gemini API 총 호출: {int(total_api_calls)}회")
+            print(f"  상품당 평균 API 호출: {avg_api_calls_per_product:.1f}회")
+        
         # 실패 유형별 통계
         if 'failure_type' in results_df.columns and total > 0:
             print(f"\n실패 유형별 통계:")
             
+            # Gemini 관련 통계 별도 표시
+            gemini_successes = len(results_df[results_df['failure_type'] == FailureType.SUCCESS])
+            gemini_no_matches = len(results_df[results_df['failure_type'] == FailureType.GEMINI_NO_MATCH])
+            gemini_quota_exceeded = len(results_df[results_df['failure_type'] == FailureType.GEMINI_QUOTA_EXCEEDED])
+            gemini_api_errors = len(results_df[results_df['failure_type'] == FailureType.GEMINI_API_ERROR])
+            
+            if gemini_successes + gemini_no_matches + gemini_quota_exceeded + gemini_api_errors > 0:
+                print(f"  Gemini AI 관련:")
+                if gemini_successes > 0:
+                    print(f"    - 매칭 성공: {gemini_successes}개")
+                if gemini_no_matches > 0:
+                    print(f"    - 동일 제품 없음: {gemini_no_matches}개")
+                if gemini_quota_exceeded > 0:
+                    print(f"    - API 할당량 초과: {gemini_quota_exceeded}개")
+                if gemini_api_errors > 0:
+                    print(f"    - API 오류: {gemini_api_errors}개")
+            
             # 시스템 오류
             system_errors = results_df[results_df['failure_type'].apply(FailureType.is_system_error)]
+            system_errors = system_errors[system_errors['failure_type'] != FailureType.GEMINI_QUOTA_EXCEEDED]  # 제외
             if len(system_errors) > 0:
                 print(f"  시스템 오류 ({len(system_errors)}개, 재시도 대상):")
                 error_counts = system_errors['failure_type'].value_counts()
@@ -324,18 +372,18 @@ class DataManager:
         
         # 성공한 상품 샘플
         if successful > 0:
-            print(f"\n주요 성공 사례:")
+            print(f"\n주요 성공 사례 (Gemini AI 매칭):")
             successful_df = results_df[results_df['status'] == 'success']
             
             for idx, (_, row) in enumerate(successful_df.head(5).iterrows()):
                 korean_name = row['coupang_product_name'][:30] + "..."
-                english_name = row.get('coupang_product_name_english', '')[:30] + "..."
+                iherb_name = row.get('iherb_product_name', '')[:30] + "..."
                 
                 coupang_price = row.get('coupang_current_price_krw', '')
                 iherb_price = row.get('iherb_discount_price_krw', '')
                 
                 print(f"  {idx+1}. {korean_name}")
-                print(f"     영어: {english_name}")
+                print(f"     매칭: {iherb_name}")
                 
                 if coupang_price and iherb_price:
                     try:

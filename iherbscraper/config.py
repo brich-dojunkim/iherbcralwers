@@ -1,9 +1,9 @@
 """
-iHerb 스크래퍼 설정 관리 - 정규식 기반 가격 추출 최적화
+iHerb 스크래퍼 설정 관리 - Gemini AI 통합 및 단순화
 """
 
 class FailureType:
-    """실패 유형 분류"""
+    """실패 유형 분류 - Gemini API 오류 추가"""
     
     # 시스템 오류 (재시도 필요)
     BROWSER_ERROR = "BROWSER_ERROR"              # 브라우저 연결/크래시 오류
@@ -13,22 +13,29 @@ class FailureType:
     PROCESSING_ERROR = "PROCESSING_ERROR"        # 기타 처리 오류
     UNPROCESSED = "UNPROCESSED"                  # 처리되지 않음
     
+    # Gemini API 관련 오류
+    GEMINI_API_ERROR = "GEMINI_API_ERROR"        # Gemini API 일반 오류 (재시도 가능)
+    GEMINI_TIMEOUT = "GEMINI_TIMEOUT"            # Gemini API 타임아웃 (재시도 가능)
+    GEMINI_QUOTA_EXCEEDED = "GEMINI_QUOTA_EXCEEDED"  # API 할당량 초과 (재시도 불가)
+    
     # 정당한 실패 (재시도 불필요)
     NO_SEARCH_RESULTS = "NO_SEARCH_RESULTS"      # 검색 결과 없음
     NO_MATCHING_PRODUCT = "NO_MATCHING_PRODUCT"  # 매칭되는 상품 없음
     COUNT_MISMATCH = "COUNT_MISMATCH"            # 개수 불일치
     DOSAGE_MISMATCH = "DOSAGE_MISMATCH"          # 용량 불일치
-    LOW_SIMILARITY = "LOW_SIMILARITY"            # 유사도 부족
+    GEMINI_NO_MATCH = "GEMINI_NO_MATCH"          # Gemini 판단: 동일 제품 없음
     
     # 성공
     SUCCESS = "SUCCESS"                          # 성공
 
     @classmethod
     def is_system_error(cls, failure_type):
-        """시스템 오류 여부 판단"""
+        """시스템 오류 여부 판단 - Gemini API 일반 오류는 재시도"""
         system_errors = {
             cls.BROWSER_ERROR, cls.NETWORK_ERROR, cls.TIMEOUT_ERROR,
-            cls.WEBDRIVER_ERROR, cls.PROCESSING_ERROR, cls.UNPROCESSED
+            cls.WEBDRIVER_ERROR, cls.PROCESSING_ERROR, cls.UNPROCESSED,
+            cls.GEMINI_API_ERROR, cls.GEMINI_TIMEOUT  # API 일반 오류는 재시도
+            # GEMINI_QUOTA_EXCEEDED는 재시도하지 않음
         }
         return failure_type in system_errors
     
@@ -42,18 +49,36 @@ class FailureType:
             cls.WEBDRIVER_ERROR: "웹드라이버 오류",
             cls.PROCESSING_ERROR: "처리 중 오류",
             cls.UNPROCESSED: "처리되지 않음",
+            cls.GEMINI_API_ERROR: "Gemini API 일반 오류",
+            cls.GEMINI_TIMEOUT: "Gemini API 타임아웃",
+            cls.GEMINI_QUOTA_EXCEEDED: "Gemini API 할당량 초과",
             cls.NO_SEARCH_RESULTS: "검색 결과 없음",
             cls.NO_MATCHING_PRODUCT: "매칭되는 상품 없음",
             cls.COUNT_MISMATCH: "개수 불일치",
-            cls.DOSAGE_MISMATCH: "용량 불일치", 
-            cls.LOW_SIMILARITY: "유사도 부족",
+            cls.DOSAGE_MISMATCH: "용량 불일치",
+            cls.GEMINI_NO_MATCH: "Gemini 판단: 동일 제품 없음",
             cls.SUCCESS: "성공"
         }
         return descriptions.get(failure_type, "알 수 없는 오류")
 
 
 class Config:
-    """스크래퍼 전역 설정"""
+    """스크래퍼 전역 설정 - Gemini AI 통합"""
+    
+    # Gemini AI 설정
+    GEMINI_API_KEY = "YOUR_GEMINI_API_KEY_HERE"  # 실제 API 키로 교체 필요
+    GEMINI_TEXT_MODEL = "gemini-2.5-flash"  # 텍스트 매칭용
+    GEMINI_VISION_MODEL = "gemini-2.5-flash"  # 이미지 비교용 (Vision 지원)
+    GEMINI_MAX_RETRIES = 3
+    GEMINI_TIMEOUT = 30  # 초
+    GEMINI_RATE_LIMIT_DELAY = 2  # API 호출 간 대기 시간 (초) - 이미지 처리로 증가
+    
+    # 이미지 비교 설정
+    COUPANG_IMAGES_DIR = "./coupang_images"  # 쿠팡 이미지 디렉토리
+    IHERB_IMAGES_DIR = "./iherb_images"      # 아이허브 이미지 디렉토리
+    IMAGE_COMPARISON_ENABLED = True           # 이미지 비교 활성화
+    IMAGE_DOWNLOAD_TIMEOUT = 15              # 이미지 다운로드 타임아웃 (초)
+    MAX_IMAGE_SIZE_MB = 10                   # 최대 이미지 크기 (MB)
     
     # 브라우저 설정
     DEFAULT_DELAY_RANGE = (0.5, 1)
@@ -67,16 +92,10 @@ class Config:
     BASE_URL = "https://www.iherb.com"
     KOREA_URL = "https://kr.iherb.com"
     
-    # 유사도 계산 가중치 (영어만 사용)
-    SIMILARITY_WEIGHTS = {
-        'english': 0.8,
-        'brand': 0.2
-    }
-    
-    # 매칭 임계값
+    # 매칭 설정 (단순화 - Gemini가 최종 판단)
     MATCHING_THRESHOLDS = {
-        'min_similarity': 0.7,
-        'success_threshold': 0.6
+        'min_similarity': 0.5,  # Gemini 판단 전 최소 임계값
+        'success_threshold': 0.6  # 성공으로 간주할 최소 점수
     }
     
     # 브라우저 옵션
@@ -125,7 +144,7 @@ class Config:
         'part_number': '[data-part-number]',
     }
     
-    # 정규표현식 패턴 - 정규식 기반 가격 추출 최적화
+    # 정규표현식 패턴 - 용량/개수 필터링용 (단순화)
     PATTERNS = {
         # 기본 패턴들
         'item_code': r'item\s*code:\s*([A-Z0-9-]+)',
@@ -167,28 +186,6 @@ class Config:
         'krw_price_quoted': r'"₩([\d,]+)"',
     }
     
-    # 제형 매핑
-    FORM_MAPPING = {
-        'tablet': ['tablet', 'tablets', 'tab'],
-        'capsule': ['capsule', 'capsules', 'caps', 'vcaps'],
-        'softgel': ['softgel', 'softgels', 'soft gel'],
-        'gummy': ['gummy', 'gummies'],
-        'powder': ['powder', 'pwd'],
-        'liquid': ['liquid', 'drops']
-    }
-    
-    # 공통 브랜드
-    COMMON_BRANDS = [
-        'now foods',
-        'nature\'s way', 
-        'solgar', 
-        'life extension', 
-        'jarrow formulas',
-        'country life',
-        'source naturals',
-        'nordic naturals'
-    ]
-    
     # 출력 컬럼
     OUTPUT_COLUMNS = [
         'iherb_product_name', 'coupang_product_name_english', 'coupang_product_name', 
@@ -199,5 +196,6 @@ class Config:
         'iherb_subscription_discount', 'iherb_price_per_unit',
         'is_in_stock', 'stock_message', 'back_in_stock_date',
         'price_difference_krw', 'cheaper_platform', 'savings_amount', 'savings_percentage',
-        'price_difference_note', 'processed_at', 'actual_index', 'search_language'
+        'price_difference_note', 'processed_at', 'actual_index', 'search_language',
+        'gemini_api_calls'  # Gemini API 사용량 추적용 컬럼 추가
     ]
