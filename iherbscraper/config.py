@@ -70,15 +70,15 @@ class Config:
     
     # ========== Gemini 2.5 Flash 설정 ==========
     GEMINI_API_KEY = "AIzaSyBe9EQB8cvXko5fWoU309sYpkiUkQLe2ZM"
-    GEMINI_TEXT_MODEL = "models/gemini-2.5-flash"  # 🆕 2.5 Flash 적용
-    GEMINI_VISION_MODEL = "models/gemini-2.5-flash"  # 🆕 2.5 Flash 적용
+    GEMINI_TEXT_MODEL = "models/gemini-2.0-flash"  # 🆕 2.0 Flash 적용
+    GEMINI_VISION_MODEL = "models/gemini-2.0-flash"  # 🆕 2.0 Flash 적용
     GEMINI_MAX_RETRIES = 3
     GEMINI_TIMEOUT = 25  # 2.5 모델이 더 빨라서 25초로 단축
     GEMINI_RATE_LIMIT_DELAY = 5  # 2.5 모델 성능 향상으로 1.5초로 단축
     
     # ========== 이미지 비교 설정 (성능 최적화) ==========
-    COUPANG_IMAGES_DIR = "../coupang_images"
-    IHERB_IMAGES_DIR = "../iherb_images"
+    COUPANG_IMAGES_DIR = "/Users/brich/Desktop/iherb_price/coupang_images"
+    IHERB_IMAGES_DIR = "/Users/brich/Desktop/iherb_price/iherb_images"
     IMAGE_COMPARISON_ENABLED = True
     IMAGE_DOWNLOAD_TIMEOUT = 12  # 타임아웃 단축
     MAX_IMAGE_SIZE_MB = 8  # 크기 제한 강화

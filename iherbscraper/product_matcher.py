@@ -1,16 +1,12 @@
 """
 상품 매칭 로직 모듈 - 영어명 검색 + Gemini AI + Vision
-주요 변경사항:
-1. 영어명 우선 검색 방식
-2. 안전 필터 회피를 위한 프롬프트 단순화
-3. 이미지 경로 수정 반영
+Gemini 2.0 Flash 최적화 버전 (폴백 제거)
 """
 
 import re
 import time
 import urllib.parse
 import os
-import base64
 import requests
 from PIL import Image
 from io import BytesIO
@@ -55,35 +51,41 @@ class ProductMatcher:
             raise
     
     def _safe_gemini_call(self, prompt, max_retries=None, use_vision=False, image_data=None):
-        """안전한 Gemini API 호출 - 안전 필터 회피 강화"""
+        """안전한 Gemini API 호출"""
         max_retries = max_retries or Config.GEMINI_MAX_RETRIES
+        
+        safety_settings = [
+            {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"}
+        ]
         
         for attempt in range(max_retries):
             try:
-                # API 호출 간격 제어
                 current_time = time.time()
                 if current_time - self.last_api_call_time < Config.GEMINI_RATE_LIMIT_DELAY:
                     time.sleep(Config.GEMINI_RATE_LIMIT_DELAY)
                 
-                # 더 보수적인 generation_config
                 generation_config = {
                     'temperature': 0.1,
-                    'max_output_tokens': 100,  # 단축된 응답
+                    'max_output_tokens': 50,
                     'top_p': 0.8,
                     'top_k': 20
                 }
                 
-                # 모델 선택 및 API 호출
                 if use_vision and image_data:
                     response = self.vision_model.generate_content(
                         [prompt] + image_data,
-                        generation_config=generation_config
+                        generation_config=generation_config,
+                        safety_settings=safety_settings
                     )
                     self.vision_api_call_count += 1
                 else:
                     response = self.text_model.generate_content(
                         prompt,
-                        generation_config=generation_config
+                        generation_config=generation_config,
+                        safety_settings=safety_settings
                     )
                 
                 self.api_call_count += 1
@@ -95,17 +97,12 @@ class ProductMatcher:
                 error_msg = str(e).lower()
                 
                 if any(keyword in error_msg for keyword in ['quota', 'limit', 'exceeded', 'resource_exhausted']):
-                    print(f"    Gemini API 할당량 초과: {e}")
                     raise Exception(f"GEMINI_QUOTA_EXCEEDED: {e}")
-                
                 elif 'timeout' in error_msg:
-                    print(f"    Gemini API 타임아웃 (시도 {attempt + 1}): {e}")
                     if attempt == max_retries - 1:
                         raise Exception(f"GEMINI_TIMEOUT: {e}")
                     time.sleep(2 ** attempt)
-                
                 else:
-                    print(f"    Gemini API 오류 (시도 {attempt + 1}): {e}")
                     if attempt == max_retries - 1:
                         raise Exception(f"GEMINI_API_ERROR: {e}")
                     time.sleep(2 ** attempt)
@@ -113,7 +110,7 @@ class ProductMatcher:
         return None
     
     def _extract_response_text(self, response):
-        """Gemini 응답에서 텍스트 안전하게 추출"""
+        """Gemini 응답에서 텍스트 추출"""
         try:
             if hasattr(response, 'text') and response.text:
                 return response.text.strip()
@@ -125,21 +122,6 @@ class ProductMatcher:
                             for part in candidate.content.parts:
                                 if hasattr(part, 'text') and part.text:
                                     return part.text.strip()
-            
-            print(f"    Gemini 응답이 차단되었거나 비어있습니다.")
-            
-            if hasattr(response, 'candidates') and response.candidates:
-                candidate = response.candidates[0]
-                if hasattr(candidate, 'finish_reason'):
-                    finish_reason = candidate.finish_reason
-                    print(f"    종료 이유: {finish_reason}")
-                    
-                    if finish_reason == 2:  # SAFETY
-                        return "BLOCKED_SAFETY"
-                    elif finish_reason == 3:  # RECITATION
-                        return "BLOCKED_RECITATION"
-                    elif finish_reason == 4:  # OTHER
-                        return "BLOCKED_OTHER"
             
             return None
             
@@ -155,7 +137,6 @@ class ProductMatcher:
             
             file_size_mb = os.path.getsize(image_path) / (1024 * 1024)
             if file_size_mb > Config.MAX_IMAGE_SIZE_MB:
-                print(f"    이미지 크기 초과: {file_size_mb:.1f}MB > {Config.MAX_IMAGE_SIZE_MB}MB")
                 return None
             
             with Image.open(image_path) as img:
@@ -176,7 +157,6 @@ class ProductMatcher:
                 }
                 
         except Exception as e:
-            print(f"    이미지 로드 실패 ({os.path.basename(image_path)}): {e}")
             return None
     
     def _download_iherb_image(self, product_url, product_code):
@@ -189,9 +169,8 @@ class ProductMatcher:
             image_filename = f"iherb_{product_code}.jpg"
             image_path = os.path.join(Config.IHERB_IMAGES_DIR, image_filename)
             
-            if os.path.exists(image_path):
-                if os.path.getsize(image_path) > 1024:
-                    return image_path
+            if os.path.exists(image_path) and os.path.getsize(image_path) > 1024:
+                return image_path
             
             image_url = self.iherb_client.extract_product_image_url(product_url)
             if not image_url:
@@ -218,11 +197,10 @@ class ProductMatcher:
                 return None
                 
         except Exception as e:
-            print(f"    아이허브 이미지 다운로드 실패: {e}")
             return None
     
     def _compare_images_with_gemini(self, coupang_image_path, iherb_image_path, search_name):
-        """Gemini Vision으로 이미지 비교 - 극도로 단순화된 프롬프트"""
+        """Gemini Vision으로 이미지 비교"""
         try:
             if not Config.IMAGE_COMPARISON_ENABLED:
                 return {'success': False, 'reason': 'image_comparison_disabled'}
@@ -233,8 +211,7 @@ class ProductMatcher:
             if not coupang_image or not iherb_image:
                 return {'success': False, 'reason': 'image_load_failed'}
             
-            # 극도로 단순화된 프롬프트 (안전 필터 회피)
-            prompt = f"Product: {search_name}\n\nSame product? Answer: YES or NO"
+            prompt = "Are these the same product? Answer YES or NO only."
             
             print(f"    이미지 비교 중... (Vision API 호출 {self.vision_api_call_count + 1}회)")
             
@@ -251,8 +228,6 @@ class ProductMatcher:
             
             if "YES" in response_clean:
                 return {'success': True, 'match': True, 'response': response}
-            elif "NO" in response_clean:
-                return {'success': True, 'match': False, 'response': response}
             else:
                 return {'success': True, 'match': False, 'response': response}
             
@@ -260,14 +235,10 @@ class ProductMatcher:
             error_msg = str(e)
             if "GEMINI_QUOTA_EXCEEDED" in error_msg:
                 raise
-            elif "GEMINI_TIMEOUT" in error_msg:
-                return {'success': False, 'reason': 'vision_timeout', 'error': error_msg}
-            else:
-                return {'success': False, 'reason': 'vision_api_error', 'error': error_msg}
+            return {'success': False, 'reason': 'vision_api_error', 'error': error_msg}
     
     def _check_strict_dosage_count_filter(self, search_name, iherb_products):
         """엄격한 용량/개수 필터링"""
-        # 검색어에서 용량과 개수 추출
         search_mg = re.search(r'(\d+(?:,\d+)*)\s*mg', search_name.lower())
         search_count = re.search(r'(\d+)\s*(?:count|ct|tablets?|capsules?|softgels?|veg\s*capsules?|vcaps?|pieces?|servings?|tab)(?!\w)', search_name.lower())
         
@@ -278,7 +249,6 @@ class ProductMatcher:
             should_include = True
             rejection_reason = None
             
-            # 용량 체크 (mg)
             if search_mg:
                 s_mg = int(search_mg.group(1).replace(',', ''))
                 iherb_mg = re.search(Config.PATTERNS['dosage_mg'], iherb_name.lower())
@@ -289,7 +259,6 @@ class ProductMatcher:
                         should_include = False
                         rejection_reason = f"용량 불일치 (검색:{s_mg}mg vs 아이허브:{i_mg}mg)"
             
-            # 개수 체크
             if search_count and should_include:
                 s_count = int(search_count.group(1))
                 iherb_count = re.search(Config.PATTERNS['english_count'], iherb_name.lower())
@@ -308,43 +277,33 @@ class ProductMatcher:
         return filtered_products
     
     def _gemini_text_match(self, search_name, filtered_products):
-        """Gemini AI 텍스트 기반 매칭 - 극도로 단순화된 프롬프트"""
+        """Gemini AI 텍스트 기반 매칭"""
         candidates_text = "\n".join([
             f"{i+1}. {product['title']}" 
             for i, product in enumerate(filtered_products)
         ])
         
-        # 극도로 단순화된 프롬프트 (안전 필터 회피)
-        prompt = f"Find: {search_name}\n\nOptions:\n{candidates_text}\n\nAnswer number or NONE:"
+        prompt = f"Which number matches?\n\nTarget: {search_name}\n\n{candidates_text}\n\nAnswer: number (1-{len(filtered_products)}) or 0"
         
         try:
-            print(f"    텍스트 매칭 중... (API 호출 {self.api_call_count + 1}회)")
+            print(f"    텍스트 매칭 시도 1/3 (API 호출 {self.api_call_count + 1}회)")
             response = self._safe_gemini_call(prompt)
             
             if not response:
                 return None, {'reason': 'gemini_no_response'}
             
-            if response in ["BLOCKED_SAFETY", "BLOCKED_RECITATION", "BLOCKED_OTHER"]:
-                return None, {
-                    'reason': 'gemini_blocked',
-                    'block_type': response,
-                    'candidates_count': len(filtered_products)
-                }
-            
-            response = response.strip().lower()
-            
-            if "none" in response:
-                return None, {
-                    'reason': 'gemini_no_match',
-                    'gemini_response': response,
-                    'candidates_count': len(filtered_products)
-                }
-            
-            number_match = re.search(r'(\d+)', response)
+            number_match = re.search(r'(\d+)', response.strip())
             if number_match:
-                selected_index = int(number_match.group(1)) - 1
+                selected_number = int(number_match.group(1))
                 
-                if 0 <= selected_index < len(filtered_products):
+                if selected_number == 0:
+                    return None, {
+                        'reason': 'gemini_no_match',
+                        'gemini_response': response,
+                        'candidates_count': len(filtered_products)
+                    }
+                elif 1 <= selected_number <= len(filtered_products):
+                    selected_index = selected_number - 1
                     selected_product = filtered_products[selected_index]
                     return selected_product, {
                         'reason': 'gemini_text_match',
@@ -374,34 +333,30 @@ class ProductMatcher:
         if not filtered_products:
             return None, {'reason': 'no_products_after_filtering'}
         
-        # 1단계: 텍스트 기반 매칭
         text_product, text_details = self._gemini_text_match(search_name, filtered_products)
         
         if not text_product:
             return None, text_details
         
-        # 2단계: 이미지 비교 (활성화된 경우에만)
         if Config.IMAGE_COMPARISON_ENABLED and coupang_product_id:
-            image_result = self._verify_with_images(
-                text_product, search_name, coupang_product_id, text_details
-            )
-            return image_result
+            return self._verify_with_images(text_product, search_name, coupang_product_id, text_details)
         
         return text_product, text_details
     
     def _verify_with_images(self, text_product, search_name, coupang_product_id, text_details):
         """이미지로 텍스트 매칭 결과 검증"""
         try:
-            # 쿠팡 이미지 경로 (config에서 경로 수정됨)
             coupang_image_path = os.path.join(
                 Config.COUPANG_IMAGES_DIR, 
                 f"coupang_{coupang_product_id}.jpg"
             )
-            
+
             if not os.path.exists(coupang_image_path):
-                print(f"    쿠팡 이미지 없음: {os.path.basename(coupang_image_path)}")
+                print(f"    쿠팡 이미지 없음: {coupang_image_path}")
                 text_details['image_verification'] = 'coupang_image_missing'
                 return text_product, text_details
+            else:
+                print(f"    쿠팡 이미지 발견: {os.path.basename(coupang_image_path)}")
             
             product_code = self._extract_product_code_from_url(text_product['url'])
             if not product_code:
@@ -410,7 +365,6 @@ class ProductMatcher:
             
             iherb_image_path = self._download_iherb_image(text_product['url'], product_code)
             if not iherb_image_path:
-                print(f"    아이허브 이미지 다운로드 실패")
                 text_details['image_verification'] = 'iherb_image_download_failed'
                 return text_product, text_details
             
@@ -444,7 +398,6 @@ class ProductMatcher:
             if "GEMINI_QUOTA_EXCEEDED" in error_msg:
                 raise
             
-            print(f"    이미지 검증 오류: {e}")
             text_details['image_verification'] = f'error: {str(e)[:50]}'
             return text_product, text_details
     
@@ -463,7 +416,6 @@ class ProductMatcher:
             if coupang_product_id and Config.IMAGE_COMPARISON_ENABLED:
                 print(f"  쿠팡 제품 ID: {coupang_product_id} (이미지 비교 대상)")
             
-            # 영어명으로 아이허브 검색
             search_url = f"{Config.BASE_URL}/search?kw={urllib.parse.quote(search_name)}"
             products = self.iherb_client.get_multiple_products(search_url)
             
@@ -472,7 +424,6 @@ class ProductMatcher:
             
             print(f"  검색 결과: {len(products)}개 제품 발견")
             
-            # 용량/개수 엄격 필터링
             print("  용량/개수 필터링 중...")
             filtered_products = self._check_strict_dosage_count_filter(search_name, products)
             
@@ -486,7 +437,6 @@ class ProductMatcher:
             
             print(f"  필터링 결과: {len(filtered_products)}개 제품 남음")
             
-            # Gemini AI 최종 매칭 + 이미지 검증
             best_product, match_details = self._final_match_with_images(
                 search_name, filtered_products, coupang_product_id
             )
@@ -503,7 +453,6 @@ class ProductMatcher:
             
         except Exception as e:
             error_msg = str(e)
-            print(f"    검색 중 오류: {error_msg}")
             
             if "GEMINI_QUOTA_EXCEEDED" in error_msg:
                 raise
