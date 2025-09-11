@@ -1,445 +1,259 @@
-import pandas as pd
 import google.generativeai as genai
-import time
-import os
+import pandas as pd
+import csv
 import re
-from typing import List, Optional
-import json
+from typing import List, Dict, Tuple
+import time
 
-class GeminiCSVTranslator:
+class ProductLabeler:
+    """Google Generative AI를 활용한 상품 라벨링 시스템"""
+    
     def __init__(self, api_key: str):
-        """
-        Gemini API를 사용한 CSV 번역기 초기화
-        
-        Args:
-            api_key: Google Gemini API 키
-        """
+        """초기화"""
         genai.configure(api_key=api_key)
-        # 유료 계정용 최신 모델 사용 (할당량 제한 없음)
-        self.model = genai.GenerativeModel('gemini-2.5-flash')
+        self.model = genai.GenerativeModel('gemini-pro')
+        
+        # CSV 출력 컬럼 정의
+        self.output_columns = [
+            'source',           # 'coupang' or 'iherb'
+            'original_id',      # 원본 product_id
+            'original_name',    # 원본 상품명
+            'ingredient',       # 주성분 (표준화)
+            'dosage_amount',    # 함량 숫자
+            'dosage_unit',      # 함량 단위 (mg, g, iu 등)
+            'form_type',        # 제형 (capsule, tablet, softgel 등)
+            'package_count',    # 개수
+            'confidence_score', # AI 추출 신뢰도 (0-1)
+            'extraction_notes'  # 추가 메모
+        ]
     
-    def preprocess_korean_text(self, text: str) -> str:
-        """
-        번역 전 한국어 텍스트에서 불필요한 부분 제거
-        
-        Args:
-            text: 한국어 상품명
-            
-        Returns:
-            전처리된 한국어 텍스트
-        """
-        # ", 1개" 패턴 제거
-        text = re.sub(r',\s*1개', '', text)
-        # ", 1개입" 패턴 제거  
-        text = re.sub(r',\s*1개입', '', text)
-        # 연속된 공백 정리
-        text = re.sub(r'\s{2,}', ' ', text)
-        return text.strip()
-    
-    def preprocess_english_for_search(self, text: str) -> str:
-        """
-        영어 번역 결과의 검색 최적화 전처리
-        
-        Args:
-            text: 번역된 영어 텍스트
-            
-        Returns:
-            검색 최적화된 영어 텍스트
-        """
-        # ", 1 Bottle", ", 1 Pack", ", 1 Container" 등 포장 정보 제거
-        text = re.sub(r',\s*1\s+(Bottle|Pack|Container|Box)', '', text, flags=re.IGNORECASE)
-        # 연속된 쉼표 정리
-        text = re.sub(r',{2,}', ',', text)
-        # 연속된 공백 정리
-        text = re.sub(r'\s{2,}', ' ', text)
-        # 앞뒤 공백 제거
-        text = text.strip()
-        # 끝에 쉼표가 남아있다면 제거
-        text = re.sub(r',$', '', text)
-        return text
-        
-    def translate_batch(self, product_names: List[str], batch_size: int = 10) -> List[str]:
-        """
-        상품명들을 배치로 번역
-        
-        Args:
-            product_names: 번역할 상품명 리스트
-            batch_size: 한 번에 번역할 상품 수
-            
-        Returns:
-            번역된 상품명 리스트
-        """
-        translated_names = []
-        
-        for i in range(0, len(product_names), batch_size):
-            batch = product_names[i:i + batch_size]
-            
-            # 한국어 전처리 적용
-            preprocessed_batch = [self.preprocess_korean_text(name) for name in batch]
-            
-            # 프롬프트 구성
-            prompt = f"""
-다음 한국어 상품명들을 영어로 번역해주세요. 
-각 상품명을 한 줄씩, 순서대로 번역해주세요.
-브랜드명은 그대로 유지하고, 상품의 특성을 잘 나타내도록 번역해주세요.
+    def create_prompt(self, product_names: List[str]) -> str:
+        """AI 프롬프트 생성 (배치 처리용)"""
+        prompt = """
+다음 건강기능식품 상품명들에서 핵심 정보를 추출해주세요.
 
 상품명들:
-{chr(10).join([f"{idx+1}. {name}" for idx, name in enumerate(preprocessed_batch)])}
-
-번역 결과를 다음 형식으로 제공해주세요:
-1. [영어 번역]
-2. [영어 번역]
-...
 """
+        for i, name in enumerate(product_names, 1):
+            prompt += f"{i}. {name}\n"
+        
+        prompt += """
+각 상품에 대해 다음 정보를 추출하여 CSV 형태로 응답해주세요:
+
+ingredient,dosage_amount,dosage_unit,form_type,package_count,confidence_score
+
+추출 규칙:
+1. ingredient: 주성분명을 영문 표준명으로 (예: L-Carnitine, Magnesium, Omega-3)
+2. dosage_amount: 함량 숫자만 (예: 500, 1000, 25)  
+3. dosage_unit: 단위만 소문자로 (mg, g, iu, billion 등)
+4. form_type: 제형 표준명 (capsule, tablet, softgel, powder, liquid)
+5. package_count: 총 개수 (예: 180, 120, 60)
+6. confidence_score: 추출 신뢰도 0.0-1.0
+
+예시:
+L-Carnitine,500,mg,capsule,180,0.95
+Magnesium,400,mg,capsule,180,0.90
+
+응답은 헤더 없이 데이터만 주세요.
+"""
+        return prompt
+    
+    def parse_ai_response(self, response_text: str, original_data: List[Dict]) -> List[Dict]:
+        """AI 응답을 파싱하여 구조화된 데이터로 변환"""
+        lines = response_text.strip().split('\n')
+        results = []
+        
+        for i, line in enumerate(lines):
+            if i >= len(original_data):
+                break
+                
+            parts = line.split(',')
+            if len(parts) >= 6:
+                result = {
+                    'source': original_data[i]['source'],
+                    'original_id': original_data[i]['original_id'],
+                    'original_name': original_data[i]['original_name'],
+                    'ingredient': parts[0].strip(),
+                    'dosage_amount': self._safe_convert(parts[1].strip(), int, 0),
+                    'dosage_unit': parts[2].strip().lower(),
+                    'form_type': parts[3].strip().lower(),
+                    'package_count': self._safe_convert(parts[4].strip(), int, 0),
+                    'confidence_score': self._safe_convert(parts[5].strip(), float, 0.0),
+                    'extraction_notes': ''
+                }
+                results.append(result)
+            else:
+                # 파싱 실패시 빈 결과 추가
+                results.append({
+                    'source': original_data[i]['source'],
+                    'original_id': original_data[i]['original_id'], 
+                    'original_name': original_data[i]['original_name'],
+                    'ingredient': '',
+                    'dosage_amount': 0,
+                    'dosage_unit': '',
+                    'form_type': '',
+                    'package_count': 0,
+                    'confidence_score': 0.0,
+                    'extraction_notes': 'AI 파싱 실패'
+                })
+        
+        return results
+    
+    def _safe_convert(self, value: str, convert_type, default):
+        """안전한 타입 변환"""
+        try:
+            return convert_type(value)
+        except:
+            return default
+    
+    def process_coupang_data(self, coupang_df: pd.DataFrame, batch_size: int = 10) -> List[Dict]:
+        """쿠팡 데이터 처리"""
+        results = []
+        
+        for i in range(0, len(coupang_df), batch_size):
+            batch = coupang_df.iloc[i:i+batch_size]
             
+            # 배치 데이터 준비
+            batch_data = []
+            product_names = []
+            
+            for _, row in batch.iterrows():
+                # 영문명 우선, 없으면 한국어명 사용
+                product_name = row.get('product_name_english', '') or row.get('product_name', '')
+                product_names.append(product_name)
+                
+                batch_data.append({
+                    'source': 'coupang',
+                    'original_id': row.get('product_id', ''),
+                    'original_name': product_name
+                })
+            
+            # AI 처리
             try:
-                print(f"\n--- 배치 {i//batch_size + 1} 번역 중 ---")
-                print("전처리된 상품명:")
-                for idx, (original, preprocessed) in enumerate(zip(batch, preprocessed_batch)):
-                    if original != preprocessed:
-                        print(f"  {idx+1}. {original} → {preprocessed}")
-                    else:
-                        print(f"  {idx+1}. {preprocessed}")
-                
-                # API 호출
+                prompt = self.create_prompt(product_names)
                 response = self.model.generate_content(prompt)
+                batch_results = self.parse_ai_response(response.text, batch_data)
+                results.extend(batch_results)
                 
-                # 응답 파싱
-                translated_batch = self.parse_translation_response(response.text, len(batch))
-                
-                # 영어 번역 결과에 대한 검색 최적화 전처리 적용
-                optimized_batch = [self.preprocess_english_for_search(trans) for trans in translated_batch]
-                translated_names.extend(optimized_batch)
-                
-                print("\n번역 및 최적화 결과:")
-                for idx, (original, translated, optimized) in enumerate(zip(batch, translated_batch, optimized_batch)):
-                    if translated != optimized:
-                        print(f"  {idx+1}. {original} → {translated} → {optimized}")
-                    else:
-                        print(f"  {idx+1}. {original} → {optimized}")
-                
-                print(f"\n✅ 배치 {i//batch_size + 1} 완료: {i+1}-{min(i+batch_size, len(product_names))} / {len(product_names)}")
-                print("-" * 80)
-                
-                # API 호출 제한 고려하여 대기
-                time.sleep(0.5)
+                print(f"쿠팡 배치 {i//batch_size + 1} 완료: {len(batch_results)}개 처리")
+                time.sleep(1)  # API 레이트 리미트 고려
                 
             except Exception as e:
-                print(f"\n❌ 배치 {i//batch_size + 1} 번역 실패: {e}")
-                print("실패한 상품명들:")
-                for idx, name in enumerate(batch):
-                    print(f"  {idx+1}. {name}")
-                print("원본 텍스트로 유지됩니다.")
-                # 실패한 경우 원본 유지
-                translated_names.extend(batch)
-                print("-" * 80)
-                
-        return translated_names
+                print(f"쿠팡 배치 {i//batch_size + 1} 오류: {e}")
+                # 오류시 빈 결과 추가
+                for data in batch_data:
+                    data.update({
+                        'ingredient': '', 'dosage_amount': 0, 'dosage_unit': '',
+                        'form_type': '', 'package_count': 0, 'confidence_score': 0.0,
+                        'extraction_notes': f'API 오류: {str(e)}'
+                    })
+                results.extend(batch_data)
+        
+        return results
     
-    def parse_translation_response(self, response_text: str, expected_count: int) -> List[str]:
-        """
-        Gemini 응답에서 번역 결과 파싱
+    def process_iherb_data(self, iherb_df: pd.DataFrame, batch_size: int = 10) -> List[Dict]:
+        """아이허브 데이터 처리 (NOW Foods만)"""
+        # NOW Foods 필터링
+        now_foods_df = iherb_df[
+            iherb_df['product_brand'].str.contains('NOW', case=False, na=False)
+        ].copy()
         
-        Args:
-            response_text: API 응답 텍스트
-            expected_count: 예상되는 번역 결과 수
+        print(f"아이허브 NOW Foods 제품: {len(now_foods_df)}개")
+        
+        results = []
+        
+        for i in range(0, len(now_foods_df), batch_size):
+            batch = now_foods_df.iloc[i:i+batch_size]
             
-        Returns:
-            파싱된 번역 결과 리스트
-        """
-        lines = response_text.strip().split('\n')
-        translations = []
-        
-        for line in lines:
-            line = line.strip()
-            if line and (line[0].isdigit() or line.startswith('*')):
-                # "1. " 또는 "* " 형식에서 번역 추출
-                if '. ' in line:
-                    translation = line.split('. ', 1)[1]
-                elif line.startswith('* '):
-                    translation = line[2:]
-                else:
-                    translation = line
-                translations.append(translation.strip())
-        
-        # 예상 개수와 맞지 않으면 조정
-        if len(translations) != expected_count:
-            print(f"경고: 예상 번역 개수({expected_count})와 실제({len(translations)})가 다릅니다.")
-            # 부족한 경우 빈 문자열로 채움
-            while len(translations) < expected_count:
-                translations.append("")
-            # 초과한 경우 잘라냄
-            translations = translations[:expected_count]
+            # 배치 데이터 준비
+            batch_data = []
+            product_names = []
+            
+            for _, row in batch.iterrows():
+                product_name = row.get('product_name', '')
+                product_names.append(product_name)
                 
-        return translations
-    
-    def translate_csv(self, 
-                     input_file: str, 
-                     output_file: str, 
-                     column_name: str = 'product_name',
-                     batch_size: int = 10,
-                     save_progress: bool = True) -> pd.DataFrame:
-        """
-        CSV 파일의 특정 컬럼을 번역
-        
-        Args:
-            input_file: 입력 CSV 파일 경로
-            output_file: 출력 CSV 파일 경로
-            column_name: 번역할 컬럼명
-            batch_size: 배치 크기
-            save_progress: 중간 저장 여부
+                batch_data.append({
+                    'source': 'iherb',
+                    'original_id': row.get('product_id', ''),
+                    'original_name': product_name
+                })
             
-        Returns:
-            번역이 완료된 DataFrame
-        """
-        # CSV 읽기
-        print(f"CSV 파일 읽는 중: {input_file}")
-        df = pd.read_csv(input_file)
+            # AI 처리
+            try:
+                prompt = self.create_prompt(product_names)
+                response = self.model.generate_content(prompt)
+                batch_results = self.parse_ai_response(response.text, batch_data)
+                results.extend(batch_results)
+                
+                print(f"아이허브 배치 {i//batch_size + 1} 완료: {len(batch_results)}개 처리")
+                time.sleep(1)  # API 레이트 리미트 고려
+                
+            except Exception as e:
+                print(f"아이허브 배치 {i//batch_size + 1} 오류: {e}")
+                # 오류시 빈 결과 추가
+                for data in batch_data:
+                    data.update({
+                        'ingredient': '', 'dosage_amount': 0, 'dosage_unit': '',
+                        'form_type': '', 'package_count': 0, 'confidence_score': 0.0,
+                        'extraction_notes': f'API 오류: {str(e)}'
+                    })
+                results.extend(batch_data)
         
-        if column_name not in df.columns:
-            raise ValueError(f"컬럼 '{column_name}'이 CSV에 없습니다.")
+        return results
+    
+    def save_to_csv(self, results: List[Dict], filename: str):
+        """결과를 CSV로 저장"""
+        df = pd.DataFrame(results)
+        df.to_csv(filename, index=False, encoding='utf-8-sig')
+        print(f"결과 저장 완료: {filename} ({len(results)}개 레코드)")
+    
+    def run_full_labeling(self, coupang_csv: str, iherb_xlsx: str, output_csv: str):
+        """전체 라벨링 프로세스 실행"""
+        print("🤖 AI 상품 라벨링 시작")
         
-        print(f"총 {len(df)} 개의 상품명을 번역합니다.")
+        # 데이터 로드
+        print("📁 데이터 로드 중...")
+        coupang_df = pd.read_csv(coupang_csv)
+        iherb_df = pd.read_excel(iherb_xlsx)
         
-        # 진행상황 파일 확인
-        progress_file = f"{output_file}.progress.json"
-        start_idx = 0
+        print(f"쿠팡 데이터: {len(coupang_df)}개")
+        print(f"아이허브 데이터: {len(iherb_df)}개")
         
-        if save_progress and os.path.exists(progress_file):
-            with open(progress_file, 'r') as f:
-                progress = json.load(f)
-                start_idx = progress.get('completed', 0)
-                print(f"이전 진행상황 발견: {start_idx} 개 완료됨")
+        # 라벨링 실행
+        all_results = []
         
-        # 번역할 상품명 추출
-        product_names = df[column_name].fillna("").astype(str).tolist()
+        print("\n🛒 쿠팡 데이터 처리 중...")
+        coupang_results = self.process_coupang_data(coupang_df)
+        all_results.extend(coupang_results)
         
-        # 이미 번역된 부분이 있다면 건너뛰기
-        if start_idx > 0:
-            product_names_to_translate = product_names[start_idx:]
-        else:
-            product_names_to_translate = product_names
-        
-        # 번역 실행
-        print("번역 시작...")
-        translated_names = self.translate_batch(product_names_to_translate, batch_size)
-        
-        # 전체 번역 결과 구성
-        if start_idx > 0:
-            # 이전 결과 로드
-            partial_df = pd.read_csv(output_file)
-            all_translated = partial_df[f'{column_name}_english'].tolist()
-            all_translated.extend(translated_names)
-        else:
-            all_translated = translated_names
-        
-        # 새 컬럼 추가
-        df[f'{column_name}_english'] = all_translated
-        
-        # 추가 정보 컬럼 생성 (원본, 전처리된 한국어, 번역 결과)
-        df[f'{column_name}_preprocessed'] = [self.preprocess_korean_text(text) for text in df[column_name].fillna("").astype(str)]
+        print("\n🌿 아이허브 데이터 처리 중...")
+        iherb_results = self.process_iherb_data(iherb_df)
+        all_results.extend(iherb_results)
         
         # 결과 저장
-        df.to_csv(output_file, index=False, encoding='utf-8-sig')
-        print(f"번역 완료! 결과 저장됨: {output_file}")
+        print(f"\n💾 결과 저장 중... (총 {len(all_results)}개)")
+        self.save_to_csv(all_results, output_csv)
         
-        # 진행상황 파일 삭제
-        if save_progress and os.path.exists(progress_file):
-            os.remove(progress_file)
-        
-        return df
-    
-    def translate_single(self, text: str) -> str:
-        """
-        단일 텍스트 번역
-        
-        Args:
-            text: 번역할 텍스트
-            
-        Returns:
-            번역된 텍스트
-        """
-        # 한국어 전처리 적용
-        preprocessed_text = self.preprocess_korean_text(text)
-        
-        prompt = f"""
-다음 한국어 상품명을 영어로 번역해주세요:
-"{preprocessed_text}"
-
-브랜드명은 그대로 유지하고, 상품의 특성을 잘 나타내도록 자연스럽게 번역해주세요.
-번역 결과만 제공해주세요.
-"""
-        
-        try:
-            # 한국어 전처리 적용
-            preprocessed_text = self.preprocess_korean_text(text)
-            
-            prompt = f"""
-다음 한국어 상품명을 영어로 번역해주세요:
-"{preprocessed_text}"
-
-브랜드명은 그대로 유지하고, 상품의 특성을 잘 나타내도록 자연스럽게 번역해주세요.
-번역 결과만 제공해주세요.
-"""
-            
-            print(f"단일 번역 시도: '{text}' → '{preprocessed_text}'")
-            
-            # API 호출 (재시도 로직 적용)
-            def api_call():
-                return self.model.generate_content(prompt)
-            
-            response = self.retry_api_call(api_call, max_retries=3, base_delay=1.0)
-            translated = response.text.strip()
-            
-            # 영어 검색 최적화 적용
-            result = self.preprocess_english_for_search(translated)
-            print(f"번역 결과: '{preprocessed_text}' → '{translated}' → '{result}'")
-            return result
-        except Exception as e:
-            print(f"번역 실패: {e}")
-            return text
+        # 요약 통계
+        df = pd.DataFrame(all_results)
+        print(f"\n📊 처리 결과:")
+        print(f"- 쿠팡: {len(df[df['source']=='coupang'])}개")
+        print(f"- 아이허브: {len(df[df['source']=='iherb'])}개") 
+        print(f"- 평균 신뢰도: {df['confidence_score'].mean():.2f}")
+        print(f"- 추출 성공률: {(df['confidence_score'] > 0.5).mean()*100:.1f}%")
 
 # 사용 예시
-def main():
-    # API 키 설정
-    API_KEY = 'AIzaSyDNB7zwp36ICInpj3SRV9GiX7ovBxyFHHE'
-    
-    # 번역기 초기화
-    translator = GeminiCSVTranslator(API_KEY)
-    
-    # 파일 경로 설정 (현재 프로젝트 구조에 맞게)
-    input_file = 'input/coupang/coupang_products_20250903_120440.csv'
-    output_file = 'output/coupang/coupang_products_translated_optimized_20250903.csv'
-    
-    # output/coupang 디렉토리 생성
-    os.makedirs('output/coupang', exist_ok=True)
-    
-    try:
-        print(f"번역 시작: {input_file}")
-        print(f"결과 저장 위치: {output_file}")
-        
-        # 번역 실행
-        df = translator.translate_csv(
-            input_file=input_file,
-            output_file=output_file,
-            column_name='product_name',
-            batch_size=10,  # 한 번에 10개씩 번역
-            save_progress=True
-        )
-        
-        print("\n=== 번역 결과 미리보기 ===")
-        print(df[['product_name', 'product_name_preprocessed', 'product_name_english']].head(10))
-        
-        # 번역 통계 출력
-        total_products = len(df)
-        translated_products = len(df[df['product_name_english'].notna() & (df['product_name_english'] != '')])
-        print(f"\n=== 번역 통계 ===")
-        print(f"전체 상품: {total_products}개")
-        print(f"번역 완료: {translated_products}개")
-        print(f"번역 성공률: {translated_products/total_products*100:.1f}%")
-        
-    except Exception as e:
-        print(f"오류 발생: {e}")
-        import traceback
-        traceback.print_exc()
-
-# 개별 파일 번역 함수
-def translate_specific_file(filename: str):
-    """특정 파일만 번역하는 함수"""
-    API_KEY = 'AIzaSyDNB7zwp36ICInpj3SRV9GiX7ovBxyFHHE'
-    translator = GeminiCSVTranslator(API_KEY)
-    
-    input_file = f'input/coupang/{filename}'
-    output_file = f'output/coupang/{filename.replace(".csv", "_translated_optimized.csv")}'
-    
-    os.makedirs('output/coupang', exist_ok=True)
-    
-    try:
-        df = translator.translate_csv(
-            input_file=input_file,
-            output_file=output_file,
-            column_name='product_name',
-            batch_size=10,
-            save_progress=True
-        )
-        return df
-    except Exception as e:
-        print(f"파일 {filename} 번역 실패: {e}")
-        return None
-
-# 테스트 함수들
-def test_single_translation():
-    """단일 번역 테스트"""
-    API_KEY = 'AIzaSyDNB7zwp36ICInpj3SRV9GiX7ovBxyFHHE'
-    translator = GeminiCSVTranslator(API_KEY)
-    
-    test_products = [
-        "나우푸드 실리마린 밀크 시슬 추출물 300mg 베지 캡슐, 200정, 1개",
-        "나우푸드 더블 스트랭스 L-아르기닌 1000mg 타블렛, 120정, 1개",
-        "나우푸드 프로바이오틱-10 유산균 250억 베지 캡슐, 100정, 1개"
-    ]
-    
-    print("=== 단일 번역 테스트 ===")
-    for product in test_products:
-        result = translator.translate_single(product)
-        print(f"최종 결과: {result}")
-        print()
-
-def test_batch_translation():
-    """배치 번역 테스트"""
-    API_KEY = 'AIzaSyDNB7zwp36ICInpj3SRV9GiX7ovBxyFHHE'
-    translator = GeminiCSVTranslator(API_KEY)
-    
-    test_products = [
-        "나우푸드 실리마린 밀크 시슬 추출물 300mg 베지 캡슐, 200정, 1개",
-        "나우푸드 더블 스트랭스 L-아르기닌 1000mg 타블렛, 120정, 1개",
-        "나우푸드 프로바이오틱-10 유산균 250억 베지 캡슐, 100정, 1개",
-        "나우푸드 울트라 오메가 3 500 EPA & 250 DHA 1000mg 피쉬 소프트젤, 180정, 1개",
-        "나우푸드 데일리 비츠 멀티비타민 & 미네랄 타블렛, 250정, 1개"
-    ]
-    
-    print("=== 배치 번역 테스트 ===")
-    results = translator.translate_batch(test_products, batch_size=3)
-    
-    print("\n=== 최종 결과 ===")
-    for original, translated in zip(test_products, results):
-        print(f"{original} → {translated}")
-
-def test_preprocessing():
-    """전처리 함수 테스트"""
-    translator = GeminiCSVTranslator('dummy_key')
-    
-    korean_samples = [
-        "나우푸드 실리마린 밀크 시슬 추출물 300mg 베지 캡슐, 200정, 1개",
-        "나우푸드 마카 500mg 베지 캡슐, 1개, 250정",
-        "나우푸드 에센셜 아로마오일, 30ml, 1개입, Orange"
-    ]
-    
-    english_samples = [
-        "Now Foods Silymarin Milk Thistle Extract 300mg Veggie Capsules, 200 Count, 1 Bottle",
-        "Now Foods Maca 500mg Veggie Capsules, 250 Count, 1 Pack",
-        "Now Foods Essential Oil, 30ml, 1 Container, Orange"
-    ]
-    
-    print("=== 한국어 전처리 테스트 ===")
-    for text in korean_samples:
-        result = translator.preprocess_korean_text(text)
-        print(f"원본: {text}")
-        print(f"전처리: {result}")
-        print()
-    
-    print("=== 영어 검색 최적화 테스트 ===")
-    for text in english_samples:
-        result = translator.preprocess_english_for_search(text)
-        print(f"원본: {text}")
-        print(f"최적화: {result}")
-        print()
-
 if __name__ == "__main__":
-    # 실행할 함수 선택
-    # main()                    # 전체 CSV 번역
-    # test_single_translation() # 단일 번역 테스트
-    # test_batch_translation()  # 배치 번역 테스트
-    # test_preprocessing()      # 전처리 함수 테스트
+    # API 키 설정
+    API_KEY = "your_google_ai_api_key_here"
     
-    main()  # 기본으로 전체 번역 실행
+    # 라벨러 초기화
+    labeler = ProductLabeler(API_KEY)
+    
+    # 전체 프로세스 실행
+    labeler.run_full_labeling(
+        coupang_csv="coupang_products_translated.csv",
+        iherb_xlsx="US ITEM FEED  TITLE BRAND EN.xlsx", 
+        output_csv="labeled_products.csv"
+    )
