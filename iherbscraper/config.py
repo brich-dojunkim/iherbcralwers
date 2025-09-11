@@ -66,7 +66,7 @@ class Config:
     """스크래퍼 전역 설정 - Gemini AI 통합"""
     
     # Gemini AI 설정
-    GEMINI_API_KEY = "YOUR_GEMINI_API_KEY_HERE"  # 실제 API 키로 교체 필요
+    GEMINI_API_KEY = "AIzaSyBe9EQB8cvXko5fWoU309sYpkiUkQLe2ZM"  # 실제 API 키로 교체 필요
     GEMINI_TEXT_MODEL = "gemini-2.5-flash"  # 텍스트 매칭용
     GEMINI_VISION_MODEL = "gemini-2.5-flash"  # 이미지 비교용 (Vision 지원)
     GEMINI_MAX_RETRIES = 3

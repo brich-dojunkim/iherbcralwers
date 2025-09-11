@@ -486,8 +486,8 @@ if __name__ == "__main__":
             max_products_to_compare=4
         )
         
-        input_csv = "/Users/brich/Desktop/iherb_price/coupang/coupang_products_translated.csv"
-        output_csv = "/Users/brich/Desktop/iherb_price/coupang/iherb_gemini_results.csv"
+        input_csv = "/Users/brich/Desktop/iherb_price/iherbscraper/input/coupang_products_20250911_130214.csv"
+        output_csv = "/output/iherb_results.csv"
         
         # Gemini AI 통합 처리 (자동 재시작 지원)
         results = scraper.process_products_complete(
