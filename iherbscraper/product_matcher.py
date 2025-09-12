@@ -268,7 +268,7 @@ class ProductMatcher:
             return {'success': False, 'reason': 'vision_api_error', 'error': error_msg}
     
     def _gemini_comprehensive_match(self, search_name, all_products):
-        """Gemini AI 종합 매칭 - 필터링과 매칭 통합"""
+        """Gemini AI 종합 매칭 - 개선된 구조화 프롬프트"""
         
         # 후보군 표시
         self._print_candidates(all_products)
@@ -277,22 +277,41 @@ class ProductMatcher:
             f"{i+1}. {product['title']}" 
             for i, product in enumerate(all_products)
         ])
-                
-        prompt = (
-            f"You are matching products. Select the best match from the list.\n\n"
-            f"Target product: {search_name}\n\n"
-            f"Options:\n{candidates_text}\n\n"
-            f"Instructions:\n"
-            f"1. Same brand + same main ingredient = potential match\n"
-            f"2. If brand, ingredient, strength, count, volume, or form conflict (both mention different values) = exclude\n"
-            f"3. If brand, ingredient, strength, count, volume, or form missing from either side = UNCERTAIN\n"
-            f"4. Only return 0 if completely different ingredients\n\n"
-            f"Response format: <number> CONFIDENT | <number> UNCERTAIN | 0 UNCERTAIN\n\n"
-            f"Choose CONFIDENT when: exact match with all stated details\n"
-            f"Choose UNCERTAIN when: same product but missing/unclear specifications\n"
-            f"Choose 0 when: completely different ingredients\n\n"
-            f"Answer:"
-        )
+        
+        prompt = f"""PRODUCT MATCHING TASK
+
+    TARGET: {search_name}
+
+    CANDIDATES:
+    {candidates_text}
+
+    MATCHING CRITERIA:
+    1. BRAND: Manufacturer name must be identical
+    2. INGREDIENT: Main active compound must be identical  
+    3. STRENGTH: Dosage amount must be identical
+    4. COUNT: Number of units must be identical
+    5. FORM: Product type must be compatible
+
+    DECISION RULES:
+    A. If BRAND differs → Return 0
+    B. If INGREDIENT differs → Return 0
+    C. If STRENGTH differs → Return 0
+    D. If COUNT differs → Return 0
+    E. If FORM incompatible → Return 0
+    F. If all criteria match exactly → Return NUMBER CONFIDENT
+    G. If brand/ingredient/form match but strength/count unspecified → Return NUMBER UNCERTAIN
+
+    EXAMPLES:
+    Target: "NOW Foods CoQ10 100mg 60 Capsules"
+    - "NOW Foods CoQ10 100mg 60 Veg Capsules" → 1 CONFIDENT
+    - "NOW Foods CoQ10 100mg Capsules" → 1 UNCERTAIN
+    - "NOW Foods CoQ10 250mg 60 Capsules" → 0 UNCERTAIN
+    - "Swanson CoQ10 100mg 60 Capsules" → 0 UNCERTAIN
+
+    RESPONSE FORMAT: <number> CONFIDENT | <number> UNCERTAIN | 0 UNCERTAIN
+    Answer with ONLY this format, no explanation.
+
+    Answer:"""
         
         try:
             print(f"    🔍 Gemini 종합 매칭 (API 호출 {self.api_call_count + 1}회)")
@@ -367,7 +386,7 @@ class ProductMatcher:
                 return None, {'reason': 'gemini_timeout', 'error': error_msg}
             else:
                 return None, {'reason': 'gemini_api_error', 'error': error_msg}
-    
+            
     def _final_match_with_smart_verification(self, search_name, all_products, coupang_product_id=None):
         """최종 매칭: Gemini 종합 판단 + 조건부 이미지 검증"""
         if not all_products:
