@@ -1,6 +1,6 @@
 """
-상품 매칭 로직 모듈 - 영어명 검색 + Gemini AI + Vision
-Gemini 2.0 Flash 최적화 버전 (폴백 제거)
+상품 매칭 로직 모듈 - 영어명 검색 + Gemini AI + 스마트 Vision
+Gemini 2.0 Flash 최적화 버전 (Gemini 판단 기반 이미지 검증)
 """
 
 import re
@@ -22,7 +22,7 @@ except ImportError:
 
 
 class ProductMatcher:
-    """영어명 검색 + Gemini AI + Vision 기반 상품 매칭 시스템"""
+    """영어명 검색 + Gemini AI + 스마트 Vision 기반 상품 매칭 시스템"""
     
     def __init__(self, iherb_client):
         self.iherb_client = iherb_client
@@ -277,13 +277,13 @@ class ProductMatcher:
         return filtered_products
     
     def _gemini_text_match(self, search_name, filtered_products):
-        """Gemini AI 텍스트 기반 매칭"""
+        """Gemini AI 텍스트 기반 매칭 + 신뢰도 판단"""
         candidates_text = "\n".join([
             f"{i+1}. {product['title']}" 
             for i, product in enumerate(filtered_products)
         ])
         
-        prompt = f"Which number matches?\n\nTarget: {search_name}\n\n{candidates_text}\n\nAnswer: number (1-{len(filtered_products)}) or 0"
+        prompt = f"Which number matches? Also, is this match confident or uncertain?\n\nTarget: {search_name}\n\n{candidates_text}\n\nAnswer: number (1-{len(filtered_products)}) or 0, and CONFIDENT or UNCERTAIN"
         
         try:
             print(f"    텍스트 매칭 시도 1/3 (API 호출 {self.api_call_count + 1}회)")
@@ -292,7 +292,10 @@ class ProductMatcher:
             if not response:
                 return None, {'reason': 'gemini_no_response'}
             
+            # 숫자와 신뢰도 추출
             number_match = re.search(r'(\d+)', response.strip())
+            confidence_uncertain = "UNCERTAIN" in response.upper()
+            
             if number_match:
                 selected_number = int(number_match.group(1))
                 
@@ -309,7 +312,8 @@ class ProductMatcher:
                         'reason': 'gemini_text_match',
                         'gemini_response': response,
                         'selected_index': selected_index,
-                        'selected_product': selected_product['title']
+                        'selected_product': selected_product['title'],
+                        'needs_image_verification': confidence_uncertain
                     }
             
             return None, {
@@ -328,8 +332,8 @@ class ProductMatcher:
             else:
                 return None, {'reason': 'gemini_api_error', 'error': error_msg}
     
-    def _final_match_with_images(self, search_name, filtered_products, coupang_product_id=None):
-        """최종 매칭: 텍스트 매칭 후 이미지 검증"""
+    def _final_match_with_smart_image_verification(self, search_name, filtered_products, coupang_product_id=None):
+        """최종 매칭: Gemini가 직접 이미지 검증 필요성 판단"""
         if not filtered_products:
             return None, {'reason': 'no_products_after_filtering'}
         
@@ -338,21 +342,33 @@ class ProductMatcher:
         if not text_product:
             return None, text_details
         
-        if Config.IMAGE_COMPARISON_ENABLED and coupang_product_id:
-            return self._verify_with_images(text_product, search_name, coupang_product_id, text_details)
+        # Gemini가 판단한 이미지 검증 필요성 확인
+        needs_image_verification = (
+            Config.IMAGE_COMPARISON_ENABLED and 
+            coupang_product_id and
+            text_details.get('needs_image_verification', False)
+        )
         
-        return text_product, text_details
+        if needs_image_verification:
+            print(f"    이미지 검증 필요 (Gemini 판단: UNCERTAIN)")
+            return self._verify_with_images(text_product, search_name, coupang_product_id, text_details)
+        else:
+            print(f"    이미지 검증 생략 (Gemini 판단: CONFIDENT)")
+            text_details['image_verification'] = 'skipped_confident_match'
+            return text_product, text_details
     
     def _verify_with_images(self, text_product, search_name, coupang_product_id, text_details):
         """이미지로 텍스트 매칭 결과 검증"""
         try:
+            print(f"    === 이미지 검증 시작 ===")
+            
             coupang_image_path = os.path.join(
                 Config.COUPANG_IMAGES_DIR, 
                 f"coupang_{coupang_product_id}.jpg"
             )
 
             if not os.path.exists(coupang_image_path):
-                print(f"    쿠팡 이미지 없음: {coupang_image_path}")
+                print(f"    쿠팡 이미지 없음")
                 text_details['image_verification'] = 'coupang_image_missing'
                 return text_product, text_details
             else:
@@ -360,19 +376,25 @@ class ProductMatcher:
             
             product_code = self._extract_product_code_from_url(text_product['url'])
             if not product_code:
+                print(f"    상품 코드 추출 실패")
                 text_details['image_verification'] = 'iherb_code_missing'
                 return text_product, text_details
             
+            print(f"    아이허브 이미지 다운로드 시도...")
             iherb_image_path = self._download_iherb_image(text_product['url'], product_code)
+            
             if not iherb_image_path:
+                print(f"    아이허브 이미지 다운로드 실패")
                 text_details['image_verification'] = 'iherb_image_download_failed'
                 return text_product, text_details
             
+            print(f"    Vision API 비교 시작...")
             vision_result = self._compare_images_with_gemini(
                 coupang_image_path, iherb_image_path, search_name
             )
             
             if not vision_result.get('success'):
+                print(f"    Vision API 실패: {vision_result.get('reason')}")
                 text_details['image_verification'] = vision_result.get('reason', 'vision_failed')
                 return text_product, text_details
             
@@ -395,6 +417,7 @@ class ProductMatcher:
                 
         except Exception as e:
             error_msg = str(e)
+            print(f"    이미지 검증 중 오류: {error_msg}")
             if "GEMINI_QUOTA_EXCEEDED" in error_msg:
                 raise
             
@@ -402,15 +425,29 @@ class ProductMatcher:
             return text_product, text_details
     
     def _extract_product_code_from_url(self, product_url):
-        """아이허브 URL에서 상품 코드 추출"""
+        """아이허브 URL에서 상품 코드 추출 - 숫자 ID도 허용"""
         try:
+            # 기존 패턴: /pr/ABC-12345 형태
             match = re.search(r'/pr/([A-Z0-9-]+)', product_url)
-            return match.group(1) if match else None
+            if match:
+                return match.group(1)
+            
+            # 새 패턴: /pr/.../12678 형태의 숫자 ID
+            match = re.search(r'/pr/[^/]+/(\d+)', product_url)
+            if match:
+                return match.group(1)
+                
+            # 마지막 숫자만 추출
+            match = re.search(r'/(\d+)/?$', product_url)
+            if match:
+                return match.group(1)
+                
+            return None
         except:
             return None
     
     def search_product_enhanced(self, search_name, coupang_product_id=None):
-        """영어명으로 검색 + Gemini AI 매칭 + 이미지 검증"""
+        """영어명으로 검색 + Gemini AI 매칭 + 스마트 이미지 검증"""
         try:
             print(f"  검색어: {search_name}")
             if coupang_product_id and Config.IMAGE_COMPARISON_ENABLED:
@@ -437,13 +474,18 @@ class ProductMatcher:
             
             print(f"  필터링 결과: {len(filtered_products)}개 제품 남음")
             
-            best_product, match_details = self._final_match_with_images(
+            best_product, match_details = self._final_match_with_smart_image_verification(
                 search_name, filtered_products, coupang_product_id
             )
             
             if best_product:
                 verification = match_details.get('image_verification', 'not_attempted')
-                match_type = "텍스트+이미지" if verification == 'match' else "텍스트만"
+                if verification == 'match':
+                    match_type = "텍스트+이미지"
+                elif verification == 'skipped_confident_match':
+                    match_type = "텍스트만"
+                else:
+                    match_type = "텍스트만"
                 print(f"  매칭 성공 ({match_type}): {best_product['title'][:50]}...")
                 return best_product['url'], 0.9, match_details
             else:

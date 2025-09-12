@@ -69,7 +69,7 @@ class Config:
     """스크래퍼 전역 설정 - Gemini 2.5 Flash 최적화 버전"""
     
     # ========== Gemini 2.5 Flash 설정 ==========
-    GEMINI_API_KEY = "AIzaSyBe9EQB8cvXko5fWoU309sYpkiUkQLe2ZM"
+    GEMINI_API_KEY = "AIzaSyD-GIKFbdwJO2BW5l-w3nCv_DQGFHA4VOU"
     GEMINI_TEXT_MODEL = "models/gemini-2.0-flash"  # 🆕 2.0 Flash 적용
     GEMINI_VISION_MODEL = "models/gemini-2.0-flash"  # 🆕 2.0 Flash 적용
     GEMINI_MAX_RETRIES = 3
@@ -191,7 +191,7 @@ class Config:
     # ========== 출력 컬럼 ==========
     OUTPUT_COLUMNS = [
         'iherb_product_name', 'coupang_product_name_english', 'coupang_product_name', 
-        'similarity_score', 'matching_reason', 'failure_type',
+        'similarity_score', 'matching_reason', 'gemini_confidence', 'failure_type',
         'coupang_url', 'iherb_product_url', 'coupang_product_id', 'iherb_product_code',
         'status', 'coupang_current_price_krw', 'coupang_original_price_krw', 'coupang_discount_rate',
         'iherb_list_price_krw', 'iherb_discount_price_krw', 'iherb_discount_percent',

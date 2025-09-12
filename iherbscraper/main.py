@@ -4,6 +4,7 @@
 1. 영어명 우선 검색 방식
 2. 번역 기능 통합
 3. 이미지 비교 활성화
+4. Gemini 신뢰도 판단 포함
 """
 
 import os
@@ -198,20 +199,20 @@ class EnglishIHerbScraper:
         
         # 아이허브 검색 및 정보 추출 (영어명 사용)
         result = self._search_and_extract_iherb_info(search_name, coupang_product_id, actual_idx)
-        product_url, product_code, iherb_product_name, iherb_price_info, similarity_score, matching_reason, failure_type = result
+        product_url, product_code, iherb_product_name, iherb_price_info, similarity_score, matching_reason, failure_type, gemini_confidence = result
         
         # 결과 생성 및 저장
         result_record = self.data_manager.create_result_record(
             row, actual_idx, search_name, product_url, similarity_score,
             product_code, iherb_product_name, coupang_price_info, iherb_price_info, 
-            matching_reason, failure_type, self.product_matcher.api_call_count
+            matching_reason, failure_type, self.product_matcher.api_call_count, gemini_confidence
         )
         
         self.data_manager.append_result_to_csv(result_record, output_file_path)
         
         # 결과 출력
         self._display_results(product_code, iherb_product_name, similarity_score, 
-                            coupang_price_info, iherb_price_info, matching_reason, failure_type)
+                            coupang_price_info, iherb_price_info, matching_reason, failure_type, gemini_confidence)
         
         # 진행률 표시
         self._display_progress(process_idx, total_count, output_file_path)
@@ -282,6 +283,7 @@ class EnglishIHerbScraper:
         iherb_price_info = {}
         matching_reason = "처리 시작"
         failure_type = FailureType.UNPROCESSED
+        gemini_confidence = "NONE"
         
         for retry in range(Config.MAX_RETRIES):
             try:
@@ -299,6 +301,16 @@ class EnglishIHerbScraper:
                     failure_type = FailureType.PROCESSING_ERROR
                     matching_reason = "검색 결과 형식 오류"
                     break
+                
+                # Gemini 신뢰도 추출
+                if match_details and isinstance(match_details, dict):
+                    needs_verification = match_details.get('needs_image_verification')
+                    if needs_verification is True:
+                        gemini_confidence = "UNCERTAIN"
+                    elif needs_verification is False:
+                        gemini_confidence = "CONFIDENT"
+                    else:
+                        gemini_confidence = "NONE"
                 
                 # 매칭 결과 분류
                 if not product_url:
@@ -334,6 +346,8 @@ class EnglishIHerbScraper:
                         image_verification = match_details.get('image_verification', 'not_attempted')
                         if image_verification == 'match':
                             matching_reason = f"Gemini AI + 이미지 매칭: {selected_product[:30]}..."
+                        elif image_verification == 'skipped_confident_match':
+                            matching_reason = f"Gemini AI 텍스트 매칭 (확신): {selected_product[:30]}..."
                         else:
                             matching_reason = f"Gemini AI 텍스트 매칭: {selected_product[:30]}..."
                         
@@ -399,10 +413,10 @@ class EnglishIHerbScraper:
                             matching_reason = f"브라우저 재시작 실패: {str(restart_error)[:50]}"
                             break
         
-        return product_url, product_code, iherb_product_name, iherb_price_info, similarity_score, matching_reason, failure_type
+        return product_url, product_code, iherb_product_name, iherb_price_info, similarity_score, matching_reason, failure_type, gemini_confidence
     
     def _display_results(self, product_code, iherb_product_name, similarity_score, 
-                        coupang_price_info, iherb_price_info, matching_reason, failure_type):
+                        coupang_price_info, iherb_price_info, matching_reason, failure_type, gemini_confidence):
         """결과 출력"""
         print()
         if product_code:
@@ -411,6 +425,7 @@ class EnglishIHerbScraper:
             print(f"     아이허브명: {iherb_product_name}")
             print(f"     매칭 점수: {similarity_score:.3f}")
             print(f"     매칭 사유: {matching_reason}")
+            print(f"     Gemini 신뢰도: {gemini_confidence}")
             
             print(f"  💰 가격 정보:")
             
@@ -460,10 +475,12 @@ class EnglishIHerbScraper:
             print(f"     매칭 점수: {similarity_score:.3f}")
             print(f"     매칭 사유: {matching_reason}")
             print(f"     실패 유형: {FailureType.get_description(failure_type)}")
+            print(f"     Gemini 신뢰도: {gemini_confidence}")
         else:
             print(f"  ❌ 매칭된 상품 없음")
             print(f"     매칭 사유: {matching_reason}")
             print(f"     실패 유형: {FailureType.get_description(failure_type)}")
+            print(f"     Gemini 신뢰도: {gemini_confidence}")
     
     def _display_progress(self, process_idx, total_count, output_file_path):
         """진행률 표시"""

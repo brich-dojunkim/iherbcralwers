@@ -253,9 +253,9 @@ class DataManager:
         return comparison_result
     
     def create_result_record(self, row, actual_idx, english_name, product_url, 
-                           similarity_score, product_code, iherb_product_name, 
-                           coupang_price_info, iherb_price_info, matching_reason=None, 
-                           failure_type=None, gemini_api_calls=0):
+                        similarity_score, product_code, iherb_product_name, 
+                        coupang_price_info, iherb_price_info, matching_reason=None, 
+                        failure_type=None, gemini_api_calls=0, gemini_confidence=None):
         """결과 레코드 생성 - Gemini API 사용량 추가"""
         
         # 가격 비교 계산
@@ -278,6 +278,7 @@ class DataManager:
             'coupang_product_name': row.get('product_name', ''),
             'similarity_score': round(similarity_score, 3) if similarity_score else 0,
             'matching_reason': matching_reason or '매칭 정보 없음',
+            'gemini_confidence': gemini_confidence or 'NONE',
             'failure_type': failure_type,
             'coupang_url': coupang_price_info.get('url', ''),
             'iherb_product_url': product_url or '',
