@@ -290,14 +290,12 @@ class ProductMatcher:
     2. INGREDIENT: Main active compound must be identical  
     3. STRENGTH: Dosage amount must be identical
     4. COUNT: Number of units must be identical
-    5. FORM: Product type must be compatible
 
     DECISION RULES:
     A. If BRAND differs → Return 0
     B. If INGREDIENT differs → Return 0
     C. If STRENGTH differs → Return 0
     D. If COUNT differs → Return 0
-    E. If FORM incompatible → Return 0
     F. If all criteria match exactly → Return NUMBER CONFIDENT
     G. If brand/ingredient/form match but strength/count unspecified → Return NUMBER UNCERTAIN
 
