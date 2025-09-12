@@ -277,26 +277,21 @@ class ProductMatcher:
             f"{i+1}. {product['title']}" 
             for i, product in enumerate(all_products)
         ])
-        
+                
         prompt = (
-            "Select the exact same product from the list.\n\n"
-            f"Target: {search_name}\n\n"
-            f"{candidates_text}\n\n"
-            f"Respond ONLY as: <number 1-{len(all_products)}> CONFIDENT, "
-            f"<number 1-{len(all_products)}> UNCERTAIN, or 0 UNCERTAIN.\n"
-            "\n"
-            "Decision order:\n"
-            "- Exclude only explicit conflicts:\n"
-            "  • Brand mismatch.\n"
-            "  • Form mismatch.\n"
-            "  • Variant/line conflict ONLY when BOTH Target and candidate state a line/variant and they differ.\n"
-            "  • Numeric conflict ONLY when BOTH state a value and they differ (per-unit strength, total amount, concentration, IU, size/volume/weight, quantity/count).\n"
-            "- Missing or unstated information is NOT a conflict. Do not infer unstated values.\n"
-            "- If all stated details match, output <number> CONFIDENT.\n"
-            "- If no candidate is CONFIDENT and at least one candidate has no conflicts, you MUST output a non-zero <number> UNCERTAIN.\n"
-            "- When choosing UNCERTAIN, prefer greater token overlap with the Target across brand, line, form, and stated numeric fields; if tied, choose the lowest index.\n"
-            "- Only if every candidate has a conflict, output 0 UNCERTAIN.\n"
-            "- One line only. No explanations."
+            f"You are matching products. Select the best match from the list.\n\n"
+            f"Target product: {search_name}\n\n"
+            f"Options:\n{candidates_text}\n\n"
+            f"Instructions:\n"
+            f"1. Same brand + same main ingredient = potential match\n"
+            f"2. If brand, ingredient, strength, count, volume, or form conflict (both mention different values) = exclude\n"
+            f"3. If brand, ingredient, strength, count, volume, or form missing from either side = UNCERTAIN\n"
+            f"4. Only return 0 if completely different ingredients\n\n"
+            f"Response format: <number> CONFIDENT | <number> UNCERTAIN | 0 UNCERTAIN\n\n"
+            f"Choose CONFIDENT when: exact match with all stated details\n"
+            f"Choose UNCERTAIN when: same product but missing/unclear specifications\n"
+            f"Choose 0 when: completely different ingredients\n\n"
+            f"Answer:"
         )
         
         try:
