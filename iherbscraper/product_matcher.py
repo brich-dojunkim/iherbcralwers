@@ -1,6 +1,6 @@
 """
-상품 매칭 로직 모듈 - 영어명 검색 + Gemini AI + 스마트 Vision
-Gemini 2.0 Flash 최적화 버전 (Gemini 판단 기반 이미지 검증)
+상품 매칭 로직 모듈 - Gemini AI 전담 검증 시스템
+모든 필터링과 매칭을 Gemini가 처리
 """
 
 import re
@@ -22,7 +22,7 @@ except ImportError:
 
 
 class ProductMatcher:
-    """영어명 검색 + Gemini AI + 스마트 Vision 기반 상품 매칭 시스템"""
+    """Gemini AI 전담 상품 매칭 시스템"""
     
     def __init__(self, iherb_client):
         self.iherb_client = iherb_client
@@ -49,6 +49,14 @@ class ProductMatcher:
         except Exception as e:
             print(f"  Gemini AI 초기화 실패: {e}")
             raise
+    
+    def _print_candidates(self, candidates):
+        """후보군 시각적 출력"""
+        print("    " + "="*80)
+        print(f"    📋 검색 후보군 ({len(candidates)}개):")
+        for i, product in enumerate(candidates):
+            print(f"      {i+1:2d}. {product['title']}")
+        print("    " + "-"*80)
     
     def _safe_gemini_call(self, prompt, max_retries=None, use_vision=False, image_data=None):
         """안전한 Gemini API 호출"""
@@ -128,6 +136,21 @@ class ProductMatcher:
         except Exception as e:
             print(f"    응답 추출 오류: {e}")
             return None
+    
+    def _parse_number_flexibly(self, response):
+        """유연한 숫자 파싱 - 다양한 형식 지원"""
+        patterns = [
+            r'[Nn]umber[:\s]*(\d+)',  # "Number: 1"
+            r'^(\d+)[:\s]',           # "1: CONFIDENT"
+            r'\b(\d+)\b',             # 어떤 숫자든
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, response)
+            if match:
+                return int(match.group(1))
+        
+        return None
     
     def _load_image_for_gemini(self, image_path):
         """Gemini Vision용 이미지 로드"""
@@ -214,6 +237,7 @@ class ProductMatcher:
             prompt = "Are these the same product? Answer YES or NO only."
             
             print(f"    이미지 비교 중... (Vision API 호출 {self.vision_api_call_count + 1}회)")
+            start_time = time.time()
             
             response = self._safe_gemini_call(
                 prompt, 
@@ -221,14 +245,20 @@ class ProductMatcher:
                 image_data=[coupang_image, iherb_image]
             )
             
+            api_time = time.time() - start_time
+            print(f"    ⏱️ Vision API 시간: {api_time:.2f}초")
+            
             if not response:
                 return {'success': False, 'reason': 'gemini_no_response'}
             
+            print(f"    🤖 Vision 응답: '{response}'")
             response_clean = response.strip().upper()
             
             if "YES" in response_clean:
+                print(f"    ✅ 이미지 매칭 성공")
                 return {'success': True, 'match': True, 'response': response}
             else:
+                print(f"    ❌ 이미지 매칭 실패")
                 return {'success': True, 'match': False, 'response': response}
             
         except Exception as e:
@@ -237,93 +267,104 @@ class ProductMatcher:
                 raise
             return {'success': False, 'reason': 'vision_api_error', 'error': error_msg}
     
-    def _check_strict_dosage_count_filter(self, search_name, iherb_products):
-        """엄격한 용량/개수 필터링"""
-        search_mg = re.search(r'(\d+(?:,\d+)*)\s*mg', search_name.lower())
-        search_count = re.search(r'(\d+)\s*(?:count|ct|tablets?|capsules?|softgels?|veg\s*capsules?|vcaps?|pieces?|servings?|tab)(?!\w)', search_name.lower())
+    def _gemini_comprehensive_match(self, search_name, all_products):
+        """Gemini AI 종합 매칭 - 필터링과 매칭 통합"""
         
-        filtered_products = []
+        # 후보군 표시
+        self._print_candidates(all_products)
         
-        for product in iherb_products:
-            iherb_name = product['title']
-            should_include = True
-            rejection_reason = None
-            
-            if search_mg:
-                s_mg = int(search_mg.group(1).replace(',', ''))
-                iherb_mg = re.search(Config.PATTERNS['dosage_mg'], iherb_name.lower())
-                
-                if iherb_mg:
-                    i_mg = int(iherb_mg.group(1).replace(',', ''))
-                    if s_mg != i_mg:
-                        should_include = False
-                        rejection_reason = f"용량 불일치 (검색:{s_mg}mg vs 아이허브:{i_mg}mg)"
-            
-            if search_count and should_include:
-                s_count = int(search_count.group(1))
-                iherb_count = re.search(Config.PATTERNS['english_count'], iherb_name.lower())
-                
-                if iherb_count:
-                    i_count = int(iherb_count.group(1))
-                    if s_count != i_count:
-                        should_include = False
-                        rejection_reason = f"개수 불일치 (검색:{s_count}개 vs 아이허브:{i_count}개)"
-            
-            if should_include:
-                filtered_products.append(product)
-            else:
-                print(f"    필터링 제외: {iherb_name[:50]}... ({rejection_reason})")
-        
-        return filtered_products
-    
-    def _gemini_text_match(self, search_name, filtered_products):
-        """Gemini AI 텍스트 기반 매칭 + 신뢰도 판단"""
         candidates_text = "\n".join([
             f"{i+1}. {product['title']}" 
-            for i, product in enumerate(filtered_products)
+            for i, product in enumerate(all_products)
         ])
         
-        prompt = f"Which number matches? Also, is this match confident or uncertain?\n\nTarget: {search_name}\n\n{candidates_text}\n\nAnswer: number (1-{len(filtered_products)}) or 0, and CONFIDENT or UNCERTAIN"
+        prompt = (
+            "Select the exact same product from the list.\n\n"
+            f"Target: {search_name}\n\n"
+            f"{candidates_text}\n\n"
+            f"Respond ONLY as: <number 1-{len(all_products)}> CONFIDENT, "
+            f"<number 1-{len(all_products)}> UNCERTAIN, or 0 UNCERTAIN.\n"
+            "\n"
+            "Decision order:\n"
+            "- Exclude only explicit conflicts:\n"
+            "  • Brand mismatch.\n"
+            "  • Form mismatch.\n"
+            "  • Variant/line conflict ONLY when BOTH Target and candidate state a line/variant and they differ.\n"
+            "  • Numeric conflict ONLY when BOTH state a value and they differ (per-unit strength, total amount, concentration, IU, size/volume/weight, quantity/count).\n"
+            "- Missing or unstated information is NOT a conflict. Do not infer unstated values.\n"
+            "- If all stated details match, output <number> CONFIDENT.\n"
+            "- If no candidate is CONFIDENT and at least one candidate has no conflicts, you MUST output a non-zero <number> UNCERTAIN.\n"
+            "- When choosing UNCERTAIN, prefer greater token overlap with the Target across brand, line, form, and stated numeric fields; if tied, choose the lowest index.\n"
+            "- Only if every candidate has a conflict, output 0 UNCERTAIN.\n"
+            "- One line only. No explanations."
+        )
         
         try:
-            print(f"    텍스트 매칭 시도 1/3 (API 호출 {self.api_call_count + 1}회)")
+            print(f"    🔍 Gemini 종합 매칭 (API 호출 {self.api_call_count + 1}회)")
+            start_time = time.time()
+            
             response = self._safe_gemini_call(prompt)
             
+            api_time = time.time() - start_time
+            print(f"    ⏱️ API 시간: {api_time:.2f}초")
+            
             if not response:
+                print(f"    ❌ Gemini 응답 없음")
                 return None, {'reason': 'gemini_no_response'}
             
-            # 숫자와 신뢰도 추출
-            number_match = re.search(r'(\d+)', response.strip())
+            print(f"    🤖 Gemini 응답: '{response}'")
+            
+            # 유연한 숫자 추출
+            selected_number = self._parse_number_flexibly(response)
             confidence_uncertain = "UNCERTAIN" in response.upper()
+            confidence_status = "UNCERTAIN" if confidence_uncertain else "CONFIDENT"
             
-            if number_match:
-                selected_number = int(number_match.group(1))
+            if selected_number is None:
+                print(f"    ❌ 번호 추출 실패")
+                return None, {
+                    'reason': 'gemini_parse_error',
+                    'gemini_response': response,
+                    'candidates_count': len(all_products)
+                }
+            
+            if selected_number == 0:
+                print(f"    ❌ 매칭 실패 - Gemini 판단: 동일 제품 없음 ({confidence_status})")
+                return None, {
+                    'reason': 'gemini_no_match',
+                    'gemini_response': response,
+                    'candidates_count': len(all_products)
+                }
+            elif 1 <= selected_number <= len(all_products):
+                selected_index = selected_number - 1
+                selected_product = all_products[selected_index]
                 
-                if selected_number == 0:
-                    return None, {
-                        'reason': 'gemini_no_match',
-                        'gemini_response': response,
-                        'candidates_count': len(filtered_products)
-                    }
-                elif 1 <= selected_number <= len(filtered_products):
-                    selected_index = selected_number - 1
-                    selected_product = filtered_products[selected_index]
-                    return selected_product, {
-                        'reason': 'gemini_text_match',
-                        'gemini_response': response,
-                        'selected_index': selected_index,
-                        'selected_product': selected_product['title'],
-                        'needs_image_verification': confidence_uncertain
-                    }
-            
-            return None, {
-                'reason': 'gemini_parse_error',
-                'gemini_response': response,
-                'candidates_count': len(filtered_products)
-            }
+                print(f"    🎯 매칭 성공: #{selected_number}")
+                print(f"       제품: {selected_product['title']}")
+                print(f"    🎚️ 신뢰도: {confidence_status}")
+                
+                if confidence_uncertain:
+                    print(f"    ⚠️ 신뢰도 낮음 - 이미지 검증 필요")
+                else:
+                    print(f"    ✅ 신뢰도 높음 - 이미지 검증 생략")
+                
+                return selected_product, {
+                    'reason': 'gemini_comprehensive_match',
+                    'gemini_response': response,
+                    'selected_index': selected_index,
+                    'selected_product': selected_product['title'],
+                    'needs_image_verification': confidence_uncertain
+                }
+            else:
+                print(f"    ❌ 잘못된 번호: {selected_number}")
+                return None, {
+                    'reason': 'gemini_parse_error',
+                    'gemini_response': response,
+                    'candidates_count': len(all_products)
+                }
             
         except Exception as e:
             error_msg = str(e)
+            print(f"    💥 API 오류: {error_msg[:30]}...")
             
             if "GEMINI_QUOTA_EXCEEDED" in error_msg:
                 raise
@@ -332,17 +373,17 @@ class ProductMatcher:
             else:
                 return None, {'reason': 'gemini_api_error', 'error': error_msg}
     
-    def _final_match_with_smart_image_verification(self, search_name, filtered_products, coupang_product_id=None):
-        """최종 매칭: Gemini가 직접 이미지 검증 필요성 판단"""
-        if not filtered_products:
-            return None, {'reason': 'no_products_after_filtering'}
+    def _final_match_with_smart_verification(self, search_name, all_products, coupang_product_id=None):
+        """최종 매칭: Gemini 종합 판단 + 조건부 이미지 검증"""
+        if not all_products:
+            return None, {'reason': 'no_search_results'}
         
-        text_product, text_details = self._gemini_text_match(search_name, filtered_products)
+        text_product, text_details = self._gemini_comprehensive_match(search_name, all_products)
         
         if not text_product:
             return None, text_details
         
-        # Gemini가 판단한 이미지 검증 필요성 확인
+        # UNCERTAIN인 경우에만 이미지 검증
         needs_image_verification = (
             Config.IMAGE_COMPARISON_ENABLED and 
             coupang_product_id and
@@ -350,17 +391,19 @@ class ProductMatcher:
         )
         
         if needs_image_verification:
-            print(f"    이미지 검증 필요 (Gemini 판단: UNCERTAIN)")
+            print(f"    📸 이미지 검증 시작 (UNCERTAIN)")
             return self._verify_with_images(text_product, search_name, coupang_product_id, text_details)
         else:
-            print(f"    이미지 검증 생략 (Gemini 판단: CONFIDENT)")
-            text_details['image_verification'] = 'skipped_confident_match'
+            print(f"    ⏭️ 이미지 검증 생략 (CONFIDENT)")
+            text_details['image_verification'] = 'skipped_confident'
             return text_product, text_details
     
     def _verify_with_images(self, text_product, search_name, coupang_product_id, text_details):
-        """이미지로 텍스트 매칭 결과 검증"""
+        """이미지 검증"""
         try:
-            print(f"    === 이미지 검증 시작 ===")
+            print(f"    " + "="*40)
+            print(f"    📸 이미지 검증")
+            print(f"    " + "-"*40)
             
             coupang_image_path = os.path.join(
                 Config.COUPANG_IMAGES_DIR, 
@@ -368,34 +411,35 @@ class ProductMatcher:
             )
 
             if not os.path.exists(coupang_image_path):
-                print(f"    쿠팡 이미지 없음")
+                print(f"    ❌ 쿠팡 이미지 없음")
                 text_details['image_verification'] = 'coupang_image_missing'
+                print(f"    " + "="*40)
                 return text_product, text_details
-            else:
-                print(f"    쿠팡 이미지 발견: {os.path.basename(coupang_image_path)}")
             
             product_code = self._extract_product_code_from_url(text_product['url'])
             if not product_code:
-                print(f"    상품 코드 추출 실패")
+                print(f"    ❌ 상품 코드 추출 실패")
                 text_details['image_verification'] = 'iherb_code_missing'
+                print(f"    " + "="*40)
                 return text_product, text_details
             
-            print(f"    아이허브 이미지 다운로드 시도...")
+            print(f"    🔄 아이허브 이미지 다운로드...")
             iherb_image_path = self._download_iherb_image(text_product['url'], product_code)
             
             if not iherb_image_path:
-                print(f"    아이허브 이미지 다운로드 실패")
+                print(f"    ❌ 다운로드 실패")
                 text_details['image_verification'] = 'iherb_image_download_failed'
+                print(f"    " + "="*40)
                 return text_product, text_details
             
-            print(f"    Vision API 비교 시작...")
             vision_result = self._compare_images_with_gemini(
                 coupang_image_path, iherb_image_path, search_name
             )
             
             if not vision_result.get('success'):
-                print(f"    Vision API 실패: {vision_result.get('reason')}")
+                print(f"    ❌ Vision API 실패")
                 text_details['image_verification'] = vision_result.get('reason', 'vision_failed')
+                print(f"    " + "="*40)
                 return text_product, text_details
             
             image_match = vision_result.get('match', False)
@@ -403,98 +447,100 @@ class ProductMatcher:
             if image_match:
                 text_details.update({
                     'image_verification': 'match',
-                    'final_result': 'text_and_image_match'
+                    'final_result': 'text_and_image_success'
                 })
-                print(f"    이미지 매칭 성공!")
+                print(f"    🎯 이미지 검증 통과")
+                print(f"    " + "="*40)
                 return text_product, text_details
             else:
                 text_details.update({
                     'image_verification': 'no_match',
-                    'final_result': 'image_mismatch'
+                    'final_result': 'image_verification_failed'
                 })
-                print(f"    이미지 매칭 실패 - 다른 제품으로 판단")
+                print(f"    ❌ 이미지 검증 실패 - 매칭 거부")
+                print(f"    " + "="*40)
                 return None, text_details
                 
         except Exception as e:
             error_msg = str(e)
-            print(f"    이미지 검증 중 오류: {error_msg}")
+            print(f"    💥 검증 오류: {error_msg[:30]}...")
             if "GEMINI_QUOTA_EXCEEDED" in error_msg:
                 raise
             
             text_details['image_verification'] = f'error: {str(e)[:50]}'
+            print(f"    " + "="*40)
             return text_product, text_details
     
     def _extract_product_code_from_url(self, product_url):
-        """아이허브 URL에서 상품 코드 추출 - 숫자 ID도 허용"""
+        """URL에서 상품 코드 추출"""
         try:
-            # 기존 패턴: /pr/ABC-12345 형태
-            match = re.search(r'/pr/([A-Z0-9-]+)', product_url)
-            if match:
-                return match.group(1)
+            patterns = [
+                r'/pr/([A-Z0-9-]+)',      # /pr/ABC-12345
+                r'/pr/[^/]+/(\d+)',       # /pr/.../12678
+                r'/(\d+)/?$'              # 마지막 숫자
+            ]
             
-            # 새 패턴: /pr/.../12678 형태의 숫자 ID
-            match = re.search(r'/pr/[^/]+/(\d+)', product_url)
-            if match:
-                return match.group(1)
-                
-            # 마지막 숫자만 추출
-            match = re.search(r'/(\d+)/?$', product_url)
-            if match:
-                return match.group(1)
-                
+            for pattern in patterns:
+                match = re.search(pattern, product_url)
+                if match:
+                    return match.group(1)
             return None
         except:
             return None
     
     def search_product_enhanced(self, search_name, coupang_product_id=None):
-        """영어명으로 검색 + Gemini AI 매칭 + 스마트 이미지 검증"""
+        """Gemini 전담 상품 매칭"""
         try:
-            print(f"  검색어: {search_name}")
+            print("\n" + "="*80)
+            print(f"🔍 Gemini 전담 매칭: {search_name}")
             if coupang_product_id and Config.IMAGE_COMPARISON_ENABLED:
-                print(f"  쿠팡 제품 ID: {coupang_product_id} (이미지 비교 대상)")
+                print(f"🏷️ 쿠팡 ID: {coupang_product_id}")
+            print("="*80)
             
             search_url = f"{Config.BASE_URL}/search?kw={urllib.parse.quote(search_name)}"
             products = self.iherb_client.get_multiple_products(search_url)
             
             if not products:
+                print("❌ 검색 결과 없음")
+                print("="*80)
                 return None, 0, {'no_results': True}
             
-            print(f"  검색 결과: {len(products)}개 제품 발견")
+            print(f"📊 검색 결과: {len(products)}개")
             
-            print("  용량/개수 필터링 중...")
-            filtered_products = self._check_strict_dosage_count_filter(search_name, products)
-            
-            if not filtered_products:
-                print("  필터링 결과: 용량/개수 일치하는 제품 없음")
-                return None, 0, {
-                    'reason': 'no_products_after_filtering',
-                    'original_count': len(products),
-                    'filtered_count': 0
-                }
-            
-            print(f"  필터링 결과: {len(filtered_products)}개 제품 남음")
-            
-            best_product, match_details = self._final_match_with_smart_image_verification(
-                search_name, filtered_products, coupang_product_id
+            best_product, match_details = self._final_match_with_smart_verification(
+                search_name, products, coupang_product_id
             )
             
             if best_product:
                 verification = match_details.get('image_verification', 'not_attempted')
-                if verification == 'match':
+                final_result = match_details.get('final_result', 'text_only')
+                
+                if final_result == 'text_and_image_success':
                     match_type = "텍스트+이미지"
-                elif verification == 'skipped_confident_match':
-                    match_type = "텍스트만"
+                elif verification == 'skipped_confident':
+                    match_type = "텍스트만(확신)"
                 else:
                     match_type = "텍스트만"
-                print(f"  매칭 성공 ({match_type}): {best_product['title'][:50]}...")
+                
+                print(f"    🎯 최종 성공: {match_type}")
+                print(f"    📋 제품: {best_product['title'][:60]}...")
+                print("="*80)
                 return best_product['url'], 0.9, match_details
             else:
                 reason = match_details.get('reason', 'unknown')
-                print(f"  매칭 실패: {reason}")
+                final_result = match_details.get('final_result', '')
+                
+                if final_result == 'image_verification_failed':
+                    print(f"    ❌ 최종 실패: 텍스트 성공했으나 이미지 검증 실패")
+                else:
+                    print(f"    ❌ 최종 실패: {reason}")
+                print("="*80)
                 return None, 0, match_details
             
         except Exception as e:
             error_msg = str(e)
+            print(f"💥 오류: {error_msg[:50]}...")
+            print("="*80)
             
             if "GEMINI_QUOTA_EXCEEDED" in error_msg:
                 raise
@@ -502,7 +548,7 @@ class ProductMatcher:
                 return None, 0, {'search_error': error_msg}
     
     def get_api_usage_stats(self):
-        """API 사용량 통계 반환"""
+        """API 사용량 통계"""
         return {
             'total_calls': self.api_call_count,
             'vision_calls': self.vision_api_call_count,
