@@ -308,8 +308,8 @@ def main():
     translator = GeminiCSVTranslator(API_KEY)
     
     # 파일 경로 설정 (현재 프로젝트 구조에 맞게)
-    input_file = '/Users/brich/Desktop/iherb_price/coupang/coupang_products_20250911_130214.csv'
-    output_file = '/Users/brich/Desktop/iherb_price/coupang/coupang_products_20250911_130214_translated.csv'
+    input_file = '/Users/brich/Desktop/iherb_price/coupang/coupang_csv/coupang_products_20250915_142911.csv'
+    output_file = '/Users/brich/Desktop/iherb_price/coupang/coupang_csv/coupang_products_20250915_142911_translated.csv'
     
     # output/coupang 디렉토리 생성
     os.makedirs('output/coupang', exist_ok=True)

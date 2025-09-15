@@ -77,8 +77,8 @@ class Config:
     GEMINI_RATE_LIMIT_DELAY = 5  # 2.5 모델 성능 향상으로 1.5초로 단축
     
     # ========== 이미지 비교 설정 (성능 최적화) ==========
-    COUPANG_IMAGES_DIR = "/Users/brich/Desktop/iherb_price/coupang_images"
-    IHERB_IMAGES_DIR = "/Users/brich/Desktop/iherb_price/iherb_images"
+    COUPANG_IMAGES_DIR = "/Users/brich/Desktop/iherb_price/coupang/coupang_images"
+    IHERB_IMAGES_DIR = "/Users/brich/Desktop/iherb_price/iherbscraper/iherb_images"
     IMAGE_COMPARISON_ENABLED = True
     IMAGE_DOWNLOAD_TIMEOUT = 12  # 타임아웃 단축
     MAX_IMAGE_SIZE_MB = 8  # 크기 제한 강화
