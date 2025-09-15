@@ -97,9 +97,9 @@ def merge_iherb_csv_files(file1_path, file2_path, output_path):
 def main():
     """메인 실행 함수"""
     # 파일 경로 설정
-    file1_path = "iherb_results_20250912.csv"
-    file2_path = "iherb_revenue_202508.csv"
-    output_path = "iherb_merged_data.csv"
+    file1_path = "/Users/brich/Desktop/iherb_price/iherbscraper/output/nowfood_250915.csv"
+    file2_path = "bflow_revenue_202508.csv"
+    output_path = "bflow_merged_data.csv"
     
     try:
         # CSV 파일 병합 실행

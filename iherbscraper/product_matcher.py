@@ -76,10 +76,10 @@ class ProductMatcher:
                     time.sleep(Config.GEMINI_RATE_LIMIT_DELAY)
                 
                 generation_config = {
-                    'temperature': 0.1,
+                    'temperature': 0.0,
                     'max_output_tokens': 50,
-                    'top_p': 0.8,
-                    'top_k': 20
+                    'top_p': 0.1,
+                    'top_k': 1
                 }
                 
                 if use_vision and image_data:
@@ -268,9 +268,8 @@ class ProductMatcher:
             return {'success': False, 'reason': 'vision_api_error', 'error': error_msg}
     
     def _gemini_comprehensive_match(self, search_name, all_products):
-        """Gemini AI 종합 매칭 - 개선된 구조화 프롬프트"""
+        """Gemini AI 상품 매칭 - 구조화된 응답 + 파싱 선택"""
         
-        # 후보군 표시
         self._print_candidates(all_products)
         
         candidates_text = "\n".join([
@@ -278,37 +277,32 @@ class ProductMatcher:
             for i, product in enumerate(all_products)
         ])
         
-        prompt = f"""PRODUCT MATCHING TASK
+        prompt = f"""Product matching system. Learn from examples:
 
-    TARGET: {search_name}
+EXAMPLES:
+✓ "Now Foods Vitamin E 400 IU 50ct" → "NOW Foods, Vitamin E, 400 IU, 50 Softgels" = CONFIDENT (all match)
+✗ "Now Foods Vitamin E 400 IU 50ct" → "Solgar, Vitamin E, 400 IU, 50 Softgels" = NO (brand differs)
+✗ "Now Foods Vitamin E 400 IU 50ct" → "NOW Foods, Garlic Oil, 1500mg, 100 Softgels" = NO (ingredient differs)
+✗ "Now Foods Vitamin E 400 IU 50ct" → "NOW Foods, Vitamin E, 1000 IU, 50 Softgels" = NO (strength differs)
+✗ "Now Foods Vitamin E 400 IU 50ct" → "NOW Foods, Vitamin E, 400 IU, 100 Softgels" = NO (count differs)
+? "Now Foods Vitamin E 400 IU 50ct" → "NOW Foods, Natural Vitamin E, 50 Softgels" = UNCERTAIN (strength missing)
 
-    CANDIDATES:
-    {candidates_text}
+TARGET: {search_name}
+CANDIDATES:
+{candidates_text}
 
-    MATCHING CRITERIA:
-    1. BRAND: Manufacturer name must be identical
-    2. INGREDIENT: Main active compound must be identical  
-    3. STRENGTH: Dosage amount must be identical
-    4. COUNT: Number of units must be identical
+For each candidate, check BRAND → INGREDIENT → STRENGTH → COUNT
 
-    DECISION RULES:
-    A. If BRAND differs → "0 UNCERTAIN"
-    B. If INGREDIENT differs → "0 UNCERTAIN" 
-    C. If STRENGTH differs → "0 UNCERTAIN"
-    D. If COUNT differs → "0 UNCERTAIN"
-    E. If ALL 4 criteria (brand, ingredient, strength, count) are explicitly stated and match exactly → "Number(1~4) CONFIDENT"
-    F. If any criteria has uncertainty (generic vs specific ingredients, missing/vague strength or count) → "Number(1~4) UNCERTAIN"
+Answer format (exactly {len(all_products)} lines):
+1. CONFIDENT/UNCERTAIN/NO
+2. CONFIDENT/UNCERTAIN/NO
+3. CONFIDENT/UNCERTAIN/NO
+4. CONFIDENT/UNCERTAIN/NO
 
-    RESPONSE FORMAT:
-    You MUST answer with ONLY one line in this exact format, no explanation.:
-    "Number(1~4) CONFIDENT" (perfect match)
-    "Number(1~4) UNCERTAIN" (partial match)  
-    "0 UNCERTAIN" (no match)    
-    
-    Answer:"""
+Answer:"""
         
         try:
-            print(f"    🔍 Gemini 종합 매칭 (API 호출 {self.api_call_count + 1}회)")
+            print(f"    🔍 Gemini 매칭 (API 호출 {self.api_call_count + 1}회)")
             start_time = time.time()
             
             response = self._safe_gemini_call(prompt)
@@ -317,55 +311,54 @@ class ProductMatcher:
             print(f"    ⏱️ API 시간: {api_time:.2f}초")
             
             if not response:
-                print(f"    ❌ Gemini 응답 없음")
                 return None, {'reason': 'gemini_no_response'}
             
             print(f"    🤖 Gemini 응답: '{response}'")
             
-            # 유연한 숫자 추출
-            selected_number = self._parse_number_flexibly(response)
-            confidence_uncertain = "UNCERTAIN" in response.upper()
-            confidence_status = "UNCERTAIN" if confidence_uncertain else "CONFIDENT"
+            # 구조화된 파싱
+            lines = response.strip().split('\n')
+            confident_matches = []
+            uncertain_matches = []
             
-            if selected_number is None:
-                print(f"    ❌ 번호 추출 실패")
-                return None, {
-                    'reason': 'gemini_parse_error',
-                    'gemini_response': response,
-                    'candidates_count': len(all_products)
-                }
-            
-            if selected_number == 0:
-                print(f"    ❌ 매칭 실패 - Gemini 판단: 동일 제품 없음 ({confidence_status})")
-                return None, {
-                    'reason': 'gemini_no_match',
-                    'gemini_response': response,
-                    'candidates_count': len(all_products)
-                }
-            elif 1 <= selected_number <= len(all_products):
-                selected_index = selected_number - 1
-                selected_product = all_products[selected_index]
-                
-                print(f"    🎯 매칭 성공: #{selected_number}")
-                print(f"       제품: {selected_product['title']}")
-                print(f"    🎚️ 신뢰도: {confidence_status}")
-                
-                if confidence_uncertain:
-                    print(f"    ⚠️ 신뢰도 낮음 - 이미지 검증 필요")
+            for i, line in enumerate(lines):
+                if i >= len(all_products):
+                    break
+                    
+                line_upper = line.strip().upper()
+                if 'CONFIDENT' in line_upper:
+                    confident_matches.append(i)
+                    print(f"    ✅ #{i+1}: CONFIDENT")
+                elif 'UNCERTAIN' in line_upper:
+                    uncertain_matches.append(i)
+                    print(f"    ⚠️ #{i+1}: UNCERTAIN")
                 else:
-                    print(f"    ✅ 신뢰도 높음 - 이미지 검증 생략")
-                
+                    print(f"    ❌ #{i+1}: NO")
+            
+            # 파싱 기반 선택 로직: CONFIDENT > UNCERTAIN > 없음
+            if confident_matches:
+                selected_idx = confident_matches[0]
+                selected_product = all_products[selected_idx]
+                print(f"    🎯 선택: #{selected_idx+1} (CONFIDENT 우선)")
                 return selected_product, {
-                    'reason': 'gemini_comprehensive_match',
-                    'gemini_response': response,
-                    'selected_index': selected_index,
+                    'reason': 'gemini_confident_match',
+                    'selected_index': selected_idx,
                     'selected_product': selected_product['title'],
-                    'needs_image_verification': confidence_uncertain
+                    'needs_image_verification': False
+                }
+            elif uncertain_matches:
+                selected_idx = uncertain_matches[0]
+                selected_product = all_products[selected_idx]
+                print(f"    🎯 선택: #{selected_idx+1} (UNCERTAIN - 이미지 검증)")
+                return selected_product, {
+                    'reason': 'gemini_uncertain_match',
+                    'selected_index': selected_idx,
+                    'selected_product': selected_product['title'],
+                    'needs_image_verification': True
                 }
             else:
-                print(f"    ❌ 잘못된 번호: {selected_number}")
+                print(f"    ❌ 모든 후보 거부")
                 return None, {
-                    'reason': 'gemini_parse_error',
+                    'reason': 'gemini_no_matches',
                     'gemini_response': response,
                     'candidates_count': len(all_products)
                 }
@@ -380,7 +373,7 @@ class ProductMatcher:
                 return None, {'reason': 'gemini_timeout', 'error': error_msg}
             else:
                 return None, {'reason': 'gemini_api_error', 'error': error_msg}
-            
+    
     def _final_match_with_smart_verification(self, search_name, all_products, coupang_product_id=None):
         """최종 매칭: Gemini 종합 판단 + 조건부 이미지 검증"""
         if not all_products:

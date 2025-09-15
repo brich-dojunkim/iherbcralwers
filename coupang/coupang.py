@@ -969,7 +969,7 @@ if __name__ == "__main__":
         headless=False,  # macOS에서는 처음에는 False 권장
         delay_range=(3, 6),  # macOS에서는 조금 더 보수적으로
         download_images=True,  # Gemini 매칭용 이미지 다운로드 활성화
-        image_dir="./coupang_images_v2"  # 새 버전 이미지 저장 디렉토리
+        image_dir="/Users/brich/Desktop/iherb_price/coupang/coupang_images"  # 새 버전 이미지 저장 디렉토리
     )
     
     # 검색 URL
