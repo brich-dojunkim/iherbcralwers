@@ -69,7 +69,7 @@ class Config:
     """스크래퍼 전역 설정 - Gemini 2.5 Flash 최적화 버전"""
     
     # ========== Gemini 2.5 Flash 설정 ==========
-    GEMINI_API_KEY = "AIzaSyA6XyWFJou4QZpRM4C_3p0JuzRjpQWSKp4"
+    GEMINI_API_KEY = "AIzaSyD-GIKFbdwJO2BW5l-w3nCv_DQGFHA4VOU"
     GEMINI_TEXT_MODEL = "models/gemini-2.0-flash"  # 🆕 2.0 Flash 적용
     GEMINI_VISION_MODEL = "models/gemini-2.0-flash"  # 🆕 2.0 Flash 적용
     GEMINI_MAX_RETRIES = 3

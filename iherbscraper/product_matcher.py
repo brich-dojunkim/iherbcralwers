@@ -292,23 +292,19 @@ class ProductMatcher:
     4. COUNT: Number of units must be identical
 
     DECISION RULES:
-    A. If BRAND differs → Return 0
-    B. If INGREDIENT differs → Return 0
-    C. If STRENGTH differs → Return 0
-    D. If COUNT differs → Return 0
-    F. If all criteria match exactly → Return NUMBER CONFIDENT
-    G. If brand/ingredient/form match but strength/count unspecified → Return NUMBER UNCERTAIN
+    A. If BRAND differs → "0 UNCERTAIN"
+    B. If INGREDIENT differs → "0 UNCERTAIN" 
+    C. If STRENGTH differs → "0 UNCERTAIN"
+    D. If COUNT differs → "0 UNCERTAIN"
+    E. If ALL 4 criteria (brand, ingredient, strength, count) are explicitly stated and match exactly → "Number(1~4) CONFIDENT"
+    F. If any criteria has uncertainty (generic vs specific ingredients, missing/vague strength or count) → "Number(1~4) UNCERTAIN"
 
-    EXAMPLES:
-    Target: "NOW Foods CoQ10 100mg 60 Capsules"
-    - "NOW Foods CoQ10 100mg 60 Veg Capsules" → 1 CONFIDENT
-    - "NOW Foods CoQ10 100mg Capsules" → 1 UNCERTAIN
-    - "NOW Foods CoQ10 250mg 60 Capsules" → 0 UNCERTAIN
-    - "Swanson CoQ10 100mg 60 Capsules" → 0 UNCERTAIN
-
-    RESPONSE FORMAT: <number> CONFIDENT | <number> UNCERTAIN | 0 UNCERTAIN
-    Answer with ONLY this format, no explanation.
-
+    RESPONSE FORMAT:
+    You MUST answer with ONLY one line in this exact format, no explanation.:
+    "Number(1~4) CONFIDENT" (perfect match)
+    "Number(1~4) UNCERTAIN" (partial match)  
+    "0 UNCERTAIN" (no match)    
+    
     Answer:"""
         
         try:
