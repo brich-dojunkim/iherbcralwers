@@ -1,5 +1,5 @@
 """
-재시작 관리자 - 상태 감지 로직 개선
+재시작 관리자 - 상태 감지 로직 수정 (아이허브 매칭 상태 정확한 판별)
 """
 
 import json
@@ -36,7 +36,7 @@ class RestartManager:
             print(f"🧹 재시작 메타데이터 정리 완료")
     
     def check_incomplete_work(self, df):
-        """미완료 작업 정밀 감지 - NOT_FOUND 상태 처리 개선"""
+        """미완료 작업 정밀 감지 - 아이허브 상태 판별 로직 수정"""
         today = datetime.now().strftime("_%Y%m%d")
         
         # 1. 쿠팡 업데이트 완료 여부 확인 (NOT_FOUND도 완료로 간주)
@@ -61,7 +61,7 @@ class RestartManager:
             coupang_complete = False
             print(f"  ⚠️ update_status 컬럼이 없음 - 쿠팡 업데이트 미완료로 간주")
         
-        # 2. 신규 상품 처리 상태 확인
+        # 2. 신규 상품 처리 상태 확인 - 패턴 수정
         new_products = df[df['update_status'] == f'NEW_PRODUCT__{today}'] if 'update_status' in df.columns else pd.DataFrame()
         new_count = len(new_products)
         
@@ -89,17 +89,64 @@ class RestartManager:
             translation_complete = False
             translated_count = 0
         
-        # 4. 아이허브 매칭 완료 여부 확인
-        if 'status' in df.columns:
-            iherb_processed = new_products[
-                new_products['status'].notna() & 
-                (new_products['status'] != '')
+        # 4. 아이허브 매칭 완료 여부 확인 - 오늘 날짜 기준 신규 매칭 확인
+        # ⚠️ 핵심 수정: 오늘 날짜 기준 아이허브 매칭 결과 확인
+        iherb_processed_count = 0
+        iherb_complete = False
+        
+        if new_count > 0:
+            print(f"  🔍 신규 상품 아이허브 매칭 상태 상세 분석 (오늘 날짜 기준):")
+            
+            date_suffix = today[1:]  # _20250916 → 20250916
+            
+            # 오늘 날짜 기준 아이허브 매칭 상태 컬럼들 확인
+            today_iherb_status_columns = [
+                f'아이허브매칭상태_{date_suffix}',
+                f'아이허브상품명_{date_suffix}',
+                f'아이허브정가_{date_suffix}',
+                f'아이허브할인가_{date_suffix}',
+                f'아이허브매칭일시_{date_suffix}'
             ]
-            iherb_complete = len(iherb_processed) == new_count
-            iherb_processed_count = len(iherb_processed)
+            
+            # 어떤 오늘 날짜 아이허브 컬럼이든 데이터가 있는 상품들
+            has_today_iherb_data = new_products[
+                new_products[today_iherb_status_columns].notna().any(axis=1)
+            ]
+            
+            print(f"    - 오늘 날짜 아이허브 매칭 데이터 있음: {len(has_today_iherb_data)}개")
+            
+            # 구체적인 매칭 상태별 분석
+            if f'아이허브매칭상태_{date_suffix}' in df.columns:
+                status_counts = new_products[f'아이허브매칭상태_{date_suffix}'].value_counts()
+                for status, count in status_counts.items():
+                    print(f"      * {status}: {count}개")
+                
+                # 처리된 상품 = 매칭 상태가 있는 상품
+                processed_today = new_products[
+                    new_products[f'아이허브매칭상태_{date_suffix}'].notna() &
+                    (new_products[f'아이허브매칭상태_{date_suffix}'] != '')
+                ]
+                iherb_processed_count = len(processed_today)
+            else:
+                # 매칭 상태 컬럼이 없으면 다른 오늘 날짜 컬럼으로 판단
+                iherb_processed_count = len(has_today_iherb_data)
+                print(f"    - 매칭 상태 컬럼 없음, 기타 오늘 날짜 데이터로 판단")
+            
+            iherb_complete = iherb_processed_count == new_count
+            print(f"    - 최종 판단: {iherb_processed_count}개 처리됨 (완료: {'✅' if iherb_complete else '❌'})")
+            
+            # 미처리 상품들의 상태 확인
+            if not iherb_complete:
+                unprocessed = new_products[
+                    ~new_products[today_iherb_status_columns].notna().any(axis=1)
+                ]
+                print(f"    - 미처리 상품: {len(unprocessed)}개")
+                if len(unprocessed) <= 5:  # 5개 이하면 상품명 표시
+                    for idx, row in unprocessed.iterrows():
+                        product_name = row['coupang_product_name'][:30] + "..."
+                        print(f"      * {product_name}")
         else:
-            iherb_complete = False
-            iherb_processed_count = 0
+            print(f"    - 신규 상품이 없으므로 아이허브 매칭 불필요")
         
         print(f"  🔍 신규 상품 처리 상태:")
         print(f"    - 총 신규 상품: {new_count}개")
@@ -108,6 +155,18 @@ class RestartManager:
         
         # 전체 완료 여부 판단
         has_incomplete = not (coupang_complete and translation_complete and iherb_complete)
+        
+        # 🔧 추가 디버깅: 미완료 이유 명시
+        if has_incomplete:
+            incomplete_reasons = []
+            if not coupang_complete:
+                incomplete_reasons.append("쿠팡 업데이트 미완료")
+            if not translation_complete:
+                incomplete_reasons.append(f"번역 미완료 ({new_count - translated_count}개)")
+            if not iherb_complete:
+                incomplete_reasons.append(f"아이허브 매칭 미완료 ({new_count - iherb_processed_count}개)")
+            
+            print(f"  ⚠️ 미완료 이유: {', '.join(incomplete_reasons)}")
         
         return {
             'has_incomplete': has_incomplete,
@@ -281,58 +340,3 @@ class RestartManager:
             analysis['error_products'] = len(df[df['status'] == 'error'])
         
         return analysis
-    
-    def suggest_optimization(self, df):
-        """최적화 제안"""
-        analysis = self.analyze_work_distribution(df)
-        suggestions = []
-        
-        # 성공률 기반 제안
-        if analysis['total_products'] > 0:
-            success_rate = analysis['successful_matches'] / analysis['total_products']
-            
-            if success_rate < 0.5:
-                suggestions.append("매칭 성공률이 낮습니다. 번역 품질이나 검색 키워드를 확인해보세요.")
-            
-            error_rate = analysis['error_products'] / analysis['total_products']
-            if error_rate > 0.1:
-                suggestions.append("오류 발생률이 높습니다. 네트워크 상태나 API 상태를 확인해보세요.")
-        
-        # 작업 분포 기반 제안
-        if analysis['new_products'] > analysis['existing_products'] * 0.5:
-            suggestions.append("신규 상품이 많습니다. 배치 크기를 늘려 효율성을 높일 수 있습니다.")
-        
-        return suggestions
-    
-    def create_progress_report(self, df):
-        """진행 상황 보고서 생성"""
-        analysis = self.analyze_work_distribution(df)
-        incomplete_status = self.check_incomplete_work(df)
-        suggestions = self.suggest_optimization(df)
-        
-        report = {
-            'timestamp': datetime.now().isoformat(),
-            'analysis': analysis,
-            'incomplete_status': incomplete_status,
-            'suggestions': suggestions,
-            'next_steps': self.get_restart_recommendations(incomplete_status)
-        }
-        
-        return report
-    
-    def save_progress_report(self, df, filename=None):
-        """진행 상황 보고서 저장"""
-        if not filename:
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            filename = f"progress_report_{timestamp}.json"
-        
-        report = self.create_progress_report(df)
-        
-        try:
-            with open(filename, 'w', encoding='utf-8') as f:
-                json.dump(report, f, ensure_ascii=False, indent=2)
-            print(f"📊 진행 상황 보고서 저장: {filename}")
-            return filename
-        except Exception as e:
-            print(f"보고서 저장 실패: {e}")
-            return None

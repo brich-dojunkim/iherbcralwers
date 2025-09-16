@@ -200,7 +200,7 @@ class CompleteEfficientUpdater:
     
     def _mark_failed_products_as_error(self, df, status):
         """실패한 상품들을 error 상태로 마킹"""
-        today = datetime.now().strftime("_%Y%m%d")
+        today = datetime.now().strftime("%Y%m%d")
         
         # 번역은 되었지만 아이허브 매칭이 안된 상품들
         unmatched = df[
@@ -316,7 +316,7 @@ class CompleteEfficientUpdater:
     
     def _create_error_product_row(self, coupang_product, error_msg):
         """오류 발생 시 행 생성"""
-        today = datetime.now().strftime("_%Y%m%d")
+        today = datetime.now().strftime("%Y%m%d")
         
         return {
             'coupang_product_name': coupang_product.get('product_name', ''),

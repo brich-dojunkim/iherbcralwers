@@ -1,5 +1,5 @@
 """
-아이허브 매칭 관리자 - BrowserManager 초기화 수정
+아이허브 매칭 관리자 - 신규 상품 아이허브 재매칭 로직 수정
 """
 
 import sys
@@ -46,12 +46,10 @@ class IHerbManager:
         self.max_products = UPDATER_CONFIG['MAX_PRODUCTS_TO_COMPARE']
     
     def init_scraper(self):
-        """아이허브 스크래퍼 초기화 - 매개변수 정확히 맞춤"""
+        """아이허브 스크래퍼 초기화"""
         if not self.scraper:
             print(f"🌿 아이허브 스크래퍼 초기화...")
             
-            # EnglishIHerbScraper 생성 (단독 실행과 동일한 방식)
-            # iherbscraper/main.py 참고: EnglishIHerbScraper(headless, delay_range, max_products_to_compare)
             try:
                 self.scraper = EnglishIHerbScraper(
                     headless=self.headless,
@@ -61,7 +59,6 @@ class IHerbManager:
                 print(f"✅ 아이허브 스크래퍼 초기화 성공")
             except Exception as e:
                 print(f"❌ 아이허브 스크래퍼 초기화 실패: {e}")
-                # 더 자세한 오류 정보 출력
                 import traceback
                 traceback.print_exc()
                 raise
@@ -116,7 +113,6 @@ class IHerbManager:
             error_msg = str(e)
             print(f"    매칭 중 오류: {error_msg}")
             
-            # 더 구체적인 오류 분류
             if "BrowserManager" in error_msg:
                 return {
                     'status': 'failed',
@@ -133,23 +129,44 @@ class IHerbManager:
                     'failure_reason': f'매칭 중 오류: {error_msg}'
                 }
     
-    def match_unmatched_products(self, df, output_file, checkpoint_interval):
-        """미매칭 상품 처리"""
+    def match_new_products_for_updated_prices(self, df, output_file, checkpoint_interval):
+        """🔧 핵심 수정: 신규 상품들의 아이허브 매칭 (업데이트된 쿠팡 가격 기준)"""
         today = datetime.now().strftime("_%Y%m%d")
         
-        # 번역은 되었지만 아이허브 매칭이 안된 상품들
-        unmatched = df[
+        # ⚠️ 중요한 수정: 신규 상품 중에서 아이허브 재매칭이 필요한 상품들 선별
+        # 조건: NEW_PRODUCT 상태 + 번역 완료 + 하지만 오늘 날짜 기준 아이허브 가격 정보 없음
+        new_products_needing_iherb = df[
             (df['update_status'] == f'NEW_PRODUCT__{today}') &
             (df['coupang_product_name_english'].notna()) &
-            (df['coupang_product_name_english'] != '') &
-            (df['status'].isna() | (df['status'] == ''))
+            (df['coupang_product_name_english'] != '')
         ].copy()
         
-        if len(unmatched) == 0:
-            print(f"ℹ️ 매칭할 상품이 없습니다")
+        print(f"🔍 신규 상품 아이허브 매칭 대상 분석:")
+        print(f"   - 총 신규 상품: {len(new_products_needing_iherb)}개")
+        
+        # 오늘 날짜 기준 아이허브 가격 정보가 이미 있는 상품 제외
+        today_iherb_columns = [
+            f'아이허브정가_{today[1:]}', f'아이허브할인가_{today[1:]}', 
+            f'아이허브할인율_{today[1:]}', f'아이허브단위가격_{today[1:]}'
+        ]
+        
+        already_processed_today = new_products_needing_iherb[
+            new_products_needing_iherb[today_iherb_columns].notna().any(axis=1)
+        ]
+        
+        # 실제 매칭이 필요한 상품들
+        needs_matching = new_products_needing_iherb[
+            ~new_products_needing_iherb[today_iherb_columns].notna().any(axis=1)
+        ]
+        
+        print(f"   - 오늘 아이허브 정보 이미 있음: {len(already_processed_today)}개")
+        print(f"   - 아이허브 매칭 필요: {len(needs_matching)}개")
+        
+        if len(needs_matching) == 0:
+            print(f"ℹ️ 아이허브 매칭할 신규 상품이 없습니다")
             return df
         
-        print(f"🌿 미매칭 상품 {len(unmatched)}개 아이허브 매칭 시작...")
+        print(f"🌿 신규 상품 아이허브 매칭 시작: {len(needs_matching)}개")
         
         # 스크래퍼 초기화 시도
         try:
@@ -157,33 +174,32 @@ class IHerbManager:
         except Exception as e:
             print(f"❌ 아이허브 스크래퍼 초기화 실패: {e}")
             # 모든 상품을 오류로 처리
-            for idx, row in unmatched.iterrows():
-                df.at[idx, 'status'] = 'error'
-                df.at[idx, 'failure_type'] = 'SCRAPER_INIT_ERROR'
-                df.at[idx, 'matching_reason'] = f'스크래퍼 초기화 실패: {str(e)}'
+            for idx, row in needs_matching.iterrows():
+                df.at[idx, f'아이허브매칭상태_{today[1:]}'] = 'scraper_init_error'
+                df.at[idx, f'아이허브매칭사유_{today[1:]}'] = f'스크래퍼 초기화 실패: {str(e)}'
             return df
         
         success_count = 0
         
-        for i, (idx, row) in enumerate(unmatched.iterrows()):
+        for i, (idx, row) in enumerate(needs_matching.iterrows()):
             try:
-                print(f"  [{i+1}/{len(unmatched)}] {row['coupang_product_name'][:40]}...")
+                print(f"  [{i+1}/{len(needs_matching)}] {row['coupang_product_name'][:40]}...")
                 
-                # 아이허브 매칭
+                # 쿠팡 상품 정보 구성 (오늘 날짜 기준)
                 coupang_product = {
                     'product_id': row['coupang_product_id'],
                     'product_name': row['coupang_product_name'],
                     'product_url': row.get('coupang_url', ''),
-                    'current_price': row.get(f'쿠팡현재가격{today}', ''),
-                    'original_price': row.get(f'쿠팡정가{today}', ''),
-                    'discount_rate': row.get(f'쿠팡할인율{today}', '')
+                    'current_price': row.get(f'쿠팡현재가격_{today}', ''),
+                    'original_price': row.get(f'쿠팡정가_{today}', ''),
+                    'discount_rate': row.get(f'쿠팡할인율_{today}', '')
                 }
                 
                 english_name = row['coupang_product_name_english']
                 result = self.match_single_product(coupang_product, english_name)
                 
-                # DataFrame 업데이트
-                df = self._update_dataframe_with_result(df, idx, result, coupang_product, today)
+                # 오늘 날짜 기준 아이허브 컬럼에 결과 저장
+                df = self._update_dataframe_with_new_iherb_result(df, idx, result, coupang_product, today)
                 
                 if result['status'] == 'success':
                     success_count += 1
@@ -198,50 +214,60 @@ class IHerbManager:
             
             except Exception as e:
                 print(f"    ❌ 오류: {e}")
-                df.at[idx, 'status'] = 'error'
-                df.at[idx, 'failure_type'] = 'PROCESSING_ERROR'
-                df.at[idx, 'matching_reason'] = f'처리 중 오류: {str(e)}'
+                df.at[idx, f'아이허브매칭상태_{today[1:]}'] = 'processing_error'
+                df.at[idx, f'아이허브매칭사유_{today[1:]}'] = f'처리 중 오류: {str(e)}'
         
-        print(f"✅ 아이허브 매칭 완료: {success_count}/{len(unmatched)}개 성공")
+        print(f"✅ 신규 상품 아이허브 매칭 완료: {success_count}/{len(needs_matching)}개 성공")
         return df
     
-    def _update_dataframe_with_result(self, df, idx, result, coupang_product, today):
-        """결과로 DataFrame 업데이트"""
+    def _update_dataframe_with_new_iherb_result(self, df, idx, result, coupang_product, today):
+        """🔧 새로운 함수: 오늘 날짜 기준 아이허브 매칭 결과로 DataFrame 업데이트"""
+        date_suffix = today[1:]  # _20250916 → 20250916
+        
         if result['status'] == 'success':
-            df.at[idx, 'status'] = 'success'
-            df.at[idx, 'iherb_product_name'] = result['iherb_product_name']
-            df.at[idx, 'iherb_product_url'] = result['iherb_product_url']
-            df.at[idx, 'iherb_product_code'] = result['iherb_product_code']
-            df.at[idx, 'similarity_score'] = result['similarity_score']
+            # 아이허브 매칭 성공
+            df.at[idx, f'아이허브매칭상태_{date_suffix}'] = 'success'
+            df.at[idx, f'아이허브상품명_{date_suffix}'] = result['iherb_product_name']
+            df.at[idx, f'아이허브상품URL_{date_suffix}'] = result['iherb_product_url']
+            df.at[idx, f'아이허브상품코드_{date_suffix}'] = result['iherb_product_code']
+            df.at[idx, f'유사도점수_{date_suffix}'] = result['similarity_score']
             
-            # 아이허브 가격 정보
+            # 아이허브 가격 정보 (오늘 날짜 기준)
             price_info = result['iherb_price_info']
-            df.at[idx, 'iherb_list_price_krw'] = price_info.get('list_price', '')
-            df.at[idx, 'iherb_discount_price_krw'] = price_info.get('discount_price', '')
-            df.at[idx, 'iherb_discount_percent'] = price_info.get('discount_percent', '')
-            df.at[idx, 'iherb_subscription_discount'] = price_info.get('subscription_discount', '')
-            df.at[idx, 'iherb_price_per_unit'] = price_info.get('price_per_unit', '')
-            df.at[idx, 'is_in_stock'] = price_info.get('is_in_stock', True)
-            df.at[idx, 'stock_message'] = price_info.get('stock_message', '')
+            df.at[idx, f'아이허브정가_{date_suffix}'] = price_info.get('list_price', '')
+            df.at[idx, f'아이허브할인가_{date_suffix}'] = price_info.get('discount_price', '')
+            df.at[idx, f'아이허브할인율_{date_suffix}'] = price_info.get('discount_percent', '')
+            df.at[idx, f'아이허브구독할인_{date_suffix}'] = price_info.get('subscription_discount', '')
+            df.at[idx, f'아이허브단위가격_{date_suffix}'] = price_info.get('price_per_unit', '')
+            df.at[idx, f'재고상태_{date_suffix}'] = price_info.get('is_in_stock', True)
+            df.at[idx, f'재고메시지_{date_suffix}'] = price_info.get('stock_message', '')
             
-            # 가격 비교
+            # 가격 비교 (오늘 날짜 기준)
             coupang_price_info = self.data_manager.extract_coupang_price_info(coupang_product)
             price_comparison = self.data_manager.calculate_price_comparison(coupang_price_info, price_info)
             
-            df.at[idx, f'가격차이{today}'] = price_comparison['price_difference_krw']
-            df.at[idx, f'저렴한플랫폼{today}'] = price_comparison['cheaper_platform']
-            df.at[idx, f'절약금액{today}'] = price_comparison['savings_amount']
-            df.at[idx, f'절약비율{today}'] = price_comparison['savings_percentage']
-            df.at[idx, f'가격차이메모{today}'] = price_comparison['price_difference_note']
+            df.at[idx, f'가격차이_{date_suffix}'] = price_comparison['price_difference_krw']
+            df.at[idx, f'저렴한플랫폼_{date_suffix}'] = price_comparison['cheaper_platform']
+            df.at[idx, f'절약금액_{date_suffix}'] = price_comparison['savings_amount']
+            df.at[idx, f'절약비율_{date_suffix}'] = price_comparison['savings_percentage']
+            df.at[idx, f'가격차이메모_{date_suffix}'] = price_comparison['price_difference_note']
         else:
-            df.at[idx, 'status'] = 'not_found'
-            df.at[idx, 'failure_type'] = 'NO_MATCHING_PRODUCT'
-            df.at[idx, 'matching_reason'] = result['failure_reason']
+            # 아이허브 매칭 실패
+            df.at[idx, f'아이허브매칭상태_{date_suffix}'] = 'not_found'
+            df.at[idx, f'아이허브매칭사유_{date_suffix}'] = result['failure_reason']
+        
+        # 매칭 처리 시각 기록
+        df.at[idx, f'아이허브매칭일시_{date_suffix}'] = datetime.now().isoformat()
         
         return df
     
+    def match_unmatched_products(self, df, output_file, checkpoint_interval):
+        """기존 함수 - 호환성 유지를 위해 새 함수로 리다이렉트"""
+        print("🔄 match_unmatched_products → match_new_products_for_updated_prices 리다이렉트")
+        return self.match_new_products_for_updated_prices(df, output_file, checkpoint_interval)
+    
     def create_new_product_row(self, coupang_product, english_name, iherb_result):
-        """신규 상품 행 생성"""
+        """신규 상품 행 생성 (기존 함수 유지)"""
         today = datetime.now().strftime("_%Y%m%d")
         
         # 기본 쿠팡 정보
