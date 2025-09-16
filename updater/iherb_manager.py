@@ -1,5 +1,5 @@
 """
-아이허브 매칭 관리자
+아이허브 매칭 관리자 - BrowserManager 초기화 수정
 """
 
 import sys
@@ -46,9 +46,11 @@ class IHerbManager:
         self.max_products = UPDATER_CONFIG['MAX_PRODUCTS_TO_COMPARE']
     
     def init_scraper(self):
-        """아이허브 스크래퍼 초기화"""
+        """아이허브 스크래퍼 초기화 - BrowserManager 매개변수 수정"""
         if not self.scraper:
             print(f"🌿 아이허브 스크래퍼 초기화...")
+            
+            # BrowserManager가 (headless, delay_range) 2개 매개변수만 받으므로 수정
             self.scraper = EnglishIHerbScraper(
                 headless=self.headless,
                 delay_range=self.delay_range,
@@ -102,10 +104,25 @@ class IHerbManager:
                 }
         
         except Exception as e:
-            return {
-                'status': 'failed',
-                'failure_reason': f'매칭 중 오류: {str(e)}'
-            }
+            error_msg = str(e)
+            print(f"    매칭 중 오류: {error_msg}")
+            
+            # 더 구체적인 오류 분류
+            if "BrowserManager" in error_msg:
+                return {
+                    'status': 'failed',
+                    'failure_reason': f'브라우저 초기화 오류: {error_msg}'
+                }
+            elif "GEMINI" in error_msg.upper():
+                return {
+                    'status': 'failed',
+                    'failure_reason': f'Gemini API 오류: {error_msg}'
+                }
+            else:
+                return {
+                    'status': 'failed',
+                    'failure_reason': f'매칭 중 오류: {error_msg}'
+                }
     
     def match_unmatched_products(self, df, output_file, checkpoint_interval):
         """미매칭 상품 처리"""
@@ -125,7 +142,18 @@ class IHerbManager:
         
         print(f"🌿 미매칭 상품 {len(unmatched)}개 아이허브 매칭 시작...")
         
-        self.init_scraper()
+        # 스크래퍼 초기화 시도
+        try:
+            self.init_scraper()
+        except Exception as e:
+            print(f"❌ 아이허브 스크래퍼 초기화 실패: {e}")
+            # 모든 상품을 오류로 처리
+            for idx, row in unmatched.iterrows():
+                df.at[idx, 'status'] = 'error'
+                df.at[idx, 'failure_type'] = 'SCRAPER_INIT_ERROR'
+                df.at[idx, 'matching_reason'] = f'스크래퍼 초기화 실패: {str(e)}'
+            return df
+        
         success_count = 0
         
         for i, (idx, row) in enumerate(unmatched.iterrows()):

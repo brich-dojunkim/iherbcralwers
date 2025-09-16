@@ -1,5 +1,5 @@
 """
-메인 업데이터 - 모든 모듈을 조합하는 핵심 클래스
+메인 업데이터 - 모든 모듈을 조합하는 핵심 클래스 (재시작 로직 개선)
 """
 
 import os
@@ -84,19 +84,37 @@ class CompleteEfficientUpdater:
         if os.path.exists(output_file):
             print(f"📂 기존 작업 파일 발견 - 재시작 모드")
             working_df = pd.read_csv(output_file, encoding='utf-8-sig')
-            self.restart_manager.print_progress_status(working_df)
             
-            # 미완료 작업이 있는지 정밀 확인
-            incomplete_status = self.restart_manager.check_incomplete_work(working_df)
-            if incomplete_status['has_incomplete']:
-                print(f"🔄 미완료 작업 감지 - 정밀 재개 시작")
-                working_df = self._resume_incomplete_work(working_df, input_file, brand_name, output_file, fill_iherb)
-                self.restart_manager.print_final_stats(working_df)
-                return output_file
+            # DataFrame 구조 검증
+            if not self.restart_manager.validate_dataframe_structure(working_df):
+                print(f"⚠️ 작업 파일 구조에 문제가 있어 새로 시작합니다.")
+                # 기존 파일을 백업하고 새로 시작
+                backup_file = f"{output_file}.backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                working_df.to_csv(backup_file, index=False, encoding='utf-8-sig')
+                print(f"📦 기존 파일 백업: {backup_file}")
             else:
-                print(f"✅ 모든 작업 완료됨")
-                self.restart_manager.cleanup_metadata()
-                return output_file
+                self.restart_manager.print_progress_status(working_df)
+                
+                # 미완료 작업이 있는지 정밀 확인
+                incomplete_status = self.restart_manager.check_incomplete_work(working_df)
+                
+                if incomplete_status['has_incomplete']:
+                    print(f"🔄 미완료 작업 감지 - 정밀 재개 시작")
+                    
+                    # 재시작 권장사항 출력
+                    recommendations = self.restart_manager.get_restart_recommendations(incomplete_status)
+                    if recommendations:
+                        print(f"📋 재시작 계획:")
+                        for rec in recommendations:
+                            print(f"   - {rec}")
+                    
+                    working_df = self._resume_incomplete_work(working_df, input_file, brand_name, output_file, fill_iherb)
+                    self.restart_manager.print_final_stats(working_df)
+                    return output_file
+                else:
+                    print(f"✅ 모든 작업 완료됨")
+                    self.restart_manager.cleanup_metadata()
+                    return output_file
         
         # 새 작업 시작
         print(f"\n🆕 새 작업 시작")
@@ -109,7 +127,7 @@ class CompleteEfficientUpdater:
         
         # 중간 저장
         working_df.to_csv(output_file, index=False, encoding='utf-8-sig')
-        print(f"💾 1단계 완료 - 중간 저장")
+        print(f"💾 쿠팡 업데이트 완료")
         
         # 2단계: 신규 상품 배치 번역 + 아이허브 매칭
         if fill_iherb and len(new_products) > 0:
@@ -129,7 +147,7 @@ class CompleteEfficientUpdater:
         return output_file
     
     def _resume_incomplete_work(self, df, input_file, brand_name, output_file, fill_iherb):
-        """미완료 작업 정밀 재개"""
+        """미완료 작업 정밀 재개 - 더 세밀한 제어"""
         print(f"🔍 미완료 작업 상태 분석 중...")
         
         status = self.restart_manager.check_incomplete_work(df)
@@ -142,31 +160,62 @@ class CompleteEfficientUpdater:
         # 1. 쿠팡 업데이트가 미완료면 다시 실행
         if not status['coupang_complete']:
             print(f"🔄 쿠팡 업데이트 재실행...")
-            df, new_products = self._update_coupang_and_find_new(input_file, brand_name)
-            df.to_csv(output_file, index=False, encoding='utf-8-sig')
-            print(f"💾 쿠팡 업데이트 완료")
-            
-            # 상태 재확인
-            status = self.restart_manager.check_incomplete_work(df)
+            try:
+                df, new_products = self._update_coupang_and_find_new(input_file, brand_name)
+                df.to_csv(output_file, index=False, encoding='utf-8-sig')
+                print(f"💾 쿠팡 업데이트 완료")
+                
+                # 상태 재확인
+                status = self.restart_manager.check_incomplete_work(df)
+            except Exception as e:
+                print(f"❌ 쿠팡 업데이트 실패: {e}")
+                # 오류가 발생해도 기존 작업 계속 진행
         
         # 2. 신규 상품 처리 재개
         if fill_iherb and status['new_products_count'] > 0:
             # 2-1. 번역 재개
             if not status['translation_complete']:
                 print(f"🔤 번역 재개: {status['new_products_count'] - status['translated_count']}개 남음")
-                df = self.translation_manager.translate_untranslated_products(df, output_file)
-                status = self.restart_manager.check_incomplete_work(df)  # 상태 업데이트
+                try:
+                    df = self.translation_manager.translate_untranslated_products(df, output_file)
+                    status = self.restart_manager.check_incomplete_work(df)  # 상태 업데이트
+                except Exception as e:
+                    print(f"❌ 번역 재개 실패: {e}")
             
             # 2-2. 아이허브 매칭 재개  
             if not status['iherb_complete']:
                 print(f"🌿 아이허브 매칭 재개: {status['new_products_count'] - status['iherb_processed_count']}개 남음")
-                df = self.iherb_manager.match_unmatched_products(df, output_file, self.checkpoint_interval)
+                try:
+                    df = self.iherb_manager.match_unmatched_products(df, output_file, self.checkpoint_interval)
+                except Exception as e:
+                    print(f"❌ 아이허브 매칭 재개 실패: {e}")
+                    # 오류 상품들을 error 상태로 처리
+                    self._mark_failed_products_as_error(df, status)
         
         # 최종 저장
         df.to_csv(output_file, index=False, encoding='utf-8-sig')
         print(f"✅ 재개 작업 완료")
         
         return df
+    
+    def _mark_failed_products_as_error(self, df, status):
+        """실패한 상품들을 error 상태로 마킹"""
+        today = datetime.now().strftime("_%Y%m%d")
+        
+        # 번역은 되었지만 아이허브 매칭이 안된 상품들
+        unmatched = df[
+            (df['update_status'] == f'NEW_PRODUCT_{today}') &
+            (df['coupang_product_name_english'].notna()) &
+            (df['coupang_product_name_english'] != '') &
+            (df['status'].isna() | (df['status'] == ''))
+        ]
+        
+        for idx, row in unmatched.iterrows():
+            df.at[idx, 'status'] = 'error'
+            df.at[idx, 'failure_type'] = 'RESUME_ERROR'
+            df.at[idx, 'matching_reason'] = '재개 중 오류로 처리 중단'
+        
+        print(f"⚠️ {len(unmatched)}개 상품을 오류 상태로 처리")
     
     def _update_coupang_and_find_new(self, input_file, brand_name):
         """쿠팡 재크롤링 + 기존 데이터 업데이트 + 신규 상품 발견"""
@@ -175,14 +224,29 @@ class CompleteEfficientUpdater:
         print(f"📋 기존 상품: {len(existing_df)}개")
         
         # 쿠팡 재크롤링
-        new_crawled_products = self.coupang_manager.crawl_brand_products(brand_name)
-        print(f"🔍 재크롤링 결과: {len(new_crawled_products)}개")
+        try:
+            new_crawled_products = self.coupang_manager.crawl_brand_products(brand_name)
+            print(f"🔍 재크롤링 결과: {len(new_crawled_products)}개")
+        except Exception as e:
+            print(f"❌ 쿠팡 크롤링 실패: {e}")
+            # 크롤링 실패 시 기존 데이터에 실패 상태 추가
+            for idx, row in existing_df.iterrows():
+                existing_df.at[idx, 'update_status'] = 'CRAWLING_FAILED'
+            return existing_df, []
         
         # 기존 상품 업데이트
-        existing_df, updated_count = self.coupang_manager.update_existing_products(existing_df, new_crawled_products)
+        try:
+            existing_df, updated_count = self.coupang_manager.update_existing_products(existing_df, new_crawled_products)
+        except Exception as e:
+            print(f"❌ 기존 상품 업데이트 실패: {e}")
+            updated_count = 0
         
         # 신규 상품 발견
-        new_products = self.coupang_manager.find_new_products(existing_df, new_crawled_products)
+        try:
+            new_products = self.coupang_manager.find_new_products(existing_df, new_crawled_products)
+        except Exception as e:
+            print(f"❌ 신규 상품 발견 실패: {e}")
+            new_products = []
         
         print(f"✅ 업데이트: {updated_count}개, 신규 발견: {len(new_products)}개")
         
@@ -197,7 +261,12 @@ class CompleteEfficientUpdater:
         print(f"🔤 1단계: 배치 번역 ({len(new_products)}개 → {UPDATER_CONFIG['TRANSLATION_BATCH_SIZE']}개씩)")
         
         # 배치 번역 수행
-        translated_products = self.translation_manager.batch_translate_products(new_products)
+        try:
+            translated_products = self.translation_manager.batch_translate_products(new_products)
+        except Exception as e:
+            print(f"❌ 배치 번역 실패: {e}")
+            # 번역 실패 시 원본 이름 사용
+            translated_products = [(product, product['product_name']) for product in new_products]
         
         print(f"🌿 2단계: 아이허브 매칭 ({len(translated_products)}개)")
         
@@ -263,7 +332,19 @@ class CompleteEfficientUpdater:
     
     def close(self):
         """리소스 정리"""
-        self.coupang_manager.close()
-        self.iherb_manager.close()
-        self.restart_manager.cleanup_metadata()
+        try:
+            self.coupang_manager.close()
+        except:
+            pass
+        
+        try:
+            self.iherb_manager.close()
+        except:
+            pass
+        
+        try:
+            self.restart_manager.cleanup_metadata()
+        except:
+            pass
+        
         print(f"🧹 모든 리소스 정리 완료")
