@@ -58,7 +58,7 @@ class TranslationManager:
         from datetime import datetime
         
         today = datetime.now().strftime("_%Y%m%d")
-        new_products = df[df['update_status'] == f'NEW_PRODUCT_{today}']
+        new_products = df[df['update_status'] == f'NEW_PRODUCT__{today}']
         
         untranslated = new_products[
             new_products['coupang_product_name_english'].isna() | 

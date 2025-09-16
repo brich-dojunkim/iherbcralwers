@@ -46,16 +46,25 @@ class IHerbManager:
         self.max_products = UPDATER_CONFIG['MAX_PRODUCTS_TO_COMPARE']
     
     def init_scraper(self):
-        """아이허브 스크래퍼 초기화 - BrowserManager 매개변수 수정"""
+        """아이허브 스크래퍼 초기화 - 매개변수 정확히 맞춤"""
         if not self.scraper:
             print(f"🌿 아이허브 스크래퍼 초기화...")
             
-            # BrowserManager가 (headless, delay_range) 2개 매개변수만 받으므로 수정
-            self.scraper = EnglishIHerbScraper(
-                headless=self.headless,
-                delay_range=self.delay_range,
-                max_products_to_compare=self.max_products
-            )
+            # EnglishIHerbScraper 생성 (단독 실행과 동일한 방식)
+            # iherbscraper/main.py 참고: EnglishIHerbScraper(headless, delay_range, max_products_to_compare)
+            try:
+                self.scraper = EnglishIHerbScraper(
+                    headless=self.headless,
+                    delay_range=self.delay_range,
+                    max_products_to_compare=self.max_products
+                )
+                print(f"✅ 아이허브 스크래퍼 초기화 성공")
+            except Exception as e:
+                print(f"❌ 아이허브 스크래퍼 초기화 실패: {e}")
+                # 더 자세한 오류 정보 출력
+                import traceback
+                traceback.print_exc()
+                raise
     
     def match_single_product(self, coupang_product, english_name):
         """단일 상품 아이허브 매칭"""
@@ -130,7 +139,7 @@ class IHerbManager:
         
         # 번역은 되었지만 아이허브 매칭이 안된 상품들
         unmatched = df[
-            (df['update_status'] == f'NEW_PRODUCT_{today}') &
+            (df['update_status'] == f'NEW_PRODUCT__{today}') &
             (df['coupang_product_name_english'].notna()) &
             (df['coupang_product_name_english'] != '') &
             (df['status'].isna() | (df['status'] == ''))
@@ -247,7 +256,7 @@ class IHerbManager:
             f'쿠팡리뷰수{today}': coupang_product.get('review_count', ''),
             f'쿠팡평점{today}': coupang_product.get('rating', ''),
             f'크롤링일시{today}': datetime.now().isoformat(),
-            'update_status': f'NEW_PRODUCT_{today}',
+            'update_status': f'NEW_PRODUCT__{today}',
             'processed_at': datetime.now().isoformat()
         }
         

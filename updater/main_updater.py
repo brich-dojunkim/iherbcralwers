@@ -204,7 +204,7 @@ class CompleteEfficientUpdater:
         
         # 번역은 되었지만 아이허브 매칭이 안된 상품들
         unmatched = df[
-            (df['update_status'] == f'NEW_PRODUCT_{today}') &
+            (df['update_status'] == f'NEW_PRODUCT__{today}') &
             (df['coupang_product_name_english'].notna()) &
             (df['coupang_product_name_english'] != '') &
             (df['status'].isna() | (df['status'] == ''))
@@ -326,7 +326,7 @@ class CompleteEfficientUpdater:
             'status': 'error',
             'failure_type': 'PROCESSING_ERROR',
             'matching_reason': f'처리 중 오류: {error_msg}',
-            'update_status': f'ERROR_{today}',
+            'update_status': f'ERROR__{today}',
             'processed_at': datetime.now().isoformat()
         }
     

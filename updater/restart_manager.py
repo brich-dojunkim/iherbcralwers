@@ -62,7 +62,7 @@ class RestartManager:
             print(f"  ⚠️ update_status 컬럼이 없음 - 쿠팡 업데이트 미완료로 간주")
         
         # 2. 신규 상품 처리 상태 확인
-        new_products = df[df['update_status'] == f'NEW_PRODUCT_{today}'] if 'update_status' in df.columns else pd.DataFrame()
+        new_products = df[df['update_status'] == f'NEW_PRODUCT__{today}'] if 'update_status' in df.columns else pd.DataFrame()
         new_count = len(new_products)
         
         if new_count == 0:
