@@ -1,0 +1,269 @@
+"""
+메인 업데이터 - 모든 모듈을 조합하는 핵심 클래스
+"""
+
+import os
+import pandas as pd
+from datetime import datetime
+
+from settings import UPDATER_CONFIG, validate_config
+from coupang_manager import CoupangManager
+from translation_manager import TranslationManager
+from iherb_manager import IHerbManager
+from restart_manager import RestartManager
+
+
+class CompleteEfficientUpdater:
+    """완전한 재시작 기능이 있는 효율적인 가격 업데이터"""
+    
+    def __init__(self, headless=False):
+        # 설정 검증
+        try:
+            validate_config()
+        except Exception as e:
+            print(f"❌ 설정 검증 실패: {e}")
+            raise
+        
+        self.headless = headless
+        self.checkpoint_interval = UPDATER_CONFIG['CHECKPOINT_INTERVAL']
+        
+        # 매니저들 초기화 (오류 체크 추가)
+        try:
+            self.coupang_manager = CoupangManager(headless)
+            print("✅ 쿠팡 매니저 초기화 완료")
+        except Exception as e:
+            print(f"❌ 쿠팡 매니저 초기화 실패: {e}")
+            raise
+            
+        try:
+            self.translation_manager = TranslationManager()
+            print("✅ 번역 매니저 초기화 완료")
+        except Exception as e:
+            print(f"❌ 번역 매니저 초기화 실패: {e}")
+            raise
+            
+        try:
+            self.iherb_manager = IHerbManager(headless)
+            print("✅ 아이허브 매니저 초기화 완료")
+        except Exception as e:
+            print(f"❌ 아이허브 매니저 초기화 실패: {e}")
+            raise
+            
+        try:
+            self.restart_manager = RestartManager()
+            print("✅ 재시작 매니저 초기화 완료")
+        except Exception as e:
+            print(f"❌ 재시작 매니저 초기화 실패: {e}")
+            raise
+        
+        print(f"🚀 완전한 효율적인 업데이터 초기화 완료")
+        print(f"   - 배치 번역 크기: {UPDATER_CONFIG['TRANSLATION_BATCH_SIZE']}")
+        print(f"   - 중간 저장 간격: {self.checkpoint_interval}")
+        print(f"   - 지원 브랜드: {len(UPDATER_CONFIG['BRAND_SEARCH_URLS'])}개")
+        print(f"   - 완전한 재시작 기능: ✅")
+    
+    def update_prices(self, input_file, brand_name, output_file=None, fill_iherb=True):
+        """메인 업데이트 함수 - 완전한 재시작 지원"""
+        print(f"\n🎯 완전한 효율적인 가격 업데이트 시작: {brand_name}")
+        
+        # 브랜드 검증
+        if brand_name not in UPDATER_CONFIG['BRAND_SEARCH_URLS']:
+            raise ValueError(f"지원되지 않는 브랜드: {brand_name}")
+        
+        # 출력 파일명 결정
+        if not output_file:
+            today = datetime.now().strftime("%Y%m%d")
+            output_file = f"complete_efficient_{brand_name.replace(' ', '_')}_{today}.csv"
+        
+        print(f"📄 작업 파일: {output_file}")
+        
+        # 재시작 메타데이터 저장
+        self.restart_manager.save_metadata(input_file, brand_name, output_file, fill_iherb)
+        
+        # 기존 작업 파일 확인 (재시작 지원)
+        if os.path.exists(output_file):
+            print(f"📂 기존 작업 파일 발견 - 재시작 모드")
+            working_df = pd.read_csv(output_file, encoding='utf-8-sig')
+            self.restart_manager.print_progress_status(working_df)
+            
+            # 미완료 작업이 있는지 정밀 확인
+            incomplete_status = self.restart_manager.check_incomplete_work(working_df)
+            if incomplete_status['has_incomplete']:
+                print(f"🔄 미완료 작업 감지 - 정밀 재개 시작")
+                working_df = self._resume_incomplete_work(working_df, input_file, brand_name, output_file, fill_iherb)
+                self.restart_manager.print_final_stats(working_df)
+                return output_file
+            else:
+                print(f"✅ 모든 작업 완료됨")
+                self.restart_manager.cleanup_metadata()
+                return output_file
+        
+        # 새 작업 시작
+        print(f"\n🆕 새 작업 시작")
+        
+        # 1단계: 쿠팡 가격 업데이트 + 신규 상품 발견
+        print(f"\n" + "="*60)
+        print(f"📊 1단계: 쿠팡 재크롤링 + 가격 업데이트")
+        print(f"="*60)
+        working_df, new_products = self._update_coupang_and_find_new(input_file, brand_name)
+        
+        # 중간 저장
+        working_df.to_csv(output_file, index=False, encoding='utf-8-sig')
+        print(f"💾 1단계 완료 - 중간 저장")
+        
+        # 2단계: 신규 상품 배치 번역 + 아이허브 매칭
+        if fill_iherb and len(new_products) > 0:
+            print(f"\n" + "="*60)
+            print(f"🌿 2단계: 신규 상품 배치 처리 ({len(new_products)}개)")
+            print(f"="*60)
+            working_df = self._process_new_products_batch(working_df, new_products, output_file)
+        
+        # 최종 저장
+        working_df.to_csv(output_file, index=False, encoding='utf-8-sig')
+        print(f"\n✅ 최종 완료: {output_file}")
+        
+        # 통계 출력 및 정리
+        self.restart_manager.print_final_stats(working_df)
+        self.restart_manager.cleanup_metadata()
+        
+        return output_file
+    
+    def _resume_incomplete_work(self, df, input_file, brand_name, output_file, fill_iherb):
+        """미완료 작업 정밀 재개"""
+        print(f"🔍 미완료 작업 상태 분석 중...")
+        
+        status = self.restart_manager.check_incomplete_work(df)
+        
+        print(f"📊 작업 상태:")
+        print(f"   - 쿠팡 업데이트: {'✅' if status['coupang_complete'] else '❌'}")
+        print(f"   - 신규 상품 번역: {status['translated_count']}/{status['new_products_count']}")
+        print(f"   - 아이허브 매칭: {status['iherb_processed_count']}/{status['new_products_count']}")
+        
+        # 1. 쿠팡 업데이트가 미완료면 다시 실행
+        if not status['coupang_complete']:
+            print(f"🔄 쿠팡 업데이트 재실행...")
+            df, new_products = self._update_coupang_and_find_new(input_file, brand_name)
+            df.to_csv(output_file, index=False, encoding='utf-8-sig')
+            print(f"💾 쿠팡 업데이트 완료")
+            
+            # 상태 재확인
+            status = self.restart_manager.check_incomplete_work(df)
+        
+        # 2. 신규 상품 처리 재개
+        if fill_iherb and status['new_products_count'] > 0:
+            # 2-1. 번역 재개
+            if not status['translation_complete']:
+                print(f"🔤 번역 재개: {status['new_products_count'] - status['translated_count']}개 남음")
+                df = self.translation_manager.translate_untranslated_products(df, output_file)
+                status = self.restart_manager.check_incomplete_work(df)  # 상태 업데이트
+            
+            # 2-2. 아이허브 매칭 재개  
+            if not status['iherb_complete']:
+                print(f"🌿 아이허브 매칭 재개: {status['new_products_count'] - status['iherb_processed_count']}개 남음")
+                df = self.iherb_manager.match_unmatched_products(df, output_file, self.checkpoint_interval)
+        
+        # 최종 저장
+        df.to_csv(output_file, index=False, encoding='utf-8-sig')
+        print(f"✅ 재개 작업 완료")
+        
+        return df
+    
+    def _update_coupang_and_find_new(self, input_file, brand_name):
+        """쿠팡 재크롤링 + 기존 데이터 업데이트 + 신규 상품 발견"""
+        # 기존 데이터 로드
+        existing_df = pd.read_csv(input_file, encoding='utf-8-sig')
+        print(f"📋 기존 상품: {len(existing_df)}개")
+        
+        # 쿠팡 재크롤링
+        new_crawled_products = self.coupang_manager.crawl_brand_products(brand_name)
+        print(f"🔍 재크롤링 결과: {len(new_crawled_products)}개")
+        
+        # 기존 상품 업데이트
+        existing_df, updated_count = self.coupang_manager.update_existing_products(existing_df, new_crawled_products)
+        
+        # 신규 상품 발견
+        new_products = self.coupang_manager.find_new_products(existing_df, new_crawled_products)
+        
+        print(f"✅ 업데이트: {updated_count}개, 신규 발견: {len(new_products)}개")
+        
+        return existing_df, new_products
+    
+    def _process_new_products_batch(self, df, new_products, output_file):
+        """신규 상품 배치 처리 - 효율적인 번역 + 아이허브 매칭"""
+        if not new_products:
+            print(f"ℹ️ 처리할 신규 상품이 없습니다.")
+            return df
+        
+        print(f"🔤 1단계: 배치 번역 ({len(new_products)}개 → {UPDATER_CONFIG['TRANSLATION_BATCH_SIZE']}개씩)")
+        
+        # 배치 번역 수행
+        translated_products = self.translation_manager.batch_translate_products(new_products)
+        
+        print(f"🌿 2단계: 아이허브 매칭 ({len(translated_products)}개)")
+        
+        # 신규 상품들을 DataFrame에 추가
+        new_rows = []
+        success_count = 0
+        
+        for i, (original_product, english_name) in enumerate(translated_products):
+            try:
+                print(f"  [{i+1}/{len(translated_products)}] {original_product['product_name'][:40]}...")
+                
+                # 아이허브 매칭
+                result = self.iherb_manager.match_single_product(original_product, english_name)
+                
+                if result['status'] == 'success':
+                    success_count += 1
+                    print(f"    ✅ 매칭: {result['iherb_product_name'][:30]}...")
+                else:
+                    print(f"    ❌ 실패: {result['failure_reason']}")
+                
+                # 결과를 DataFrame 형태로 변환
+                new_row = self.iherb_manager.create_new_product_row(original_product, english_name, result)
+                new_rows.append(new_row)
+                
+                # 주기적 중간 저장
+                if (i + 1) % self.checkpoint_interval == 0:
+                    temp_df = pd.concat([df, pd.DataFrame(new_rows)], ignore_index=True)
+                    temp_df.to_csv(output_file, index=False, encoding='utf-8-sig')
+                    print(f"    💾 중간 저장 ({i+1}개 처리)")
+                
+            except Exception as e:
+                print(f"    ❌ 오류: {e}")
+                # 오류 발생 시에도 빈 행 추가
+                error_row = self._create_error_product_row(original_product, str(e))
+                new_rows.append(error_row)
+        
+        # 최종 DataFrame 결합
+        if new_rows:
+            new_df = pd.DataFrame(new_rows)
+            final_df = pd.concat([df, new_df], ignore_index=True)
+        else:
+            final_df = df
+        
+        print(f"✅ 신규 상품 처리 완료: {success_count}/{len(translated_products)}개 성공")
+        
+        return final_df
+    
+    def _create_error_product_row(self, coupang_product, error_msg):
+        """오류 발생 시 행 생성"""
+        today = datetime.now().strftime("_%Y%m%d")
+        
+        return {
+            'coupang_product_name': coupang_product.get('product_name', ''),
+            'coupang_product_id': coupang_product.get('product_id', ''),
+            'coupang_url': coupang_product.get('product_url', ''),
+            f'쿠팡현재가격{today}': coupang_product.get('current_price', ''),
+            'status': 'error',
+            'failure_type': 'PROCESSING_ERROR',
+            'matching_reason': f'처리 중 오류: {error_msg}',
+            'update_status': f'ERROR_{today}',
+            'processed_at': datetime.now().isoformat()
+        }
+    
+    def close(self):
+        """리소스 정리"""
+        self.coupang_manager.close()
+        self.iherb_manager.close()
+        self.restart_manager.cleanup_metadata()
+        print(f"🧹 모든 리소스 정리 완료")
