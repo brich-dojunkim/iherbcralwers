@@ -1,10 +1,11 @@
 """
-쿠팡 크롤링 관리자 - 마스터 파일 시스템 지원
+쿠팡 크롤링 관리자 - 마스터 파일 시스템 지원 (공통 패턴 적용)
 """
 
 import sys
 from datetime import datetime
 from settings import COUPANG_PATH, UPDATER_CONFIG
+from common import MasterFilePatterns
 
 # 쿠팡 모듈 경로 추가
 sys.path.insert(0, str(COUPANG_PATH))
@@ -19,7 +20,7 @@ except ImportError as e:
 
 
 class CoupangManager:
-    """쿠팡 크롤링 전담 관리자 - 마스터 파일 시스템"""
+    """쿠팡 크롤링 전담 관리자 - 마스터 파일 시스템 (공통 패턴 적용)"""
     
     def __init__(self, headless=False):
         if not COUPANG_AVAILABLE:
@@ -60,12 +61,14 @@ class CoupangManager:
         return products
     
     def update_master_prices(self, master_df, new_products):
-        """마스터 파일의 기존 상품 가격 업데이트"""
+        """마스터 파일의 기존 상품 가격 업데이트 - 공통 패턴 적용"""
         existing_ids = set(str(pid) for pid in master_df['coupang_product_id'].dropna())
         crawled_dict = {str(p['product_id']): p for p in new_products if p.get('product_id')}
         
         updated_count = 0
-        today = datetime.now().strftime("_%Y%m%d")
+        
+        # ✅ 공통 컬럼명 사용
+        coupang_columns = MasterFilePatterns.get_daily_coupang_columns()
         
         print(f"📊 가격 업데이트 시작:")
         print(f"   - 마스터 파일 상품: {len(existing_ids)}개")
@@ -77,13 +80,13 @@ class CoupangManager:
             if product_id in crawled_dict:
                 new_product = crawled_dict[product_id]
                 
-                # 날짜별 히스토리 컬럼 업데이트
-                master_df.at[idx, f'쿠팡현재가격{today}'] = new_product.get('current_price', '')
-                master_df.at[idx, f'쿠팡정가{today}'] = new_product.get('original_price', '')
-                master_df.at[idx, f'쿠팡할인율{today}'] = new_product.get('discount_rate', '')
-                master_df.at[idx, f'쿠팡리뷰수{today}'] = new_product.get('review_count', '')
-                master_df.at[idx, f'쿠팡평점{today}'] = new_product.get('rating', '')
-                master_df.at[idx, f'쿠팡크롤링시간{today}'] = datetime.now().isoformat()
+                # ✅ 공통 컬럼명 사용 - 날짜별 히스토리 컬럼 업데이트
+                master_df.at[idx, coupang_columns['current_price']] = new_product.get('current_price', '')
+                master_df.at[idx, coupang_columns['original_price']] = new_product.get('original_price', '')
+                master_df.at[idx, coupang_columns['discount_rate']] = new_product.get('discount_rate', '')
+                master_df.at[idx, coupang_columns['review_count']] = new_product.get('review_count', '')
+                master_df.at[idx, coupang_columns['rating']] = new_product.get('rating', '')
+                master_df.at[idx, coupang_columns['crawled_at']] = datetime.now().isoformat()
                 
                 # 상태 업데이트
                 if 'update_status' not in master_df.columns:
@@ -100,7 +103,7 @@ class CoupangManager:
                 if 'update_status' not in master_df.columns:
                     master_df['update_status'] = ''
                 master_df.at[idx, 'update_status'] = 'NOT_FOUND'
-                master_df.at[idx, f'쿠팡크롤링시간{today}'] = datetime.now().isoformat()
+                master_df.at[idx, coupang_columns['crawled_at']] = datetime.now().isoformat()
                 master_df.at[idx, 'last_updated'] = datetime.now().isoformat()
         
         print(f"✅ 가격 업데이트 완료: {updated_count}개")
@@ -128,24 +131,26 @@ class CoupangManager:
         return new_products
     
     def update_existing_products(self, existing_df, new_products):
-        """기존 상품 가격 업데이트 (호환성 유지)"""
+        """기존 상품 가격 업데이트 (호환성 유지) - 공통 패턴 적용"""
         existing_ids = set(str(pid) for pid in existing_df['coupang_product_id'].dropna())
         crawled_dict = {str(p['product_id']): p for p in new_products if p.get('product_id')}
         
         updated_count = 0
-        date_suffix = datetime.now().strftime("_%Y%m%d")
+        
+        # ✅ 공통 컬럼명 사용
+        coupang_columns = MasterFilePatterns.get_daily_coupang_columns()
         
         for idx, row in existing_df.iterrows():
             product_id = str(row.get('coupang_product_id', ''))
             
             if product_id in crawled_dict:
                 new_product = crawled_dict[product_id]
-                existing_df.at[idx, f'쿠팡현재가격{date_suffix}'] = new_product.get('current_price', '')
-                existing_df.at[idx, f'쿠팡정가{date_suffix}'] = new_product.get('original_price', '')
-                existing_df.at[idx, f'쿠팡할인율{date_suffix}'] = new_product.get('discount_rate', '')
-                existing_df.at[idx, f'쿠팡리뷰수{date_suffix}'] = new_product.get('review_count', '')
-                existing_df.at[idx, f'쿠팡평점{date_suffix}'] = new_product.get('rating', '')
-                existing_df.at[idx, f'크롤링일시{date_suffix}'] = datetime.now().isoformat()
+                existing_df.at[idx, coupang_columns['current_price']] = new_product.get('current_price', '')
+                existing_df.at[idx, coupang_columns['original_price']] = new_product.get('original_price', '')
+                existing_df.at[idx, coupang_columns['discount_rate']] = new_product.get('discount_rate', '')
+                existing_df.at[idx, coupang_columns['review_count']] = new_product.get('review_count', '')
+                existing_df.at[idx, coupang_columns['rating']] = new_product.get('rating', '')
+                existing_df.at[idx, coupang_columns['crawled_at']] = datetime.now().isoformat()
                 existing_df.at[idx, 'update_status'] = 'UPDATED'
                 updated_count += 1
             else:
@@ -166,8 +171,8 @@ class CoupangManager:
         return new_products
     
     def analyze_price_changes(self, master_df):
-        """가격 변화 분석 (마스터 파일 전용)"""
-        today = datetime.now().strftime("_%Y%m%d")
+        """가격 변화 분석 (마스터 파일 전용) - 공통 패턴 적용"""
+        
         price_changes = {
             'increased': 0,
             'decreased': 0,
@@ -176,7 +181,7 @@ class CoupangManager:
             'missing_prices': 0
         }
         
-        # 오늘과 이전 가격 컬럼들 찾기
+        # ✅ 공통 패턴 사용 - 오늘과 이전 가격 컬럼들 찾기
         price_columns = [col for col in master_df.columns if col.startswith('쿠팡현재가격_')]
         price_columns.sort()  # 날짜순 정렬
         
@@ -184,7 +189,7 @@ class CoupangManager:
             print(f"ℹ️ 가격 비교를 위한 히스토리가 부족합니다 ({len(price_columns)}개 날짜)")
             return price_changes
         
-        today_col = f'쿠팡현재가격{today}'
+        today_col = f'쿠팡현재가격_{MasterFilePatterns.get_today_suffix()}'
         if today_col not in price_columns:
             print(f"ℹ️ 오늘 가격 정보가 없습니다: {today_col}")
             return price_changes

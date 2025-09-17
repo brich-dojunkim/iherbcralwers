@@ -1,5 +1,5 @@
 """
-메인 업데이터 - 마스터 파일 시스템 (단일 파일 관리)
+메인 업데이터 - 마스터 파일 시스템 (공통 패턴 적용)
 """
 
 import os
@@ -11,10 +11,11 @@ from coupang_manager import CoupangManager
 from translation_manager import TranslationManager
 from iherb_manager import IHerbManager
 from restart_manager import RestartManager
+from common import MasterFilePatterns, get_new_products_filter
 
 
 class CompleteEfficientUpdater:
-    """마스터 파일 시스템 - 단일 파일 관리 가격 업데이터"""
+    """마스터 파일 시스템 - 단일 파일 관리 가격 업데이터 (공통 패턴 적용)"""
     
     def __init__(self, headless=False):
         # 설정 검증
@@ -56,14 +57,15 @@ class CompleteEfficientUpdater:
             print(f"❌ 재시작 매니저 초기화 실패: {e}")
             raise
         
-        print(f"🚀 마스터 파일 시스템 업데이터 초기화 완료")
+        print(f"🚀 마스터 파일 시스템 업데이터 초기화 완료 (공통 패턴 적용)")
         print(f"   - 배치 번역 크기: {UPDATER_CONFIG['TRANSLATION_BATCH_SIZE']}")
         print(f"   - 중간 저장 간격: {self.checkpoint_interval}")
         print(f"   - 지원 브랜드: {len(UPDATER_CONFIG['BRAND_SEARCH_URLS'])}개")
         print(f"   - 마스터 파일 시스템: ✅")
+        print(f"   - 공통 패턴 모듈: ✅")
     
     def update_prices(self, initial_file, brand_name, fill_iherb=True):
-        """메인 업데이트 함수 - 마스터 파일 시스템"""
+        """메인 업데이트 함수 - 마스터 파일 시스템 (공통 패턴 적용)"""
         print(f"\n🎯 마스터 파일 시스템 가격 업데이트 시작: {brand_name}")
         
         # 브랜드 검증
@@ -169,7 +171,7 @@ class CompleteEfficientUpdater:
         return master_df
     
     def _resume_incomplete_work(self, df, brand_name, master_file, fill_iherb):
-        """미완료 작업 정밀 재개"""
+        """미완료 작업 정밀 재개 - 공통 패턴 적용"""
         print(f"🔍 미완료 작업 상태 분석 중...")
         
         status = self.restart_manager.check_incomplete_work(df)
@@ -216,11 +218,11 @@ class CompleteEfficientUpdater:
         return df
     
     def _mark_failed_products_as_error(self, df, status):
-        """실패한 상품들을 error 상태로 마킹"""
-        today = datetime.now().strftime("_%Y%m%d")
+        """실패한 상품들을 error 상태로 마킹 - 공통 패턴 적용"""
         
+        # ✅ 공통 패턴 사용
         unmatched = df[
-            (df['update_status'] == f'NEW_PRODUCT{today}') &
+            get_new_products_filter(df) &
             (df['coupang_product_name_english'].notna()) &
             (df['coupang_product_name_english'] != '') &
             (df['status'].isna() | (df['status'] == ''))
@@ -261,7 +263,7 @@ class CompleteEfficientUpdater:
         return master_df, new_products
     
     def _process_new_products_in_master(self, master_df, new_products, master_file):
-        """마스터 파일에 신규 상품 추가 처리"""
+        """마스터 파일에 신규 상품 추가 처리 - 공통 패턴 적용"""
         if not new_products:
             return master_df
         
@@ -321,8 +323,11 @@ class CompleteEfficientUpdater:
         return final_df
     
     def _create_master_new_row(self, coupang_product, english_name, iherb_result):
-        """마스터 파일용 신규 상품 행 생성"""
-        today = datetime.now().strftime("_%Y%m%d")
+        """마스터 파일용 신규 상품 행 생성 - 공통 패턴 적용"""
+        
+        # ✅ 공통 컬럼명 사용
+        coupang_columns = MasterFilePatterns.get_daily_coupang_columns()
+        iherb_columns = MasterFilePatterns.get_daily_iherb_columns()
         
         # 기본 정보
         row = {
@@ -330,12 +335,12 @@ class CompleteEfficientUpdater:
             'coupang_product_name_english': english_name,
             'coupang_product_id': coupang_product.get('product_id', ''),
             'coupang_url': coupang_product.get('product_url', ''),
-            f'쿠팡현재가격{today}': coupang_product.get('current_price', ''),
-            f'쿠팡정가{today}': coupang_product.get('original_price', ''),
-            f'쿠팡할인율{today}': coupang_product.get('discount_rate', ''),
-            f'쿠팡리뷰수{today}': coupang_product.get('review_count', ''),
-            f'쿠팡평점{today}': coupang_product.get('rating', ''),
-            'update_status': f'NEW_PRODUCT{today}',
+            coupang_columns['current_price']: coupang_product.get('current_price', ''),
+            coupang_columns['original_price']: coupang_product.get('original_price', ''),
+            coupang_columns['discount_rate']: coupang_product.get('discount_rate', ''),
+            coupang_columns['review_count']: coupang_product.get('review_count', ''),
+            coupang_columns['rating']: coupang_product.get('rating', ''),
+            'update_status': MasterFilePatterns.get_new_product_status(),
             'created_at': datetime.now().isoformat(),
             'last_updated': datetime.now().isoformat(),
             'processed_at': datetime.now().isoformat()
@@ -368,11 +373,11 @@ class CompleteEfficientUpdater:
             price_comparison = self.iherb_manager.data_manager.calculate_price_comparison(coupang_price_info, price_info)
             
             row.update({
-                f'가격차이{today}': price_comparison['price_difference_krw'],
-                f'저렴한플랫폼{today}': price_comparison['cheaper_platform'],
-                f'절약금액{today}': price_comparison['savings_amount'],
-                f'절약비율{today}': price_comparison['savings_percentage'],
-                f'가격차이메모{today}': price_comparison['price_difference_note'],
+                iherb_columns['price_difference']: price_comparison['price_difference_krw'],
+                iherb_columns['cheaper_platform']: price_comparison['cheaper_platform'],
+                iherb_columns['savings_amount']: price_comparison['savings_amount'],
+                iherb_columns['savings_percentage']: price_comparison['savings_percentage'],
+                iherb_columns['price_difference_note']: price_comparison['price_difference_note'],
             })
         else:
             row.update({
@@ -384,18 +389,20 @@ class CompleteEfficientUpdater:
         return row
     
     def _create_master_error_row(self, coupang_product, error_msg):
-        """마스터 파일용 오류 행 생성"""
-        today = datetime.now().strftime("_%Y%m%d")
+        """마스터 파일용 오류 행 생성 - 공통 패턴 적용"""
+        
+        # ✅ 공통 컬럼명 사용
+        coupang_columns = MasterFilePatterns.get_daily_coupang_columns()
         
         return {
             'coupang_product_name': coupang_product.get('product_name', ''),
             'coupang_product_id': coupang_product.get('product_id', ''),
             'coupang_url': coupang_product.get('product_url', ''),
-            f'쿠팡현재가격{today}': coupang_product.get('current_price', ''),
+            coupang_columns['current_price']: coupang_product.get('current_price', ''),
             'status': 'error',
             'failure_type': 'PROCESSING_ERROR',
             'matching_reason': f'처리 중 오류: {error_msg}',
-            'update_status': f'ERROR{today}',
+            'update_status': f'ERROR_{MasterFilePatterns.get_today_suffix()}',
             'created_at': datetime.now().isoformat(),
             'last_updated': datetime.now().isoformat(),
             'processed_at': datetime.now().isoformat()

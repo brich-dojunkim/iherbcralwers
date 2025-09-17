@@ -1,11 +1,12 @@
 """
-아이허브 매칭 관리자 - 마스터 파일 시스템 지원
+아이허브 매칭 관리자 - 마스터 파일 시스템 지원 (공통 패턴 적용)
 """
 
 import sys
 import importlib.util
 from datetime import datetime
 from settings import IHERB_PATH, UPDATER_CONFIG
+from common import MasterFilePatterns, get_new_products_filter
 
 # 아이허브 모듈 경로 추가
 sys.path.insert(0, str(IHERB_PATH))
@@ -33,7 +34,7 @@ except Exception as e:
 
 
 class IHerbManager:
-    """아이허브 매칭 전담 관리자 - 마스터 파일 시스템"""
+    """아이허브 매칭 전담 관리자 - 마스터 파일 시스템 (공통 패턴 적용)"""
     
     def __init__(self, headless=False):
         if not IHERB_AVAILABLE:
@@ -130,23 +131,26 @@ class IHerbManager:
                 }
     
     def match_new_products_for_updated_prices(self, master_df, master_file, checkpoint_interval):
-        """마스터 파일의 신규 상품들에 대한 아이허브 매칭"""
-        today = datetime.now().strftime("_%Y%m%d")
+        """마스터 파일의 신규 상품들에 대한 아이허브 매칭 - 공통 패턴 적용"""
         
-        # 신규 상품 중에서 아이허브 매칭이 필요한 상품들 선별
+        # ✅ 공통 패턴 사용 - 신규 상품 중에서 아이허브 매칭이 필요한 상품들 선별
         new_products_needing_iherb = master_df[
-            (master_df['update_status'] == f'NEW_PRODUCT{today}') &
+            get_new_products_filter(master_df) &
             (master_df['coupang_product_name_english'].notna()) &
             (master_df['coupang_product_name_english'] != '')
         ].copy()
         
         print(f"🔍 신규 상품 아이허브 매칭 대상 분석:")
+        print(f"   - 사용된 패턴: '{MasterFilePatterns.get_new_product_status()}'")
         print(f"   - 총 신규 상품: {len(new_products_needing_iherb)}개")
         
-        # 오늘 날짜 기준 아이허브 가격 정보가 이미 있는 상품 제외
+        # ✅ 공통 컬럼명 사용 - 오늘 날짜 기준 아이허브 가격 정보가 이미 있는 상품 제외
+        iherb_columns = MasterFilePatterns.get_daily_iherb_columns()
         today_iherb_columns = [
-            f'아이허브정가{today}', f'아이허브할인가{today}', 
-            f'아이허브할인율{today}', f'아이허브단위가격{today}'
+            iherb_columns['list_price'], 
+            iherb_columns['discount_price'], 
+            iherb_columns['discount_percent'], 
+            iherb_columns['price_per_unit']
         ]
         
         already_processed_today = new_products_needing_iherb[
@@ -174,8 +178,8 @@ class IHerbManager:
             print(f"❌ 아이허브 스크래퍼 초기화 실패: {e}")
             # 모든 상품을 오류로 처리
             for idx, row in needs_matching.iterrows():
-                master_df.at[idx, f'아이허브매칭상태{today}'] = 'scraper_init_error'
-                master_df.at[idx, f'아이허브매칭사유{today}'] = f'스크래퍼 초기화 실패: {str(e)}'
+                master_df.at[idx, iherb_columns['matching_status']] = 'scraper_init_error'
+                master_df.at[idx, iherb_columns['matching_reason']] = f'스크래퍼 초기화 실패: {str(e)}'
             return master_df
         
         success_count = 0
@@ -184,21 +188,22 @@ class IHerbManager:
             try:
                 print(f"  [{i+1}/{len(needs_matching)}] {row['coupang_product_name'][:40]}...")
                 
-                # 쿠팡 상품 정보 구성 (오늘 날짜 기준)
+                # ✅ 공통 컬럼명 사용 - 쿠팡 상품 정보 구성 (오늘 날짜 기준)
+                coupang_columns = MasterFilePatterns.get_daily_coupang_columns()
                 coupang_product = {
                     'product_id': row['coupang_product_id'],
                     'product_name': row['coupang_product_name'],
                     'product_url': row.get('coupang_url', ''),
-                    'current_price': row.get(f'쿠팡현재가격{today}', ''),
-                    'original_price': row.get(f'쿠팡정가{today}', ''),
-                    'discount_rate': row.get(f'쿠팡할인율{today}', '')
+                    'current_price': row.get(coupang_columns['current_price'], ''),
+                    'original_price': row.get(coupang_columns['original_price'], ''),
+                    'discount_rate': row.get(coupang_columns['discount_rate'], '')
                 }
                 
                 english_name = row['coupang_product_name_english']
                 result = self.match_single_product(coupang_product, english_name)
                 
-                # 오늘 날짜 기준 아이허브 컬럼에 결과 저장
-                master_df = self._update_master_with_iherb_result(master_df, idx, result, coupang_product, today)
+                # ✅ 공통 컬럼명 사용 - 오늘 날짜 기준 아이허브 컬럼에 결과 저장
+                master_df = self._update_master_with_iherb_result(master_df, idx, result, coupang_product)
                 
                 if result['status'] == 'success':
                     success_count += 1
@@ -214,41 +219,45 @@ class IHerbManager:
             
             except Exception as e:
                 print(f"    ❌ 오류: {e}")
-                master_df.at[idx, f'아이허브매칭상태{today}'] = 'processing_error'
-                master_df.at[idx, f'아이허브매칭사유{today}'] = f'처리 중 오류: {str(e)}'
+                master_df.at[idx, iherb_columns['matching_status']] = 'processing_error'
+                master_df.at[idx, iherb_columns['matching_reason']] = f'처리 중 오류: {str(e)}'
         
         print(f"✅ 신규 상품 아이허브 매칭 완료: {success_count}/{len(needs_matching)}개 성공")
         return master_df
     
-    def _update_master_with_iherb_result(self, master_df, idx, result, coupang_product, today):
-        """마스터 파일에 오늘 날짜 기준 아이허브 매칭 결과 업데이트"""
+    def _update_master_with_iherb_result(self, master_df, idx, result, coupang_product):
+        """마스터 파일에 오늘 날짜 기준 아이허브 매칭 결과 업데이트 - 공통 컬럼명 적용"""
+        
+        # ✅ 공통 컬럼명 사용
+        iherb_columns = MasterFilePatterns.get_daily_iherb_columns()
+        
         if result['status'] == 'success':
             # 아이허브 매칭 성공
-            master_df.at[idx, f'아이허브매칭상태{today}'] = 'success'
-            master_df.at[idx, f'아이허브상품명{today}'] = result['iherb_product_name']
-            master_df.at[idx, f'아이허브상품URL{today}'] = result['iherb_product_url']
-            master_df.at[idx, f'아이허브상품코드{today}'] = result['iherb_product_code']
-            master_df.at[idx, f'유사도점수{today}'] = result['similarity_score']
+            master_df.at[idx, iherb_columns['matching_status']] = 'success'
+            master_df.at[idx, f'아이허브상품명_{MasterFilePatterns.get_today_suffix()}'] = result['iherb_product_name']
+            master_df.at[idx, f'아이허브상품URL_{MasterFilePatterns.get_today_suffix()}'] = result['iherb_product_url']
+            master_df.at[idx, f'아이허브상품코드_{MasterFilePatterns.get_today_suffix()}'] = result['iherb_product_code']
+            master_df.at[idx, f'유사도점수_{MasterFilePatterns.get_today_suffix()}'] = result['similarity_score']
             
             # 아이허브 가격 정보 (오늘 날짜 기준)
             price_info = result['iherb_price_info']
-            master_df.at[idx, f'아이허브정가{today}'] = price_info.get('list_price', '')
-            master_df.at[idx, f'아이허브할인가{today}'] = price_info.get('discount_price', '')
-            master_df.at[idx, f'아이허브할인율{today}'] = price_info.get('discount_percent', '')
-            master_df.at[idx, f'아이허브구독할인{today}'] = price_info.get('subscription_discount', '')
-            master_df.at[idx, f'아이허브단위가격{today}'] = price_info.get('price_per_unit', '')
-            master_df.at[idx, f'재고상태{today}'] = price_info.get('is_in_stock', True)
-            master_df.at[idx, f'재고메시지{today}'] = price_info.get('stock_message', '')
+            master_df.at[idx, iherb_columns['list_price']] = price_info.get('list_price', '')
+            master_df.at[idx, iherb_columns['discount_price']] = price_info.get('discount_price', '')
+            master_df.at[idx, iherb_columns['discount_percent']] = price_info.get('discount_percent', '')
+            master_df.at[idx, iherb_columns['subscription_discount']] = price_info.get('subscription_discount', '')
+            master_df.at[idx, iherb_columns['price_per_unit']] = price_info.get('price_per_unit', '')
+            master_df.at[idx, iherb_columns['stock_status']] = price_info.get('is_in_stock', True)
+            master_df.at[idx, iherb_columns['stock_message']] = price_info.get('stock_message', '')
             
             # 가격 비교 (오늘 날짜 기준)
             coupang_price_info = self.data_manager.extract_coupang_price_info(coupang_product)
             price_comparison = self.data_manager.calculate_price_comparison(coupang_price_info, price_info)
             
-            master_df.at[idx, f'가격차이{today}'] = price_comparison['price_difference_krw']
-            master_df.at[idx, f'저렴한플랫폼{today}'] = price_comparison['cheaper_platform']
-            master_df.at[idx, f'절약금액{today}'] = price_comparison['savings_amount']
-            master_df.at[idx, f'절약비율{today}'] = price_comparison['savings_percentage']
-            master_df.at[idx, f'가격차이메모{today}'] = price_comparison['price_difference_note']
+            master_df.at[idx, iherb_columns['price_difference']] = price_comparison['price_difference_krw']
+            master_df.at[idx, iherb_columns['cheaper_platform']] = price_comparison['cheaper_platform']
+            master_df.at[idx, iherb_columns['savings_amount']] = price_comparison['savings_amount']
+            master_df.at[idx, iherb_columns['savings_percentage']] = price_comparison['savings_percentage']
+            master_df.at[idx, iherb_columns['price_difference_note']] = price_comparison['price_difference_note']
             
             # 기본 매칭 정보도 업데이트 (마스터 파일은 최신 정보 유지)
             master_df.at[idx, 'status'] = 'success'
@@ -259,8 +268,8 @@ class IHerbManager:
             
         else:
             # 아이허브 매칭 실패
-            master_df.at[idx, f'아이허브매칭상태{today}'] = 'not_found'
-            master_df.at[idx, f'아이허브매칭사유{today}'] = result['failure_reason']
+            master_df.at[idx, iherb_columns['matching_status']] = 'not_found'
+            master_df.at[idx, iherb_columns['matching_reason']] = result['failure_reason']
             
             # 기본 상태도 업데이트
             master_df.at[idx, 'status'] = 'not_found'
@@ -268,14 +277,16 @@ class IHerbManager:
             master_df.at[idx, 'matching_reason'] = result['failure_reason']
         
         # 매칭 처리 시각 기록
-        master_df.at[idx, f'아이허브매칭일시{today}'] = datetime.now().isoformat()
+        master_df.at[idx, iherb_columns['matched_at']] = datetime.now().isoformat()
         master_df.at[idx, 'last_updated'] = datetime.now().isoformat()
         
         return master_df
     
     def update_iherb_prices_for_existing(self, master_df, master_file, checkpoint_interval):
-        """기존 매칭된 상품들의 아이허브 가격 재수집"""
-        today = datetime.now().strftime("_%Y%m%d")
+        """기존 매칭된 상품들의 아이허브 가격 재수집 - 공통 컬럼명 적용"""
+        
+        # ✅ 공통 컬럼명 사용
+        iherb_columns = MasterFilePatterns.get_daily_iherb_columns()
         
         # 이미 매칭된 상품들 중 오늘 아이허브 가격이 없는 상품들
         matched_products = master_df[
@@ -285,7 +296,7 @@ class IHerbManager:
         ].copy()
         
         # 오늘 아이허브 가격이 이미 있는지 확인
-        today_iherb_columns = [f'아이허브정가{today}', f'아이허브할인가{today}']
+        today_iherb_columns = [iherb_columns['list_price'], iherb_columns['discount_price']]
         already_has_today_price = matched_products[
             matched_products[today_iherb_columns].notna().any(axis=1)
         ]
@@ -323,15 +334,15 @@ class IHerbManager:
                     self.scraper.iherb_client.extract_product_info_with_price(product_url)
                 
                 if iherb_price_info:
-                    # 오늘 날짜 아이허브 가격 정보 업데이트
-                    master_df.at[idx, f'아이허브정가{today}'] = iherb_price_info.get('list_price', '')
-                    master_df.at[idx, f'아이허브할인가{today}'] = iherb_price_info.get('discount_price', '')
-                    master_df.at[idx, f'아이허브할인율{today}'] = iherb_price_info.get('discount_percent', '')
-                    master_df.at[idx, f'아이허브구독할인{today}'] = iherb_price_info.get('subscription_discount', '')
-                    master_df.at[idx, f'아이허브단위가격{today}'] = iherb_price_info.get('price_per_unit', '')
-                    master_df.at[idx, f'재고상태{today}'] = iherb_price_info.get('is_in_stock', True)
-                    master_df.at[idx, f'재고메시지{today}'] = iherb_price_info.get('stock_message', '')
-                    master_df.at[idx, f'아이허브가격수집일시{today}'] = datetime.now().isoformat()
+                    # ✅ 공통 컬럼명 사용 - 오늘 날짜 아이허브 가격 정보 업데이트
+                    master_df.at[idx, iherb_columns['list_price']] = iherb_price_info.get('list_price', '')
+                    master_df.at[idx, iherb_columns['discount_price']] = iherb_price_info.get('discount_price', '')
+                    master_df.at[idx, iherb_columns['discount_percent']] = iherb_price_info.get('discount_percent', '')
+                    master_df.at[idx, iherb_columns['subscription_discount']] = iherb_price_info.get('subscription_discount', '')
+                    master_df.at[idx, iherb_columns['price_per_unit']] = iherb_price_info.get('price_per_unit', '')
+                    master_df.at[idx, iherb_columns['stock_status']] = iherb_price_info.get('is_in_stock', True)
+                    master_df.at[idx, iherb_columns['stock_message']] = iherb_price_info.get('stock_message', '')
+                    master_df.at[idx, f'아이허브가격수집일시_{MasterFilePatterns.get_today_suffix()}'] = datetime.now().isoformat()
                     
                     # 기본 아이허브 정보도 최신으로 업데이트
                     master_df.at[idx, 'iherb_list_price_krw'] = iherb_price_info.get('list_price', '')
@@ -342,29 +353,30 @@ class IHerbManager:
                     master_df.at[idx, 'is_in_stock'] = iherb_price_info.get('is_in_stock', True)
                     master_df.at[idx, 'stock_message'] = iherb_price_info.get('stock_message', '')
                     
-                    # 가격 비교 재계산 (오늘 쿠팡 가격과 비교)
+                    # ✅ 공통 컬럼명 사용 - 가격 비교 재계산 (오늘 쿠팡 가격과 비교)
+                    coupang_columns = MasterFilePatterns.get_daily_coupang_columns()
                     coupang_product = {
-                        'current_price': row.get(f'쿠팡현재가격{today}', ''),
-                        'original_price': row.get(f'쿠팡정가{today}', ''),
-                        'discount_rate': row.get(f'쿠팡할인율{today}', '')
+                        'current_price': row.get(coupang_columns['current_price'], ''),
+                        'original_price': row.get(coupang_columns['original_price'], ''),
+                        'discount_rate': row.get(coupang_columns['discount_rate'], '')
                     }
                     
                     if coupang_product['current_price']:
                         coupang_price_info = self.data_manager.extract_coupang_price_info(coupang_product)
                         price_comparison = self.data_manager.calculate_price_comparison(coupang_price_info, iherb_price_info)
                         
-                        master_df.at[idx, f'가격차이{today}'] = price_comparison['price_difference_krw']
-                        master_df.at[idx, f'저렴한플랫폼{today}'] = price_comparison['cheaper_platform']
-                        master_df.at[idx, f'절약금액{today}'] = price_comparison['savings_amount']
-                        master_df.at[idx, f'절약비율{today}'] = price_comparison['savings_percentage']
-                        master_df.at[idx, f'가격차이메모{today}'] = price_comparison['price_difference_note']
+                        master_df.at[idx, iherb_columns['price_difference']] = price_comparison['price_difference_krw']
+                        master_df.at[idx, iherb_columns['cheaper_platform']] = price_comparison['cheaper_platform']
+                        master_df.at[idx, iherb_columns['savings_amount']] = price_comparison['savings_amount']
+                        master_df.at[idx, iherb_columns['savings_percentage']] = price_comparison['savings_percentage']
+                        master_df.at[idx, iherb_columns['price_difference_note']] = price_comparison['price_difference_note']
                     
                     success_count += 1
                     print(f"    ✅ 가격 업데이트 성공")
                 else:
                     print(f"    ❌ 가격 수집 실패")
-                    master_df.at[idx, f'아이허브가격수집일시{today}'] = datetime.now().isoformat()
-                    master_df.at[idx, f'아이허브가격수집상태{today}'] = 'failed'
+                    master_df.at[idx, f'아이허브가격수집일시_{MasterFilePatterns.get_today_suffix()}'] = datetime.now().isoformat()
+                    master_df.at[idx, f'아이허브가격수집상태_{MasterFilePatterns.get_today_suffix()}'] = 'failed'
                 
                 master_df.at[idx, 'last_updated'] = datetime.now().isoformat()
                 
@@ -375,8 +387,8 @@ class IHerbManager:
             
             except Exception as e:
                 print(f"    ❌ 오류: {e}")
-                master_df.at[idx, f'아이허브가격수집일시{today}'] = datetime.now().isoformat()
-                master_df.at[idx, f'아이허브가격수집상태{today}'] = f'error: {str(e)}'
+                master_df.at[idx, f'아이허브가격수집일시_{MasterFilePatterns.get_today_suffix()}'] = datetime.now().isoformat()
+                master_df.at[idx, f'아이허브가격수집상태_{MasterFilePatterns.get_today_suffix()}'] = f'error: {str(e)}'
         
         print(f"✅ 아이허브 가격 업데이트 완료: {success_count}/{len(needs_price_update)}개 성공")
         return master_df
@@ -387,8 +399,11 @@ class IHerbManager:
         return self.match_new_products_for_updated_prices(df, output_file, checkpoint_interval)
     
     def create_new_product_row(self, coupang_product, english_name, iherb_result):
-        """신규 상품 행 생성 (기존 함수 유지 - 호환성)"""
-        today = datetime.now().strftime("_%Y%m%d")
+        """신규 상품 행 생성 (기존 함수 유지 - 호환성) - 공통 컬럼명 적용"""
+        
+        # ✅ 공통 컬럼명 사용
+        coupang_columns = MasterFilePatterns.get_daily_coupang_columns()
+        iherb_columns = MasterFilePatterns.get_daily_iherb_columns()
         
         # 기본 쿠팡 정보
         row = {
@@ -396,13 +411,13 @@ class IHerbManager:
             'coupang_product_name_english': english_name,
             'coupang_product_id': coupang_product.get('product_id', ''),
             'coupang_url': coupang_product.get('product_url', ''),
-            f'쿠팡현재가격{today}': coupang_product.get('current_price', ''),
-            f'쿠팡정가{today}': coupang_product.get('original_price', ''),
-            f'쿠팡할인율{today}': coupang_product.get('discount_rate', ''),
-            f'쿠팡리뷰수{today}': coupang_product.get('review_count', ''),
-            f'쿠팡평점{today}': coupang_product.get('rating', ''),
-            f'크롤링일시{today}': datetime.now().isoformat(),
-            'update_status': f'NEW_PRODUCT{today}',
+            coupang_columns['current_price']: coupang_product.get('current_price', ''),
+            coupang_columns['original_price']: coupang_product.get('original_price', ''),
+            coupang_columns['discount_rate']: coupang_product.get('discount_rate', ''),
+            coupang_columns['review_count']: coupang_product.get('review_count', ''),
+            coupang_columns['rating']: coupang_product.get('rating', ''),
+            coupang_columns['crawled_at']: datetime.now().isoformat(),
+            'update_status': MasterFilePatterns.get_new_product_status(),
             'processed_at': datetime.now().isoformat(),
             'created_at': datetime.now().isoformat(),
             'last_updated': datetime.now().isoformat()
@@ -435,11 +450,11 @@ class IHerbManager:
             price_comparison = self.data_manager.calculate_price_comparison(coupang_price_info, price_info)
             
             row.update({
-                f'가격차이{today}': price_comparison['price_difference_krw'],
-                f'저렴한플랫폼{today}': price_comparison['cheaper_platform'],
-                f'절약금액{today}': price_comparison['savings_amount'],
-                f'절약비율{today}': price_comparison['savings_percentage'],
-                f'가격차이메모{today}': price_comparison['price_difference_note'],
+                iherb_columns['price_difference']: price_comparison['price_difference_krw'],
+                iherb_columns['cheaper_platform']: price_comparison['cheaper_platform'],
+                iherb_columns['savings_amount']: price_comparison['savings_amount'],
+                iherb_columns['savings_percentage']: price_comparison['savings_percentage'],
+                iherb_columns['price_difference_note']: price_comparison['price_difference_note'],
             })
         else:
             row.update({

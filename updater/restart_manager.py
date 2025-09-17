@@ -1,5 +1,5 @@
 """
-재시작 관리자 - 마스터 파일 시스템 지원 (컬럼 안전성 강화)
+재시작 관리자 - 마스터 파일 시스템 지원 (공통 패턴 적용)
 """
 
 import json
@@ -7,9 +7,10 @@ import os
 import pandas as pd
 from datetime import datetime
 from settings import UPDATER_CONFIG
+from common import MasterFilePatterns, get_new_products_filter
 
 class RestartManager:
-    """재시작 전담 관리자 - 마스터 파일 시스템"""
+    """재시작 전담 관리자 - 마스터 파일 시스템 (공통 패턴 적용)"""
     
     def __init__(self):
         self.metadata_file = UPDATER_CONFIG['RESTART_METADATA_FILE']
@@ -37,19 +38,19 @@ class RestartManager:
             print(f"🧹 재시작 메타데이터 정리 완료")
     
     def check_incomplete_work(self, master_df):
-        """마스터 파일에서 미완료 작업 정밀 감지 - 컬럼 안전성 강화"""
-        today = datetime.now().strftime("_%Y%m%d")
+        """마스터 파일에서 미완료 작업 정밀 감지 - 공통 패턴 적용"""
         
         # 1. 쿠팡 업데이트 완료 여부 확인
         if 'update_status' in master_df.columns:
             # 오늘 업데이트가 필요한 상품들 (기존 상품)
-            existing_products = master_df[~master_df['update_status'].str.startswith('NEW_PRODUCT', na=False)]
+            existing_products = master_df[~get_new_products_filter(master_df)]
             
             # 오늘 업데이트 완료된 상품들
+            coupang_columns = MasterFilePatterns.get_daily_coupang_columns()
             today_updated = master_df[
                 (master_df['update_status'] == 'UPDATED') |
                 (master_df['update_status'] == 'NOT_FOUND') |
-                (master_df[f'쿠팡크롤링시간{today}'].notna() if f'쿠팡크롤링시간{today}' in master_df.columns else False)
+                (master_df[coupang_columns['crawled_at']].notna() if coupang_columns['crawled_at'] in master_df.columns else False)
             ]
             
             coupang_complete = len(today_updated) >= len(existing_products)
@@ -62,9 +63,13 @@ class RestartManager:
             coupang_complete = False
             print(f"  ⚠️ update_status 컬럼이 없음 - 쿠팡 업데이트 미완료로 간주")
         
-        # 2. 신규 상품 처리 상태 확인
-        new_products = master_df[master_df['update_status'] == f'NEW_PRODUCT{today}'] if 'update_status' in master_df.columns else pd.DataFrame()
+        # 2. 신규 상품 처리 상태 확인 - 공통 패턴 적용
+        new_products = master_df[get_new_products_filter(master_df)]
         new_count = len(new_products)
+        
+        print(f"  🔍 신규 상품 패턴 확인:")
+        print(f"    - 사용된 패턴: '{MasterFilePatterns.get_new_product_status()}'")
+        print(f"    - 매칭된 상품: {new_count}개")
         
         if new_count == 0:
             print(f"  ℹ️ 오늘 신규 상품 없음")
@@ -90,23 +95,23 @@ class RestartManager:
             translation_complete = False
             translated_count = 0
         
-        # 4. 아이허브 매칭 완료 여부 확인 - 컬럼 안전성 강화
+        # 4. 아이허브 매칭 완료 여부 확인 - 공통 컬럼명 적용
         iherb_processed_count = 0
         iherb_complete = False
         
         if new_count > 0:
             print(f"  🔍 신규 상품 아이허브 매칭 상태 (오늘 날짜 기준):")
             
-            # 오늘 날짜 기준 아이허브 매칭 상태 컬럼들 정의
+            # ✅ 공통 컬럼명 사용 - 오늘 날짜 기준 아이허브 매칭 상태 컬럼들 정의
+            iherb_columns = MasterFilePatterns.get_daily_iherb_columns()
             today_iherb_status_columns = [
-                f'아이허브매칭상태{today}',
-                f'아이허브상품명{today}',
-                f'아이허브정가{today}',
-                f'아이허브할인가{today}',
-                f'아이허브매칭일시{today}'
+                iherb_columns['matching_status'],
+                iherb_columns['list_price'],
+                iherb_columns['discount_price'],
+                iherb_columns['matched_at']
             ]
             
-            # FIX: 실제 존재하는 컬럼들만 필터링
+            # 실제 존재하는 컬럼들만 필터링
             existing_today_iherb_columns = [col for col in today_iherb_status_columns if col in master_df.columns]
             
             print(f"    - 예상 오늘 날짜 아이허브 컬럼: {len(today_iherb_status_columns)}개")
@@ -121,7 +126,7 @@ class RestartManager:
                 print(f"    - 오늘 날짜 아이허브 데이터 있음: {len(has_today_iherb_data)}개")
                 
                 # 매칭 상태별 분석 (컬럼 존재 확인 후)
-                status_col = f'아이허브매칭상태{today}'
+                status_col = iherb_columns['matching_status']
                 if status_col in master_df.columns:
                     # new_products에서 해당 컬럼의 값 분포 확인
                     status_counts = new_products[status_col].value_counts()
@@ -189,15 +194,14 @@ class RestartManager:
         }
     
     def print_progress_status(self, master_df):
-        """마스터 파일 진행 상황 출력 - 컬럼 안전성 강화"""
+        """마스터 파일 진행 상황 출력 - 공통 패턴 적용"""
         total = len(master_df)
-        today = datetime.now().strftime("_%Y%m%d")
         
-        # 오늘 업데이트 상태 (컬럼 존재 확인)
+        # ✅ 공통 패턴 사용 - 오늘 업데이트 상태 (컬럼 존재 확인)
         if 'update_status' in master_df.columns:
             updated = len(master_df[master_df['update_status'] == 'UPDATED'])
             not_found = len(master_df[master_df['update_status'] == 'NOT_FOUND'])
-            new_products = len(master_df[master_df['update_status'] == f'NEW_PRODUCT{today}'])
+            new_products = len(master_df[get_new_products_filter(master_df)])
             error_products = len(master_df[master_df['update_status'].str.startswith('ERROR', na=False)])
         else:
             updated = not_found = new_products = error_products = 0
@@ -210,18 +214,23 @@ class RestartManager:
         else:
             completed = failed = errors = 0
         
-        # 가격 히스토리 분석
+        # ✅ 공통 패턴 사용 - 가격 히스토리 분석
+        coupang_columns = MasterFilePatterns.get_daily_coupang_columns()
+        iherb_columns = MasterFilePatterns.get_daily_iherb_columns()
+        
         price_columns = [col for col in master_df.columns if col.startswith('쿠팡현재가격_')]
         price_history_dates = len(price_columns)
         
         iherb_price_columns = [col for col in master_df.columns if col.startswith('아이허브할인가_')]
         iherb_history_dates = len(iherb_price_columns)
         
+        today_suffix = MasterFilePatterns.get_today_suffix()
+        
         print(f"📊 마스터 파일 현재 상태:")
         print(f"   - 총 상품: {total}개")
         print(f"   - 쿠팡 가격 히스토리: {price_history_dates}개 날짜")
         print(f"   - 아이허브 가격 히스토리: {iherb_history_dates}개 날짜")
-        print(f"   - 오늘({today[1:]}) 쿠팡 업데이트: {updated + not_found}개 (성공: {updated}, 미발견: {not_found})")
+        print(f"   - 오늘({today_suffix}) 쿠팡 업데이트: {updated + not_found}개 (성공: {updated}, 미발견: {not_found})")
         print(f"   - 오늘 신규 상품: {new_products}개")
         print(f"   - 아이허브 매칭 성공: {completed}개")
         if failed > 0:
@@ -230,7 +239,7 @@ class RestartManager:
             print(f"   - 처리 오류: {errors}개")
     
     def print_final_stats(self, master_df):
-        """마스터 파일 최종 통계 출력"""
+        """마스터 파일 최종 통계 출력 - 공통 패턴 적용"""
         print(f"\n" + "="*60)
         print(f"📈 마스터 파일 시스템 최종 통계")
         print(f"="*60)
@@ -238,7 +247,7 @@ class RestartManager:
         total = len(master_df)
         print(f"📦 총 상품: {total}개")
         
-        # 가격 히스토리 분석
+        # ✅ 공통 패턴 사용 - 가격 히스토리 분석
         price_columns = [col for col in master_df.columns if col.startswith('쿠팡현재가격_')]
         iherb_price_columns = [col for col in master_df.columns if col.startswith('아이허브할인가_')]
         
@@ -250,10 +259,10 @@ class RestartManager:
         if iherb_price_columns:
             print(f"     범위: {iherb_price_columns[0]} ~ {iherb_price_columns[-1]}")
         
-        # 오늘 업데이트 상태
-        today = datetime.now().strftime("_%Y%m%d")
+        # ✅ 공통 패턴 사용 - 오늘 업데이트 상태
+        today_suffix = MasterFilePatterns.get_today_suffix()
         if 'update_status' in master_df.columns:
-            print(f"\n📊 오늘({today[1:]}) 업데이트 상태:")
+            print(f"\n📊 오늘({today_suffix}) 업데이트 상태:")
             status_counts = master_df['update_status'].value_counts()
             for status, count in status_counts.items():
                 if 'NEW_PRODUCT' in str(status) or 'UPDATED' in str(status) or 'NOT_FOUND' in str(status):
@@ -274,9 +283,12 @@ class RestartManager:
             if error_count > 0:
                 print(f"   - 오류: {error_count}개 ({error_count/total*100:.1f}%)")
         
-        # 가격 정보 통계 (컬럼 안전성 확인)
-        today_coupang_price_col = f'쿠팡현재가격{today}'
-        today_iherb_price_col = f'아이허브할인가{today}'
+        # ✅ 공통 컬럼명 사용 - 가격 정보 통계 (컬럼 안전성 확인)
+        coupang_columns = MasterFilePatterns.get_daily_coupang_columns()
+        iherb_columns = MasterFilePatterns.get_daily_iherb_columns()
+        
+        today_coupang_price_col = coupang_columns['current_price']
+        today_iherb_price_col = iherb_columns['discount_price']
         
         if today_coupang_price_col in master_df.columns:
             coupang_price_count = len(master_df[
@@ -301,6 +313,7 @@ class RestartManager:
         print(f"   - 완전한 재시작: 중단 지점부터 정확한 재개")
         print(f"   - 배치 처리: {UPDATER_CONFIG['TRANSLATION_BATCH_SIZE']}개씩 효율적 번역")
         print(f"   - 체크포인트: {UPDATER_CONFIG['CHECKPOINT_INTERVAL']}개마다 안전 저장")
+        print(f"   - 공통 패턴: 모든 모듈에서 일관된 컬럼명/패턴 사용")
         
         print(f"="*60)
     
