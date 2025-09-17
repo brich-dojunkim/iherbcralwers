@@ -1,5 +1,5 @@
 """
-메인 업데이터 - 모든 모듈을 조합하는 핵심 클래스 (재시작 로직 개선)
+메인 업데이터 - 마스터 파일 시스템 (단일 파일 관리)
 """
 
 import os
@@ -14,7 +14,7 @@ from restart_manager import RestartManager
 
 
 class CompleteEfficientUpdater:
-    """완전한 재시작 기능이 있는 효율적인 가격 업데이터"""
+    """마스터 파일 시스템 - 단일 파일 관리 가격 업데이터"""
     
     def __init__(self, headless=False):
         # 설정 검증
@@ -27,7 +27,7 @@ class CompleteEfficientUpdater:
         self.headless = headless
         self.checkpoint_interval = UPDATER_CONFIG['CHECKPOINT_INTERVAL']
         
-        # 매니저들 초기화 (오류 체크 추가)
+        # 매니저들 초기화
         try:
             self.coupang_manager = CoupangManager(headless)
             print("✅ 쿠팡 매니저 초기화 완료")
@@ -56,98 +56,120 @@ class CompleteEfficientUpdater:
             print(f"❌ 재시작 매니저 초기화 실패: {e}")
             raise
         
-        print(f"🚀 완전한 효율적인 업데이터 초기화 완료")
+        print(f"🚀 마스터 파일 시스템 업데이터 초기화 완료")
         print(f"   - 배치 번역 크기: {UPDATER_CONFIG['TRANSLATION_BATCH_SIZE']}")
         print(f"   - 중간 저장 간격: {self.checkpoint_interval}")
         print(f"   - 지원 브랜드: {len(UPDATER_CONFIG['BRAND_SEARCH_URLS'])}개")
-        print(f"   - 완전한 재시작 기능: ✅")
+        print(f"   - 마스터 파일 시스템: ✅")
     
-    def update_prices(self, input_file, brand_name, output_file=None, fill_iherb=True):
-        """메인 업데이트 함수 - 완전한 재시작 지원"""
-        print(f"\n🎯 완전한 효율적인 가격 업데이트 시작: {brand_name}")
+    def update_prices(self, initial_file, brand_name, fill_iherb=True):
+        """메인 업데이트 함수 - 마스터 파일 시스템"""
+        print(f"\n🎯 마스터 파일 시스템 가격 업데이트 시작: {brand_name}")
         
         # 브랜드 검증
         if brand_name not in UPDATER_CONFIG['BRAND_SEARCH_URLS']:
             raise ValueError(f"지원되지 않는 브랜드: {brand_name}")
         
-        # 출력 파일명 결정
-        if not output_file:
-            today = datetime.now().strftime("%Y%m%d")
-            output_file = f"complete_efficient_{brand_name.replace(' ', '_')}_{today}.csv"
-        
-        print(f"📄 작업 파일: {output_file}")
+        # 마스터 파일명 결정
+        master_file = f"master_{brand_name.replace(' ', '_')}.csv"
+        print(f"📄 마스터 파일: {master_file}")
         
         # 재시작 메타데이터 저장
-        self.restart_manager.save_metadata(input_file, brand_name, output_file, fill_iherb)
+        self.restart_manager.save_metadata(initial_file, brand_name, master_file, fill_iherb)
         
-        # 기존 작업 파일 확인 (재시작 지원)
-        if os.path.exists(output_file):
-            print(f"📂 기존 작업 파일 발견 - 재시작 모드")
-            working_df = pd.read_csv(output_file, encoding='utf-8-sig')
+        # 마스터 파일 초기화 또는 로드
+        if not os.path.exists(master_file):
+            print(f"🆕 마스터 파일 생성 - 초기 데이터로부터")
+            master_df = self._initialize_master_file(initial_file, master_file)
+        else:
+            print(f"📂 기존 마스터 파일 로드")
+            master_df = pd.read_csv(master_file, encoding='utf-8-sig')
             
             # DataFrame 구조 검증
-            if not self.restart_manager.validate_dataframe_structure(working_df):
-                print(f"⚠️ 작업 파일 구조에 문제가 있어 새로 시작합니다.")
-                # 기존 파일을 백업하고 새로 시작
-                backup_file = f"{output_file}.backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-                working_df.to_csv(backup_file, index=False, encoding='utf-8-sig')
+            if not self.restart_manager.validate_dataframe_structure(master_df):
+                print(f"⚠️ 마스터 파일 구조에 문제가 있어 백업 후 재생성합니다.")
+                backup_file = f"{master_file}.backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                master_df.to_csv(backup_file, index=False, encoding='utf-8-sig')
                 print(f"📦 기존 파일 백업: {backup_file}")
+                master_df = self._initialize_master_file(initial_file, master_file)
             else:
-                self.restart_manager.print_progress_status(working_df)
+                self.restart_manager.print_progress_status(master_df)
                 
-                # 미완료 작업이 있는지 정밀 확인
-                incomplete_status = self.restart_manager.check_incomplete_work(working_df)
+                # 미완료 작업이 있는지 확인
+                incomplete_status = self.restart_manager.check_incomplete_work(master_df)
                 
                 if incomplete_status['has_incomplete']:
                     print(f"🔄 미완료 작업 감지 - 정밀 재개 시작")
-                    
-                    # 재시작 권장사항 출력
-                    recommendations = self.restart_manager.get_restart_recommendations(incomplete_status)
-                    if recommendations:
-                        print(f"📋 재시작 계획:")
-                        for rec in recommendations:
-                            print(f"   - {rec}")
-                    
-                    working_df = self._resume_incomplete_work(working_df, input_file, brand_name, output_file, fill_iherb)
-                    self.restart_manager.print_final_stats(working_df)
-                    return output_file
-                else:
-                    print(f"✅ 모든 작업 완료됨")
-                    self.restart_manager.cleanup_metadata()
-                    return output_file
+                    master_df = self._resume_incomplete_work(master_df, brand_name, master_file, fill_iherb)
+                    self.restart_manager.print_final_stats(master_df)
+                    return master_file
         
-        # 새 작업 시작
-        print(f"\n🆕 새 작업 시작")
-        
-        # 1단계: 쿠팡 가격 업데이트 + 신규 상품 발견
+        # 메인 업데이트 실행
         print(f"\n" + "="*60)
-        print(f"📊 1단계: 쿠팡 재크롤링 + 가격 업데이트")
+        print(f"📊 마스터 파일 업데이트")
         print(f"="*60)
-        working_df, new_products = self._update_coupang_and_find_new(input_file, brand_name)
         
-        # 중간 저장
-        working_df.to_csv(output_file, index=False, encoding='utf-8-sig')
-        print(f"💾 쿠팡 업데이트 완료")
+        # 1. 쿠팡 가격 업데이트 + 신규 상품 발견
+        master_df, new_products = self._update_master_with_coupang(master_df, brand_name, master_file)
         
-        # 2단계: 신규 상품 배치 번역 + 아이허브 매칭
+        # 2. 신규 상품 처리
         if fill_iherb and len(new_products) > 0:
-            print(f"\n" + "="*60)
-            print(f"🌿 2단계: 신규 상품 배치 처리 ({len(new_products)}개)")
-            print(f"="*60)
-            working_df = self._process_new_products_batch(working_df, new_products, output_file)
+            print(f"\n🌿 신규 상품 처리: {len(new_products)}개")
+            master_df = self._process_new_products_in_master(master_df, new_products, master_file)
         
         # 최종 저장
-        working_df.to_csv(output_file, index=False, encoding='utf-8-sig')
-        print(f"\n✅ 최종 완료: {output_file}")
+        master_df.to_csv(master_file, index=False, encoding='utf-8-sig')
+        print(f"\n✅ 마스터 파일 업데이트 완료: {master_file}")
         
         # 통계 출력 및 정리
-        self.restart_manager.print_final_stats(working_df)
+        self.restart_manager.print_final_stats(master_df)
         self.restart_manager.cleanup_metadata()
         
-        return output_file
+        return master_file
     
-    def _resume_incomplete_work(self, df, input_file, brand_name, output_file, fill_iherb):
-        """미완료 작업 정밀 재개 - 더 세밀한 제어"""
+    def _initialize_master_file(self, initial_file, master_file):
+        """초기 데이터로부터 마스터 파일 생성"""
+        print(f"📋 초기 데이터 로드: {initial_file}")
+        
+        if not os.path.exists(initial_file):
+            raise FileNotFoundError(f"초기 데이터 파일을 찾을 수 없습니다: {initial_file}")
+        
+        # 초기 데이터 로드
+        initial_df = pd.read_csv(initial_file, encoding='utf-8-sig')
+        print(f"   - 초기 상품: {len(initial_df)}개")
+        
+        # 마스터 파일 구조로 변환
+        master_df = self._convert_to_master_structure(initial_df)
+        
+        # 마스터 파일 저장
+        master_df.to_csv(master_file, index=False, encoding='utf-8-sig')
+        print(f"✅ 마스터 파일 생성 완료: {master_file}")
+        
+        return master_df
+    
+    def _convert_to_master_structure(self, df):
+        """기존 데이터를 마스터 파일 구조로 변환"""
+        # 기본 컬럼들은 유지
+        master_columns = [
+            'coupang_product_id', 'coupang_product_name', 'coupang_product_name_english',
+            'coupang_url', 'iherb_product_name', 'iherb_product_url', 'iherb_product_code',
+            'similarity_score', 'matching_reason', 'gemini_confidence', 'failure_type',
+            'status', 'iherb_list_price_krw', 'iherb_discount_price_krw', 'iherb_discount_percent',
+            'iherb_subscription_discount', 'iherb_price_per_unit', 'is_in_stock', 'stock_message',
+            'price_difference_note', 'processed_at', 'actual_index', 'search_language', 'update_status'
+        ]
+        
+        # 새 DataFrame 생성 (기존 컬럼 유지)
+        master_df = df.copy()
+        
+        # 마스터 파일 전용 컬럼 추가
+        master_df['created_at'] = datetime.now().isoformat()
+        master_df['last_updated'] = datetime.now().isoformat()
+        
+        return master_df
+    
+    def _resume_incomplete_work(self, df, brand_name, master_file, fill_iherb):
+        """미완료 작업 정밀 재개"""
         print(f"🔍 미완료 작업 상태 분석 중...")
         
         status = self.restart_manager.check_incomplete_work(df)
@@ -161,15 +183,10 @@ class CompleteEfficientUpdater:
         if not status['coupang_complete']:
             print(f"🔄 쿠팡 업데이트 재실행...")
             try:
-                df, new_products = self._update_coupang_and_find_new(input_file, brand_name)
-                df.to_csv(output_file, index=False, encoding='utf-8-sig')
-                print(f"💾 쿠팡 업데이트 완료")
-                
-                # 상태 재확인
+                df, new_products = self._update_master_with_coupang(df, brand_name, master_file)
                 status = self.restart_manager.check_incomplete_work(df)
             except Exception as e:
                 print(f"❌ 쿠팡 업데이트 실패: {e}")
-                # 오류가 발생해도 기존 작업 계속 진행
         
         # 2. 신규 상품 처리 재개
         if fill_iherb and status['new_products_count'] > 0:
@@ -177,8 +194,8 @@ class CompleteEfficientUpdater:
             if not status['translation_complete']:
                 print(f"🔤 번역 재개: {status['new_products_count'] - status['translated_count']}개 남음")
                 try:
-                    df = self.translation_manager.translate_untranslated_products(df, output_file)
-                    status = self.restart_manager.check_incomplete_work(df)  # 상태 업데이트
+                    df = self.translation_manager.translate_untranslated_products(df, master_file)
+                    status = self.restart_manager.check_incomplete_work(df)
                 except Exception as e:
                     print(f"❌ 번역 재개 실패: {e}")
             
@@ -186,25 +203,24 @@ class CompleteEfficientUpdater:
             if not status['iherb_complete']:
                 print(f"🌿 아이허브 매칭 재개: {status['new_products_count'] - status['iherb_processed_count']}개 남음")
                 try:
-                    df = self.iherb_manager.match_unmatched_products(df, output_file, self.checkpoint_interval)
+                    df = self.iherb_manager.match_new_products_for_updated_prices(df, master_file, self.checkpoint_interval)
                 except Exception as e:
                     print(f"❌ 아이허브 매칭 재개 실패: {e}")
-                    # 오류 상품들을 error 상태로 처리
                     self._mark_failed_products_as_error(df, status)
         
         # 최종 저장
-        df.to_csv(output_file, index=False, encoding='utf-8-sig')
+        df['last_updated'] = datetime.now().isoformat()
+        df.to_csv(master_file, index=False, encoding='utf-8-sig')
         print(f"✅ 재개 작업 완료")
         
         return df
     
     def _mark_failed_products_as_error(self, df, status):
         """실패한 상품들을 error 상태로 마킹"""
-        today = datetime.now().strftime("%Y%m%d")
+        today = datetime.now().strftime("_%Y%m%d")
         
-        # 번역은 되었지만 아이허브 매칭이 안된 상품들
         unmatched = df[
-            (df['update_status'] == f'NEW_PRODUCT__{today}') &
+            (df['update_status'] == f'NEW_PRODUCT{today}') &
             (df['coupang_product_name_english'].notna()) &
             (df['coupang_product_name_english'] != '') &
             (df['status'].isna() | (df['status'] == ''))
@@ -217,11 +233,9 @@ class CompleteEfficientUpdater:
         
         print(f"⚠️ {len(unmatched)}개 상품을 오류 상태로 처리")
     
-    def _update_coupang_and_find_new(self, input_file, brand_name):
-        """쿠팡 재크롤링 + 기존 데이터 업데이트 + 신규 상품 발견"""
-        # 기존 데이터 로드
-        existing_df = pd.read_csv(input_file, encoding='utf-8-sig')
-        print(f"📋 기존 상품: {len(existing_df)}개")
+    def _update_master_with_coupang(self, master_df, brand_name, master_file):
+        """마스터 파일에 쿠팡 데이터 업데이트"""
+        print(f"🤖 쿠팡 재크롤링 시작...")
         
         # 쿠팡 재크롤링
         try:
@@ -229,48 +243,40 @@ class CompleteEfficientUpdater:
             print(f"🔍 재크롤링 결과: {len(new_crawled_products)}개")
         except Exception as e:
             print(f"❌ 쿠팡 크롤링 실패: {e}")
-            # 크롤링 실패 시 기존 데이터에 실패 상태 추가
-            for idx, row in existing_df.iterrows():
-                existing_df.at[idx, 'update_status'] = 'CRAWLING_FAILED'
-            return existing_df, []
+            return master_df, []
         
-        # 기존 상품 업데이트
-        try:
-            existing_df, updated_count = self.coupang_manager.update_existing_products(existing_df, new_crawled_products)
-        except Exception as e:
-            print(f"❌ 기존 상품 업데이트 실패: {e}")
-            updated_count = 0
+        # 기존 상품 가격 업데이트
+        master_df, updated_count = self.coupang_manager.update_master_prices(master_df, new_crawled_products)
         
         # 신규 상품 발견
-        try:
-            new_products = self.coupang_manager.find_new_products(existing_df, new_crawled_products)
-        except Exception as e:
-            print(f"❌ 신규 상품 발견 실패: {e}")
-            new_products = []
+        new_products = self.coupang_manager.find_new_products_for_master(master_df, new_crawled_products)
         
-        print(f"✅ 업데이트: {updated_count}개, 신규 발견: {len(new_products)}개")
+        print(f"✅ 가격 업데이트: {updated_count}개, 신규 발견: {len(new_products)}개")
         
-        return existing_df, new_products
+        # 중간 저장
+        master_df['last_updated'] = datetime.now().isoformat()
+        master_df.to_csv(master_file, index=False, encoding='utf-8-sig')
+        print(f"💾 중간 저장 완료")
+        
+        return master_df, new_products
     
-    def _process_new_products_batch(self, df, new_products, output_file):
-        """신규 상품 배치 처리 - 효율적인 번역 + 아이허브 매칭"""
+    def _process_new_products_in_master(self, master_df, new_products, master_file):
+        """마스터 파일에 신규 상품 추가 처리"""
         if not new_products:
-            print(f"ℹ️ 처리할 신규 상품이 없습니다.")
-            return df
+            return master_df
         
-        print(f"🔤 1단계: 배치 번역 ({len(new_products)}개 → {UPDATER_CONFIG['TRANSLATION_BATCH_SIZE']}개씩)")
+        print(f"🔤 1단계: 배치 번역 ({len(new_products)}개)")
         
-        # 배치 번역 수행
+        # 배치 번역
         try:
             translated_products = self.translation_manager.batch_translate_products(new_products)
         except Exception as e:
             print(f"❌ 배치 번역 실패: {e}")
-            # 번역 실패 시 원본 이름 사용
             translated_products = [(product, product['product_name']) for product in new_products]
         
         print(f"🌿 2단계: 아이허브 매칭 ({len(translated_products)}개)")
         
-        # 신규 상품들을 DataFrame에 추가
+        # 신규 상품들을 마스터 파일에 추가
         new_rows = []
         success_count = 0
         
@@ -287,36 +293,99 @@ class CompleteEfficientUpdater:
                 else:
                     print(f"    ❌ 실패: {result['failure_reason']}")
                 
-                # 결과를 DataFrame 형태로 변환
-                new_row = self.iherb_manager.create_new_product_row(original_product, english_name, result)
+                # 마스터 파일용 새 행 생성
+                new_row = self._create_master_new_row(original_product, english_name, result)
                 new_rows.append(new_row)
                 
                 # 주기적 중간 저장
                 if (i + 1) % self.checkpoint_interval == 0:
-                    temp_df = pd.concat([df, pd.DataFrame(new_rows)], ignore_index=True)
-                    temp_df.to_csv(output_file, index=False, encoding='utf-8-sig')
+                    temp_df = pd.concat([master_df, pd.DataFrame(new_rows)], ignore_index=True)
+                    temp_df['last_updated'] = datetime.now().isoformat()
+                    temp_df.to_csv(master_file, index=False, encoding='utf-8-sig')
                     print(f"    💾 중간 저장 ({i+1}개 처리)")
                 
             except Exception as e:
                 print(f"    ❌ 오류: {e}")
-                # 오류 발생 시에도 빈 행 추가
-                error_row = self._create_error_product_row(original_product, str(e))
+                error_row = self._create_master_error_row(original_product, str(e))
                 new_rows.append(error_row)
         
         # 최종 DataFrame 결합
         if new_rows:
             new_df = pd.DataFrame(new_rows)
-            final_df = pd.concat([df, new_df], ignore_index=True)
+            final_df = pd.concat([master_df, new_df], ignore_index=True)
         else:
-            final_df = df
+            final_df = master_df
         
         print(f"✅ 신규 상품 처리 완료: {success_count}/{len(translated_products)}개 성공")
         
         return final_df
     
-    def _create_error_product_row(self, coupang_product, error_msg):
-        """오류 발생 시 행 생성"""
-        today = datetime.now().strftime("%Y%m%d")
+    def _create_master_new_row(self, coupang_product, english_name, iherb_result):
+        """마스터 파일용 신규 상품 행 생성"""
+        today = datetime.now().strftime("_%Y%m%d")
+        
+        # 기본 정보
+        row = {
+            'coupang_product_name': coupang_product.get('product_name', ''),
+            'coupang_product_name_english': english_name,
+            'coupang_product_id': coupang_product.get('product_id', ''),
+            'coupang_url': coupang_product.get('product_url', ''),
+            f'쿠팡현재가격{today}': coupang_product.get('current_price', ''),
+            f'쿠팡정가{today}': coupang_product.get('original_price', ''),
+            f'쿠팡할인율{today}': coupang_product.get('discount_rate', ''),
+            f'쿠팡리뷰수{today}': coupang_product.get('review_count', ''),
+            f'쿠팡평점{today}': coupang_product.get('rating', ''),
+            'update_status': f'NEW_PRODUCT{today}',
+            'created_at': datetime.now().isoformat(),
+            'last_updated': datetime.now().isoformat(),
+            'processed_at': datetime.now().isoformat()
+        }
+        
+        # 아이허브 정보 추가
+        if iherb_result['status'] == 'success':
+            row.update({
+                'status': 'success',
+                'iherb_product_name': iherb_result['iherb_product_name'],
+                'iherb_product_url': iherb_result['iherb_product_url'],
+                'iherb_product_code': iherb_result['iherb_product_code'],
+                'similarity_score': iherb_result['similarity_score'],
+            })
+            
+            # 아이허브 가격 정보
+            price_info = iherb_result['iherb_price_info']
+            row.update({
+                'iherb_list_price_krw': price_info.get('list_price', ''),
+                'iherb_discount_price_krw': price_info.get('discount_price', ''),
+                'iherb_discount_percent': price_info.get('discount_percent', ''),
+                'iherb_subscription_discount': price_info.get('subscription_discount', ''),
+                'iherb_price_per_unit': price_info.get('price_per_unit', ''),
+                'is_in_stock': price_info.get('is_in_stock', True),
+                'stock_message': price_info.get('stock_message', ''),
+            })
+            
+            # 가격 비교
+            coupang_price_info = self.iherb_manager.data_manager.extract_coupang_price_info(coupang_product)
+            price_comparison = self.iherb_manager.data_manager.calculate_price_comparison(coupang_price_info, price_info)
+            
+            row.update({
+                f'가격차이{today}': price_comparison['price_difference_krw'],
+                f'저렴한플랫폼{today}': price_comparison['cheaper_platform'],
+                f'절약금액{today}': price_comparison['savings_amount'],
+                f'절약비율{today}': price_comparison['savings_percentage'],
+                f'가격차이메모{today}': price_comparison['price_difference_note'],
+            })
+        else:
+            row.update({
+                'status': 'not_found',
+                'failure_type': 'NO_MATCHING_PRODUCT',
+                'matching_reason': iherb_result['failure_reason']
+            })
+        
+        return row
+    
+    def _create_master_error_row(self, coupang_product, error_msg):
+        """마스터 파일용 오류 행 생성"""
+        today = datetime.now().strftime("_%Y%m%d")
         
         return {
             'coupang_product_name': coupang_product.get('product_name', ''),
@@ -326,7 +395,9 @@ class CompleteEfficientUpdater:
             'status': 'error',
             'failure_type': 'PROCESSING_ERROR',
             'matching_reason': f'처리 중 오류: {error_msg}',
-            'update_status': f'ERROR__{today}',
+            'update_status': f'ERROR{today}',
+            'created_at': datetime.now().isoformat(),
+            'last_updated': datetime.now().isoformat(),
             'processed_at': datetime.now().isoformat()
         }
     
