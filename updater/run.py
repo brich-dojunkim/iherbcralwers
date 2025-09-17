@@ -32,8 +32,8 @@ def main():
     
     try:
         # 실행 파라미터 설정
-        initial_file = "/Users/brich/Desktop/iherb_price/iherbscraper/output/nowfood_20250915.csv"
-        brand = "NOW Foods"
+        initial_file = "/Users/brich/Desktop/iherb_price/iherbscraper/output/doctorsbest_250915.csv"
+        brand = "Doctors Best"
         
         print(f"\n📋 마스터 파일 시스템 설정:")
         print(f"   - 초기 데이터: {initial_file}")
