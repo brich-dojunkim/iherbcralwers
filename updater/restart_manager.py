@@ -1,5 +1,5 @@
 """
-재시작 관리자 - 마스터 파일 시스템 지원
+재시작 관리자 - 마스터 파일 시스템 지원 (컬럼 안전성 강화)
 """
 
 import json
@@ -37,7 +37,7 @@ class RestartManager:
             print(f"🧹 재시작 메타데이터 정리 완료")
     
     def check_incomplete_work(self, master_df):
-        """마스터 파일에서 미완료 작업 정밀 감지"""
+        """마스터 파일에서 미완료 작업 정밀 감지 - 컬럼 안전성 강화"""
         today = datetime.now().strftime("_%Y%m%d")
         
         # 1. 쿠팡 업데이트 완료 여부 확인
@@ -90,14 +90,14 @@ class RestartManager:
             translation_complete = False
             translated_count = 0
         
-        # 4. 아이허브 매칭 완료 여부 확인 - 오늘 날짜 기준
+        # 4. 아이허브 매칭 완료 여부 확인 - 컬럼 안전성 강화
         iherb_processed_count = 0
         iherb_complete = False
         
         if new_count > 0:
             print(f"  🔍 신규 상품 아이허브 매칭 상태 (오늘 날짜 기준):")
             
-            # 오늘 날짜 기준 아이허브 매칭 상태 컬럼들 확인
+            # 오늘 날짜 기준 아이허브 매칭 상태 컬럼들 정의
             today_iherb_status_columns = [
                 f'아이허브매칭상태{today}',
                 f'아이허브상품명{today}',
@@ -106,41 +106,58 @@ class RestartManager:
                 f'아이허브매칭일시{today}'
             ]
             
-            # 오늘 날짜 아이허브 데이터가 있는 상품들
-            has_today_iherb_data = new_products[
-                new_products[today_iherb_status_columns].notna().any(axis=1)
-            ]
+            # FIX: 실제 존재하는 컬럼들만 필터링
+            existing_today_iherb_columns = [col for col in today_iherb_status_columns if col in master_df.columns]
             
-            print(f"    - 오늘 날짜 아이허브 데이터 있음: {len(has_today_iherb_data)}개")
+            print(f"    - 예상 오늘 날짜 아이허브 컬럼: {len(today_iherb_status_columns)}개")
+            print(f"    - 실제 존재하는 컬럼: {len(existing_today_iherb_columns)}개")
             
-            # 매칭 상태별 분석
-            if f'아이허브매칭상태{today}' in master_df.columns:
-                status_counts = new_products[f'아이허브매칭상태{today}'].value_counts()
-                for status, count in status_counts.items():
-                    print(f"      * {status}: {count}개")
-                
-                processed_today = new_products[
-                    new_products[f'아이허브매칭상태{today}'].notna() &
-                    (new_products[f'아이허브매칭상태{today}'] != '')
+            if existing_today_iherb_columns:
+                # 오늘 날짜 아이허브 데이터가 있는 상품들 (안전한 방식)
+                has_today_iherb_data = new_products[
+                    new_products[existing_today_iherb_columns].notna().any(axis=1)
                 ]
-                iherb_processed_count = len(processed_today)
+                
+                print(f"    - 오늘 날짜 아이허브 데이터 있음: {len(has_today_iherb_data)}개")
+                
+                # 매칭 상태별 분석 (컬럼 존재 확인 후)
+                status_col = f'아이허브매칭상태{today}'
+                if status_col in master_df.columns:
+                    # new_products에서 해당 컬럼의 값 분포 확인
+                    status_counts = new_products[status_col].value_counts()
+                    for status, count in status_counts.items():
+                        if pd.notna(status):  # NaN 값은 제외
+                            print(f"      * {status}: {count}개")
+                    
+                    processed_today = new_products[
+                        new_products[status_col].notna() &
+                        (new_products[status_col] != '')
+                    ]
+                    iherb_processed_count = len(processed_today)
+                else:
+                    # 상태 컬럼이 없으면 다른 오늘 날짜 데이터로 판단
+                    iherb_processed_count = len(has_today_iherb_data)
+                    print(f"    - 매칭 상태 컬럼 없음, 기타 오늘 날짜 데이터로 판단")
             else:
-                iherb_processed_count = len(has_today_iherb_data)
-                print(f"    - 매칭 상태 컬럼 없음, 기타 오늘 날짜 데이터로 판단")
+                # 오늘 날짜 아이허브 컬럼이 전혀 없음
+                print(f"    - 오늘 날짜 아이허브 컬럼이 전혀 없음")
+                iherb_processed_count = 0
             
             iherb_complete = iherb_processed_count == new_count
             print(f"    - 최종 판단: {iherb_processed_count}개 처리됨 (완료: {'✅' if iherb_complete else '❌'})")
             
-            # 미처리 상품들 확인
-            if not iherb_complete:
+            # 미처리 상품들 확인 (안전한 방식)
+            if not iherb_complete and existing_today_iherb_columns:
                 unprocessed = new_products[
-                    ~new_products[today_iherb_status_columns].notna().any(axis=1)
+                    ~new_products[existing_today_iherb_columns].notna().any(axis=1)
                 ]
                 print(f"    - 미처리 상품: {len(unprocessed)}개")
                 if len(unprocessed) <= 5:
                     for idx, row in unprocessed.iterrows():
-                        product_name = row['coupang_product_name'][:30] + "..."
+                        product_name = row.get('coupang_product_name', 'N/A')[:30] + "..."
                         print(f"      * {product_name}")
+            elif not iherb_complete:
+                print(f"    - 미처리 상품: {new_count - iherb_processed_count}개 (컬럼 부재로 정확한 목록 확인 불가)")
         
         print(f"  🔍 신규 상품 처리 상태:")
         print(f"    - 총 신규 상품: {new_count}개")
@@ -172,11 +189,11 @@ class RestartManager:
         }
     
     def print_progress_status(self, master_df):
-        """마스터 파일 진행 상황 출력"""
+        """마스터 파일 진행 상황 출력 - 컬럼 안전성 강화"""
         total = len(master_df)
         today = datetime.now().strftime("_%Y%m%d")
         
-        # 오늘 업데이트 상태
+        # 오늘 업데이트 상태 (컬럼 존재 확인)
         if 'update_status' in master_df.columns:
             updated = len(master_df[master_df['update_status'] == 'UPDATED'])
             not_found = len(master_df[master_df['update_status'] == 'NOT_FOUND'])
@@ -185,7 +202,7 @@ class RestartManager:
         else:
             updated = not_found = new_products = error_products = 0
         
-        # 매칭 상태
+        # 매칭 상태 (컬럼 존재 확인)
         if 'status' in master_df.columns:
             completed = len(master_df[master_df['status'] == 'success'])
             failed = len(master_df[master_df['status'] == 'not_found'])
@@ -257,7 +274,7 @@ class RestartManager:
             if error_count > 0:
                 print(f"   - 오류: {error_count}개 ({error_count/total*100:.1f}%)")
         
-        # 가격 정보 통계
+        # 가격 정보 통계 (컬럼 안전성 확인)
         today_coupang_price_col = f'쿠팡현재가격{today}'
         today_iherb_price_col = f'아이허브할인가{today}'
         
@@ -417,87 +434,3 @@ class RestartManager:
         except Exception as e:
             print(f"⚠️ 백업 생성 실패: {e}")
             return None
-    
-    def analyze_work_distribution(self, master_df):
-        """마스터 파일 작업 분포 분석"""
-        today = datetime.now().strftime("_%Y%m%d")
-        
-        analysis = {
-            'total_products': len(master_df),
-            'existing_products': 0,
-            'new_products_today': 0,
-            'updated_today': 0,
-            'successful_matches': 0,
-            'failed_matches': 0,
-            'error_products': 0,
-            'price_history_coverage': 0
-        }
-        
-        if 'update_status' in master_df.columns:
-            # 기존 상품 vs 오늘 신규 상품
-            analysis['existing_products'] = len(master_df[~master_df['update_status'].str.startswith('NEW_PRODUCT', na=False)])
-            analysis['new_products_today'] = len(master_df[master_df['update_status'] == f'NEW_PRODUCT{today}'])
-            
-            # 오늘 업데이트된 상품
-            analysis['updated_today'] = len(master_df[
-                (master_df['update_status'] == 'UPDATED') | 
-                (master_df['update_status'] == 'NOT_FOUND')
-            ])
-        
-        if 'status' in master_df.columns:
-            analysis['successful_matches'] = len(master_df[master_df['status'] == 'success'])
-            analysis['failed_matches'] = len(master_df[master_df['status'] == 'not_found'])
-            analysis['error_products'] = len(master_df[master_df['status'] == 'error'])
-        
-        # 가격 히스토리 커버리지
-        price_columns = [col for col in master_df.columns if col.startswith('쿠팡현재가격_')]
-        if price_columns:
-            total_possible_entries = len(master_df) * len(price_columns)
-            actual_entries = 0
-            for col in price_columns:
-                actual_entries += len(master_df[master_df[col].notna() & (master_df[col] != '')])
-            analysis['price_history_coverage'] = (actual_entries / total_possible_entries * 100) if total_possible_entries > 0 else 0
-        
-        print(f"📊 작업 분포 분석:")
-        print(f"   - 총 상품: {analysis['total_products']}개")
-        print(f"   - 기존 상품: {analysis['existing_products']}개")
-        print(f"   - 오늘 신규: {analysis['new_products_today']}개")
-        print(f"   - 오늘 업데이트: {analysis['updated_today']}개")
-        print(f"   - 매칭 성공: {analysis['successful_matches']}개")
-        print(f"   - 가격 히스토리 커버리지: {analysis['price_history_coverage']:.1f}%")
-        
-        return analysis
-    
-    def get_maintenance_recommendations(self, master_df):
-        """마스터 파일 유지보수 권장사항"""
-        recommendations = []
-        
-        # 중복 제품 확인
-        if 'coupang_product_id' in master_df.columns:
-            duplicates = master_df['coupang_product_id'].duplicated().sum()
-            if duplicates > 0:
-                recommendations.append(f"🔧 중복 상품 {duplicates}개 정리 필요")
-        
-        # 오래된 데이터 확인
-        price_columns = [col for col in master_df.columns if col.startswith('쿠팡현재가격_')]
-        if len(price_columns) > 30:  # 30일 이상의 히스토리
-            recommendations.append(f"🗂️ 오래된 가격 히스토리 아카이빙 고려 ({len(price_columns)}일)")
-        
-        # 불완전한 매칭 확인
-        if 'status' in master_df.columns:
-            unprocessed = len(master_df[master_df['status'].isna() | (master_df['status'] == '')])
-            if unprocessed > 0:
-                recommendations.append(f"🔄 미처리 상품 {unprocessed}개 매칭 완료 필요")
-        
-        # 파일 크기 확인
-        if len(master_df) > 10000:
-            recommendations.append(f"📦 대용량 파일 ({len(master_df)}개 상품) - 성능 최적화 고려")
-        
-        if recommendations:
-            print(f"🔧 유지보수 권장사항:")
-            for rec in recommendations:
-                print(f"   - {rec}")
-        else:
-            print(f"✅ 마스터 파일 상태 양호 - 유지보수 불필요")
-        
-        return recommendations
