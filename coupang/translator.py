@@ -28,12 +28,12 @@ class GeminiCSVTranslator:
         Returns:
             전처리된 한국어 텍스트
         """
-        # ", 1개" 패턴 제거
-        text = re.sub(r',\s*1개', '', text)
-        # ", 1개입" 패턴 제거  
-        text = re.sub(r',\s*1개입', '', text)
+        # ", n개" 또는 ", n개입" 패턴 제거 (n은 숫자)
+        text = re.sub(r',\s*\d+\s*개입?', '', text)
+        
         # 연속된 공백 정리
         text = re.sub(r'\s{2,}', ' ', text)
+        
         return text.strip()
     
     def preprocess_english_for_search(self, text: str) -> str:
@@ -308,12 +308,9 @@ def main():
     translator = GeminiCSVTranslator(API_KEY)
     
     # 파일 경로 설정 (현재 프로젝트 구조에 맞게)
-    input_file = '/Users/brich/Desktop/iherb_price/coupang/coupang_csv/coupang_products_20250915_142911.csv'
-    output_file = '/Users/brich/Desktop/iherb_price/coupang/coupang_csv/coupang_products_20250915_142911_translated.csv'
-    
-    # output/coupang 디렉토리 생성
-    os.makedirs('output/coupang', exist_ok=True)
-    
+    input_file = '/Users/brich/Desktop/iherb_price/coupang/coupang_csv/coupang_products_20250917_124911.csv'
+    output_file = '/Users/brich/Desktop/iherb_price/coupang/coupang_csv/coupang_products_20250917_124911_translated.csv'
+        
     try:
         print(f"번역 시작: {input_file}")
         print(f"결과 저장 위치: {output_file}")
@@ -343,103 +340,5 @@ def main():
         import traceback
         traceback.print_exc()
 
-# 개별 파일 번역 함수
-def translate_specific_file(filename: str):
-    """특정 파일만 번역하는 함수"""
-    API_KEY = 'AIzaSyDNB7zwp36ICInpj3SRV9GiX7ovBxyFHHE'
-    translator = GeminiCSVTranslator(API_KEY)
-    
-    input_file = f'input/coupang/{filename}'
-    output_file = f'output/coupang/{filename.replace(".csv", "_translated_optimized.csv")}'
-    
-    os.makedirs('output/coupang', exist_ok=True)
-    
-    try:
-        df = translator.translate_csv(
-            input_file=input_file,
-            output_file=output_file,
-            column_name='product_name',
-            batch_size=10,
-            save_progress=True
-        )
-        return df
-    except Exception as e:
-        print(f"파일 {filename} 번역 실패: {e}")
-        return None
-
-# 테스트 함수들
-def test_single_translation():
-    """단일 번역 테스트"""
-    API_KEY = 'AIzaSyDNB7zwp36ICInpj3SRV9GiX7ovBxyFHHE'
-    translator = GeminiCSVTranslator(API_KEY)
-    
-    test_products = [
-        "나우푸드 실리마린 밀크 시슬 추출물 300mg 베지 캡슐, 200정, 1개",
-        "나우푸드 더블 스트랭스 L-아르기닌 1000mg 타블렛, 120정, 1개",
-        "나우푸드 프로바이오틱-10 유산균 250억 베지 캡슐, 100정, 1개"
-    ]
-    
-    print("=== 단일 번역 테스트 ===")
-    for product in test_products:
-        result = translator.translate_single(product)
-        print(f"최종 결과: {result}")
-        print()
-
-def test_batch_translation():
-    """배치 번역 테스트"""
-    API_KEY = 'AIzaSyDNB7zwp36ICInpj3SRV9GiX7ovBxyFHHE'
-    translator = GeminiCSVTranslator(API_KEY)
-    
-    test_products = [
-        "나우푸드 실리마린 밀크 시슬 추출물 300mg 베지 캡슐, 200정, 1개",
-        "나우푸드 더블 스트랭스 L-아르기닌 1000mg 타블렛, 120정, 1개",
-        "나우푸드 프로바이오틱-10 유산균 250억 베지 캡슐, 100정, 1개",
-        "나우푸드 울트라 오메가 3 500 EPA & 250 DHA 1000mg 피쉬 소프트젤, 180정, 1개",
-        "나우푸드 데일리 비츠 멀티비타민 & 미네랄 타블렛, 250정, 1개"
-    ]
-    
-    print("=== 배치 번역 테스트 ===")
-    results = translator.translate_batch(test_products, batch_size=3)
-    
-    print("\n=== 최종 결과 ===")
-    for original, translated in zip(test_products, results):
-        print(f"{original} → {translated}")
-
-def test_preprocessing():
-    """전처리 함수 테스트"""
-    translator = GeminiCSVTranslator('dummy_key')
-    
-    korean_samples = [
-        "나우푸드 실리마린 밀크 시슬 추출물 300mg 베지 캡슐, 200정, 1개",
-        "나우푸드 마카 500mg 베지 캡슐, 1개, 250정",
-        "나우푸드 에센셜 아로마오일, 30ml, 1개입, Orange"
-    ]
-    
-    english_samples = [
-        "Now Foods Silymarin Milk Thistle Extract 300mg Veggie Capsules, 200 Count, 1 Bottle",
-        "Now Foods Maca 500mg Veggie Capsules, 250 Count, 1 Pack",
-        "Now Foods Essential Oil, 30ml, 1 Container, Orange"
-    ]
-    
-    print("=== 한국어 전처리 테스트 ===")
-    for text in korean_samples:
-        result = translator.preprocess_korean_text(text)
-        print(f"원본: {text}")
-        print(f"전처리: {result}")
-        print()
-    
-    print("=== 영어 검색 최적화 테스트 ===")
-    for text in english_samples:
-        result = translator.preprocess_english_for_search(text)
-        print(f"원본: {text}")
-        print(f"최적화: {result}")
-        print()
-
 if __name__ == "__main__":
-    # 실행할 함수 선택
-    # main()                    # 전체 CSV 번역
-    # test_single_translation() # 단일 번역 테스트
-    # test_batch_translation()  # 배치 번역 테스트
-    # test_preprocessing()      # 전처리 함수 테스트
-    
     main()  # 기본으로 전체 번역 실행

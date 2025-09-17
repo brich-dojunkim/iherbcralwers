@@ -543,8 +543,8 @@ if __name__ == "__main__":
             max_products_to_compare=4
         )
         
-        input_csv = "/Users/brich/Desktop/iherb_price/coupang/coupang_csv/coupang_products_20250915_142911_translated.csv"
-        output_csv = "./output/doctorsbest_250915.csv"
+        input_csv = "/Users/brich/Desktop/iherb_price/coupang/coupang_csv/coupang_products_20250917_124911_translated.csv"
+        output_csv = "./output/lifeextension_250917.csv"
         
         # 영어명 기반 처리 (자동 재시작 지원)
         results = scraper.process_products_complete(
