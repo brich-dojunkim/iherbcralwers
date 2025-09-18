@@ -138,7 +138,11 @@ class UpdaterConfig:
     ]
 
 
-# 전역 설정 인스턴스
+# 🔧 핵심 수정: Config 클래스 alias 추가
+# 다른 모듈들이 "from config import Config"를 사용할 수 있도록
+Config = IHerbConfig if IHerbConfig else UpdaterConfig
+
+# 전역 설정 인스턴스 (기존 이름 유지)
 CONFIG = UpdaterConfig
 
 # 초기화
@@ -149,6 +153,11 @@ print(f"  출력 디렉토리: {CONFIG.OUTPUT_DIR}")
 print(f"  백업 디렉토리: {CONFIG.BACKUP_DIR}")
 print(f"  마스터 컬럼 수: {len(CONFIG.MASTER_COLUMNS)}")
 print(f"  iHerb 모듈 연동: {'✓' if IHerbConfig else '✗'}")
+
+# Config alias 정보
+if IHerbConfig:
+    print(f"  Config 클래스 alias: iHerbConfig → Config")
+    print(f"  다른 모듈에서 'from config import Config' 사용 가능")
 
 # 디버그 정보
 if IHerbConfig:
