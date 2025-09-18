@@ -12,15 +12,30 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 COUPANG_MODULE_PATH = os.path.join(BASE_DIR, 'coupang')
 IHERB_MODULE_PATH = os.path.join(BASE_DIR, 'iherbscraper')
 
-sys.path.append(COUPANG_MODULE_PATH)
-sys.path.append(IHERB_MODULE_PATH)
+# 경로를 맨 앞에 추가하여 우선순위 확보
+sys.path.insert(0, IHERB_MODULE_PATH)
+sys.path.insert(0, COUPANG_MODULE_PATH)
 
-# 기존 모듈 설정 임포트
+# 기존 모듈 설정 임포트 (명시적 모듈명 사용)
 try:
-    from config import Config as IHerbConfig
-    from config import FailureType
-except ImportError:
-    print("⚠️ iHerbScraper 모듈을 찾을 수 없습니다.")
+    # iherbscraper.config에서 임포트
+    import importlib.util
+    
+    # iherbscraper config 모듈 직접 로드
+    iherb_config_path = os.path.join(IHERB_MODULE_PATH, 'config.py')
+    if os.path.exists(iherb_config_path):
+        spec = importlib.util.spec_from_file_location("iherb_config", iherb_config_path)
+        iherb_config_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(iherb_config_module)
+        
+        IHerbConfig = iherb_config_module.Config
+        FailureType = iherb_config_module.FailureType
+        print("✓ iHerb 모듈 설정 로드 성공")
+    else:
+        raise ImportError("iHerb config.py not found")
+        
+except Exception as e:
+    print(f"⚠️ iHerbScraper 모듈 로드 실패: {e}")
     IHerbConfig = None
     FailureType = None
 
@@ -134,3 +149,9 @@ print(f"  출력 디렉토리: {CONFIG.OUTPUT_DIR}")
 print(f"  백업 디렉토리: {CONFIG.BACKUP_DIR}")
 print(f"  마스터 컬럼 수: {len(CONFIG.MASTER_COLUMNS)}")
 print(f"  iHerb 모듈 연동: {'✓' if IHerbConfig else '✗'}")
+
+# 디버그 정보
+if IHerbConfig:
+    print(f"  iHerb Config 클래스: {IHerbConfig}")
+    print(f"  FailureType 클래스: {FailureType}")
+    print(f"  베이스 URL: {getattr(IHerbConfig, 'BASE_URL', 'N/A')}")

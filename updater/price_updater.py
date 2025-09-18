@@ -5,18 +5,57 @@
 
 import pandas as pd
 import time
+import sys
+import os
 from datetime import datetime
 from typing import List, Dict
+
+# 설정 임포트
 from config import CONFIG
 
-# 기존 모듈 임포트
+# 기존 모듈 임포트 (절대 경로 사용)
 try:
-    from browser_manager import BrowserManager
-    from iherb_client import IHerbClient
+    # 기존 모듈 경로 확인
+    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    IHERB_MODULE_PATH = os.path.join(BASE_DIR, 'iherbscraper')
+    
+    # 경로가 sys.path에 없으면 추가
+    if IHERB_MODULE_PATH not in sys.path:
+        sys.path.insert(0, IHERB_MODULE_PATH)
+    
+    # 명시적 모듈 임포트
+    import importlib.util
+    
+    # browser_manager 모듈 로드
+    browser_manager_path = os.path.join(IHERB_MODULE_PATH, 'browser_manager.py')
+    if os.path.exists(browser_manager_path):
+        spec = importlib.util.spec_from_file_location("browser_manager", browser_manager_path)
+        browser_manager_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(browser_manager_module)
+        BrowserManager = browser_manager_module.BrowserManager
+        print("✓ BrowserManager 모듈 로드 성공")
+    else:
+        raise ImportError("browser_manager.py not found")
+    
+    # iherb_client 모듈 로드
+    iherb_client_path = os.path.join(IHERB_MODULE_PATH, 'iherb_client.py')
+    if os.path.exists(iherb_client_path):
+        spec = importlib.util.spec_from_file_location("iherb_client", iherb_client_path)
+        iherb_client_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(iherb_client_module)
+        IHerbClient = iherb_client_module.IHerbClient
+        print("✓ IHerbClient 모듈 로드 성공")
+    else:
+        raise ImportError("iherb_client.py not found")
+    
     MODULES_AVAILABLE = True
-except ImportError:
-    print("⚠️ 기존 모듈을 찾을 수 없습니다. 모듈 경로를 확인해주세요.")
+    
+except Exception as e:
+    print(f"⚠️ 기존 모듈 로드 실패: {e}")
+    print(f"  IHERB_MODULE_PATH: {IHERB_MODULE_PATH if 'IHERB_MODULE_PATH' in locals() else 'N/A'}")
     MODULES_AVAILABLE = False
+    BrowserManager = None
+    IHerbClient = None
 
 
 class PriceUpdater:
@@ -95,7 +134,7 @@ class PriceUpdater:
                     self.update_stats['failed_updates'] += 1
                     
                     # 실패 시 기존 데이터라도 유지
-                    if existing_record:
+                    if 'existing_record' in locals() and existing_record:
                         updated_records.append(existing_record)
             
             # 결과 정리

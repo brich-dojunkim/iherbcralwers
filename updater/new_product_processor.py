@@ -6,18 +6,60 @@
 import pandas as pd
 import tempfile
 import os
+import sys
 from datetime import datetime
 from typing import List, Dict
+
+# 설정 임포트
 from config import CONFIG
 
-# 기존 모듈 임포트
+# 기존 모듈 임포트 (절대 경로 사용)
 try:
-    from translator import GeminiCSVTranslator
-    from main import EnglishIHerbScraper
+    # 기존 모듈 경로 확인
+    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    COUPANG_MODULE_PATH = os.path.join(BASE_DIR, 'coupang')
+    IHERB_MODULE_PATH = os.path.join(BASE_DIR, 'iherbscraper')
+    
+    # 경로가 sys.path에 없으면 추가
+    if COUPANG_MODULE_PATH not in sys.path:
+        sys.path.insert(0, COUPANG_MODULE_PATH)
+    if IHERB_MODULE_PATH not in sys.path:
+        sys.path.insert(0, IHERB_MODULE_PATH)
+    
+    # 명시적 모듈 임포트
+    import importlib.util
+    
+    # translator 모듈 로드
+    translator_path = os.path.join(COUPANG_MODULE_PATH, 'translator.py')
+    if os.path.exists(translator_path):
+        spec = importlib.util.spec_from_file_location("coupang_translator", translator_path)
+        translator_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(translator_module)
+        GeminiCSVTranslator = translator_module.GeminiCSVTranslator
+        print("✓ Coupang 번역 모듈 로드 성공")
+    else:
+        raise ImportError("translator.py not found")
+    
+    # main 모듈 로드 (iherb scraper)
+    main_path = os.path.join(IHERB_MODULE_PATH, 'main.py')
+    if os.path.exists(main_path):
+        spec = importlib.util.spec_from_file_location("iherb_main", main_path)
+        main_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(main_module)
+        EnglishIHerbScraper = main_module.EnglishIHerbScraper
+        print("✓ iHerb 스크래퍼 모듈 로드 성공")
+    else:
+        raise ImportError("main.py not found")
+    
     MODULES_AVAILABLE = True
-except ImportError:
-    print("⚠️ 기존 모듈을 찾을 수 없습니다. 모듈 경로를 확인해주세요.")
+    
+except Exception as e:
+    print(f"⚠️ 기존 모듈 로드 실패: {e}")
+    print(f"  COUPANG_MODULE_PATH: {COUPANG_MODULE_PATH if 'COUPANG_MODULE_PATH' in locals() else 'N/A'}")
+    print(f"  IHERB_MODULE_PATH: {IHERB_MODULE_PATH if 'IHERB_MODULE_PATH' in locals() else 'N/A'}")
     MODULES_AVAILABLE = False
+    GeminiCSVTranslator = None
+    EnglishIHerbScraper = None
 
 
 class NewProductProcessor:
@@ -211,11 +253,11 @@ class NewProductProcessor:
                 return pd.DataFrame(columns=self.config.MASTER_COLUMNS)
             
             # 마스터 포맷으로 변환
-            for _, row in result_df.iterrows():
+            for idx in result_df.index:
                 # 메타 정보 추가
-                row['last_updated'] = datetime.now().isoformat()
-                row['data_source'] = 'new_product'
-                row['update_count'] = 0
+                result_df.at[idx, 'last_updated'] = datetime.now().isoformat()
+                result_df.at[idx, 'data_source'] = 'new_product'
+                result_df.at[idx, 'update_count'] = 0
             
             # 컬럼 순서 맞추기
             result_df = result_df.reindex(columns=self.config.MASTER_COLUMNS, fill_value='')
