@@ -91,7 +91,7 @@ if __name__ == "__main__":
     )
     
     # 검색 URL
-    search_url = "https://www.coupang.com/np/search?listSize=36&filterType=coupang_global&rating=0&isPriceRange=false&minPrice=&maxPrice=&component=&sorter=scoreDesc&brand=29472&offerCondition=&filter=&fromComponent=N&channel=user&selectedPlpKeepFilter=&q=%EB%9D%BC%EC%9D%B4%ED%94%84+%EC%9D%B5%EC%8A%A4%ED%85%90%EC%85%98"
+    search_url = "https://www.coupang.com/np/search?listSize=36&filterType=coupang_global&rating=0&isPriceRange=false&minPrice=&maxPrice=&component=&sorter=scoreDesc&brand=&offerCondition=&filter=194176%23attr_7652%2431823%40DEFAULT&fromComponent=N&channel=user&selectedPlpKeepFilter=&q=%EB%9D%BC%EC%9D%B4%ED%94%84+%EC%9D%B5%EC%8A%A4%ED%85%90%EC%85%98"
     
     print("\n브라우저가 열리면 필요시 수동으로 처리해주세요.")
     print("Ctrl+C로 언제든지 중단할 수 있습니다.")

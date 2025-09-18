@@ -1,0 +1,3571 @@
+{
+  "generated_at": "2025-09-17T18:42:04.596577",
+  "image_directory": "/Users/brich/Desktop/iherb_price/coupang_images",
+  "total_images": 356,
+  "images": [
+    {
+      "product_id": "91328939124",
+      "filename": "coupang_91328939124.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_91328939124.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/767b/e797e31a1d7309004de8c929f9e41c41bca3fb9ca6c00f1298e2b124e8d7.png",
+      "width": 600,
+      "height": 600,
+      "file_size": 235477,
+      "downloaded_at": "2025-09-17T18:36:19.035560"
+    },
+    {
+      "product_id": "91328938852",
+      "filename": "coupang_91328938852.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_91328938852.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/bc3a/de90c2cbaae19ae5b0a0c54c6c557cdb421f04d6a04dbe3b3752d67cfb76.png",
+      "width": 600,
+      "height": 600,
+      "file_size": 851938,
+      "downloaded_at": "2025-09-17T18:36:20.311238"
+    },
+    {
+      "product_id": "3270592295",
+      "filename": "coupang_3270592295.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3270592295.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/44d7/79e3b9891021b7bd85cd2111afe3865e211e5842752094161534cb22e216.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 48354,
+      "downloaded_at": "2025-09-17T18:36:20.560589"
+    },
+    {
+      "product_id": "91328939133",
+      "filename": "coupang_91328939133.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_91328939133.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/6599/9a8e0446d6b6ebdc48e14cc44f031d2039a5a6343a7d6e76b4b63848fd82.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 43625,
+      "downloaded_at": "2025-09-17T18:36:20.714517"
+    },
+    {
+      "product_id": "4041700392",
+      "filename": "coupang_4041700392.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_4041700392.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/4299/9cfc9f3103a39a04549781b11f74a5cfdb0d7595708a7e29de7203602e45.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 44797,
+      "downloaded_at": "2025-09-17T18:36:20.893402"
+    },
+    {
+      "product_id": "3226478935",
+      "filename": "coupang_3226478935.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3226478935.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/4136/ee086e30fde3df19d2e38a91169ef624ff4dc12fa5e0aeb3bea4d0c8b651.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 47371,
+      "downloaded_at": "2025-09-17T18:36:20.945761"
+    },
+    {
+      "product_id": "4041700596",
+      "filename": "coupang_4041700596.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_4041700596.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/e1dc/c81b0958706af12bbff4c75e82657dc750023dc1f31d8a26f5e3ec3556df.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 43272,
+      "downloaded_at": "2025-09-17T18:36:21.000435"
+    },
+    {
+      "product_id": "3259984782",
+      "filename": "coupang_3259984782.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3259984782.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/e3ae/6be7ee5f63366a6a425446c3c49750d70b8ed6967b3d7c5d093c8bc352f1.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 42175,
+      "downloaded_at": "2025-09-17T18:36:21.052559"
+    },
+    {
+      "product_id": "3231080948",
+      "filename": "coupang_3231080948.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231080948.jpg",
+      "image_url": "https://thumbnail7.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/a06f/e6b0a27573630e9edc4bb7247f8a70955f4d3576711606c30916e19d2ce1.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 44637,
+      "downloaded_at": "2025-09-17T18:36:21.277749"
+    },
+    {
+      "product_id": "3233506369",
+      "filename": "coupang_3233506369.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3233506369.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/3c75/713c3b31fae76ed311b5c4db0108ad150fa3cf5d2a84c3740c7f3fa29189.png",
+      "width": 600,
+      "height": 600,
+      "file_size": 836248,
+      "downloaded_at": "2025-09-17T18:36:22.416491"
+    },
+    {
+      "product_id": "3233644754",
+      "filename": "coupang_3233644754.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3233644754.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/f78e/fd6f756397efd3cce96725c84cc4e4bb56a1bf4def609eaee790fabe646b.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 45520,
+      "downloaded_at": "2025-09-17T18:36:22.619859"
+    },
+    {
+      "product_id": "3468574492",
+      "filename": "coupang_3468574492.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3468574492.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/5a4b/d3570bd639808ad0114154670f4d7d48f4fa9419ebb5c456992531e25fff.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 43332,
+      "downloaded_at": "2025-09-17T18:36:22.858469"
+    },
+    {
+      "product_id": "3231082364",
+      "filename": "coupang_3231082364.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231082364.jpg",
+      "image_url": "https://thumbnail7.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/5dd2/0b6e39bdcd27b024fa44c08b46ed5b8f21c481a4c2470b578fd08ea3502c.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 45931,
+      "downloaded_at": "2025-09-17T18:36:23.068474"
+    },
+    {
+      "product_id": "86902805724",
+      "filename": "coupang_86902805724.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_86902805724.jpg",
+      "image_url": "https://thumbnail7.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/656b/e8dab207fc7ff8e4bc3d7720da2b000d9833a4f609c451247c85120a9a20.png",
+      "width": 600,
+      "height": 600,
+      "file_size": 900383,
+      "downloaded_at": "2025-09-17T18:36:24.170066"
+    },
+    {
+      "product_id": "3267072439",
+      "filename": "coupang_3267072439.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3267072439.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/f29b/af85762706f181b37bf090f7f0efea16ee5b1750e866d3d9baf7d704dc82.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 44313,
+      "downloaded_at": "2025-09-17T18:36:24.222029"
+    },
+    {
+      "product_id": "3231064618",
+      "filename": "coupang_3231064618.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231064618.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/0569/6ec62538945e794d9b2a186f04bd4bc0ec491ab86454b0306ad9d35c0a01.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 45500,
+      "downloaded_at": "2025-09-17T18:36:24.457298"
+    },
+    {
+      "product_id": "3270592332",
+      "filename": "coupang_3270592332.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3270592332.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/d9e4/822a22a34e7c88b859398bf7c6f33b433571cbdd8b4c31a12c2492cb0413.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 39166,
+      "downloaded_at": "2025-09-17T18:36:24.516661"
+    },
+    {
+      "product_id": "3468574467",
+      "filename": "coupang_3468574467.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3468574467.jpg",
+      "image_url": "https://thumbnail7.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/56c1/19483cc11e455db41133af93fed544bf24ec29537f0513ded2e1859bc9af.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 44548,
+      "downloaded_at": "2025-09-17T18:36:24.770713"
+    },
+    {
+      "product_id": "3279277158",
+      "filename": "coupang_3279277158.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3279277158.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/1648/299917d308963599eea41bcbb22bd6900e14001ff2c37a776d396ed740a0.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 42165,
+      "downloaded_at": "2025-09-17T18:36:24.979101"
+    },
+    {
+      "product_id": "3661847979",
+      "filename": "coupang_3661847979.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3661847979.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/dd85/d50e86385732fd64d55a336f641b8dccd50582c285282c3024fdba2674d9.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 50738,
+      "downloaded_at": "2025-09-17T18:36:25.222853"
+    },
+    {
+      "product_id": "4041700151",
+      "filename": "coupang_4041700151.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_4041700151.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/99c3/46019edb58211fa307ca1f120065ec3d1cb99ef7670f51b319cfe8d21785.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 43992,
+      "downloaded_at": "2025-09-17T18:36:25.523373"
+    },
+    {
+      "product_id": "3226477693",
+      "filename": "coupang_3226477693.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3226477693.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/f566/2d105636579d35a99e2ab5533d6d5405269b29a3d78bb7bbe2240ba7a8f8.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 41650,
+      "downloaded_at": "2025-09-17T18:36:25.792259"
+    },
+    {
+      "product_id": "4041694706",
+      "filename": "coupang_4041694706.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_4041694706.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/1ad6/c6785ca7d6e3d9a1e72413f26984448a92ed2c6eae7c789d4c8d098844fc.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 42469,
+      "downloaded_at": "2025-09-17T18:36:26.018750"
+    },
+    {
+      "product_id": "91328939917",
+      "filename": "coupang_91328939917.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_91328939917.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/7772/1eccaa57a68cc9bf50f66fc74d99910e039be33fe8170d9ac7cd874fb0fe.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 33979,
+      "downloaded_at": "2025-09-17T18:36:26.232181"
+    },
+    {
+      "product_id": "3226455788",
+      "filename": "coupang_3226455788.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3226455788.jpg",
+      "image_url": "https://thumbnail7.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/2262/b8c379248b3ffbc02405b3ce4a28395364eedd60e059790235e84b3b597b.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 47135,
+      "downloaded_at": "2025-09-17T18:36:26.282567"
+    },
+    {
+      "product_id": "3279324191",
+      "filename": "coupang_3279324191.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3279324191.jpg",
+      "image_url": "https://thumbnail7.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/7162/61065fc34b35fa08bf8e1a259fab002097d7a56895e8b6ef478fda80d93c.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 45152,
+      "downloaded_at": "2025-09-17T18:36:26.346749"
+    },
+    {
+      "product_id": "3231052213",
+      "filename": "coupang_3231052213.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231052213.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/8e91/f98184c5c3a4eef30ad63ddf5a5aeb760232e998911f2760467b3e6278c2.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 45475,
+      "downloaded_at": "2025-09-17T18:36:26.547029"
+    },
+    {
+      "product_id": "3231081066",
+      "filename": "coupang_3231081066.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231081066.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/a5cb/4300c7fad4ef9202a7d5421a50b050e075794c6b47b63e90fe0bd60b8bc6.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 43844,
+      "downloaded_at": "2025-09-17T18:36:26.746526"
+    },
+    {
+      "product_id": "3271717150",
+      "filename": "coupang_3271717150.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3271717150.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/e7be/ae017c2e19a3c9f5170c2be203e47c9f013cf2b3d1ac7862c638777a2fa7.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 39358,
+      "downloaded_at": "2025-09-17T18:36:26.929712"
+    },
+    {
+      "product_id": "78329212910",
+      "filename": "coupang_78329212910.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_78329212910.jpg",
+      "image_url": "https://thumbnail7.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/2541/a55cd28e99c67debf441dcb4b67f7010a64276ee8e9d2e6ee8088360108c.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 52605,
+      "downloaded_at": "2025-09-17T18:36:26.993255"
+    },
+    {
+      "product_id": "3233668528",
+      "filename": "coupang_3233668528.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3233668528.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/4150/aea6acb629f69a311717fb6a3f42cb110c445c99bc1aba61b55251cd45e2.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 41677,
+      "downloaded_at": "2025-09-17T18:36:27.216074"
+    },
+    {
+      "product_id": "74795096262",
+      "filename": "coupang_74795096262.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_74795096262.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/32c0/ee6cb8d2bf43b6b12fe624639b87b81406321e6084c0e6b9d56486af543e.JPG",
+      "width": 600,
+      "height": 600,
+      "file_size": 62872,
+      "downloaded_at": "2025-09-17T18:36:27.517979"
+    },
+    {
+      "product_id": "70530999211",
+      "filename": "coupang_70530999211.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_70530999211.jpg",
+      "image_url": "https://thumbnail7.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/f52b/dd8780adc512585ef6ead809909ad1e5cf7d15fb7c1051f51f7627413416.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 58406,
+      "downloaded_at": "2025-09-17T18:36:27.708172"
+    },
+    {
+      "product_id": "91328938938",
+      "filename": "coupang_91328938938.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_91328938938.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/50fc/118dcb67c081c16fc87c335efcd440db8ee2e6a5758a2229e9a36978825f.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 35980,
+      "downloaded_at": "2025-09-17T18:36:27.754831"
+    },
+    {
+      "product_id": "91328939173",
+      "filename": "coupang_91328939173.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_91328939173.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/813a/4fa83c6e5d19b36eb4e3494cee901c734c1ab2abfa14916d33c56ea1a0b5.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 34751,
+      "downloaded_at": "2025-09-17T18:36:27.809856"
+    },
+    {
+      "product_id": "3231058594",
+      "filename": "coupang_3231058594.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231058594.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/7182/327adf2fe4ed62d6e89e89f216d0babf22b8304a107987a036ecd8ef66d3.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 46817,
+      "downloaded_at": "2025-09-17T18:36:27.991057"
+    },
+    {
+      "product_id": "70009656479",
+      "filename": "coupang_70009656479.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_70009656479.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/843f/4ae73dcde80f4913cfcc0aff63a026148634fe22f252ab3dc9699498988d.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 47045,
+      "downloaded_at": "2025-09-17T18:36:57.679586"
+    },
+    {
+      "product_id": "3231081059",
+      "filename": "coupang_3231081059.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231081059.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/908a/ef35fe49a7ad1e20321f52d8d153cadb58c5a5ae86e3b494596fef046595.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 45114,
+      "downloaded_at": "2025-09-17T18:36:57.727813"
+    },
+    {
+      "product_id": "5310926561",
+      "filename": "coupang_5310926561.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_5310926561.jpg",
+      "image_url": "https://thumbnail7.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/4447/7a2bdf50c1b893c72d83d2ad376e75d9bf4c277f7d491fe8bb5931842cdc.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 45783,
+      "downloaded_at": "2025-09-17T18:36:57.912005"
+    },
+    {
+      "product_id": "3279192939",
+      "filename": "coupang_3279192939.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3279192939.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/image_audit/prod/915ef7ba-bba6-426b-a0dc-c5f447181c67_fixing_v2.png",
+      "width": 600,
+      "height": 600,
+      "file_size": 223086,
+      "downloaded_at": "2025-09-17T18:36:58.426613"
+    },
+    {
+      "product_id": "91328939971",
+      "filename": "coupang_91328939971.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_91328939971.jpg",
+      "image_url": "https://thumbnail7.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/ea2d/7b75e901ab5157cac5eabfab05530b2b322d193c640dfbae6a7881bcb3d3.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 39607,
+      "downloaded_at": "2025-09-17T18:36:58.797074"
+    },
+    {
+      "product_id": "3084110060",
+      "filename": "coupang_3084110060.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3084110060.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/b3ec/685b257ffbc48e8b62ee5be3f57a140ce34a53d22b1a15ac81fb0a9d9ba9.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 43972,
+      "downloaded_at": "2025-09-17T18:36:59.033003"
+    },
+    {
+      "product_id": "3231080929",
+      "filename": "coupang_3231080929.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231080929.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/6a75/4975b8510dafe1836722a880b06693f5c204ba6c4afd288efbf49173c573.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 41586,
+      "downloaded_at": "2025-09-17T18:36:59.313032"
+    },
+    {
+      "product_id": "74812857727",
+      "filename": "coupang_74812857727.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_74812857727.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/23db/020008da33e5bf02fb0ee2137ec9032ebc13fa2c356aeaf31d87f852002d.JPG",
+      "width": 600,
+      "height": 600,
+      "file_size": 96997,
+      "downloaded_at": "2025-09-17T18:36:59.363826"
+    },
+    {
+      "product_id": "78338361144",
+      "filename": "coupang_78338361144.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_78338361144.jpg",
+      "image_url": "https://thumbnail7.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/image_audit/stage/manual/4cb9e86e1ef78b8068526f84e408852a37fffbaf71a964634bdebb67aa7a_1751002703414.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 40169,
+      "downloaded_at": "2025-09-17T18:36:59.590850"
+    },
+    {
+      "product_id": "3468574507",
+      "filename": "coupang_3468574507.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3468574507.jpg",
+      "image_url": "https://thumbnail7.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/1fd6/55ad4d99d221b6c4ca69b8b0a1a6837f26f221d550a97f193495a7fb5efa.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 48679,
+      "downloaded_at": "2025-09-17T18:36:59.830024"
+    },
+    {
+      "product_id": "91328938991",
+      "filename": "coupang_91328938991.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_91328938991.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/ee24/1fa3dcf72c861334a487b3cddb801e2f6082507ba1a475ae6445249e2e17.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 36694,
+      "downloaded_at": "2025-09-17T18:37:00.218902"
+    },
+    {
+      "product_id": "3468574157",
+      "filename": "coupang_3468574157.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3468574157.jpg",
+      "image_url": "https://thumbnail7.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/f978/381a8f9edf4b0ef2e0860b36ade59e1fa0a90cc98c6c18756ba66838ca76.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 44776,
+      "downloaded_at": "2025-09-17T18:37:00.456609"
+    },
+    {
+      "product_id": "3231081070",
+      "filename": "coupang_3231081070.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231081070.jpg",
+      "image_url": "https://thumbnail7.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/image_audit/prod/9da82481-11ca-42e6-8267-32893c5e66da_fixing_v2.png",
+      "width": 600,
+      "height": 600,
+      "file_size": 197414,
+      "downloaded_at": "2025-09-17T18:37:00.955432"
+    },
+    {
+      "product_id": "3468574453",
+      "filename": "coupang_3468574453.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3468574453.jpg",
+      "image_url": "https://thumbnail7.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/7b24/ad4e002acfb555102be96d4fe039cf7fc0cec164a8830bda38f10f58249c.JPG",
+      "width": 600,
+      "height": 600,
+      "file_size": 64835,
+      "downloaded_at": "2025-09-17T18:37:01.440653"
+    },
+    {
+      "product_id": "3531784167",
+      "filename": "coupang_3531784167.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3531784167.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/ad2e/2e8b53ca093f1311c95457986e52df0a76c9011127e09ccc93a3c2030c38.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 57834,
+      "downloaded_at": "2025-09-17T18:37:01.649129"
+    },
+    {
+      "product_id": "3267072967",
+      "filename": "coupang_3267072967.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3267072967.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/f4ad/b42b77909ad19184ecdac701a1cc63b51e3335eaf183b92c05c3b107f439.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 41321,
+      "downloaded_at": "2025-09-17T18:37:01.693683"
+    },
+    {
+      "product_id": "3279335296",
+      "filename": "coupang_3279335296.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3279335296.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2018/10/29/3279335296/7ac113f6-edc1-45a4-a441-e832f7e6d86f.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 43475,
+      "downloaded_at": "2025-09-17T18:37:01.738641"
+    },
+    {
+      "product_id": "74795091971",
+      "filename": "coupang_74795091971.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_74795091971.jpg",
+      "image_url": "https://thumbnail7.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/d3e2/7d8ff44f6bf7802b1a3cf1f2ae0c3214246b38e099e7316c7d1c0c2b70b8.png",
+      "width": 600,
+      "height": 600,
+      "file_size": 187831,
+      "downloaded_at": "2025-09-17T18:37:01.816416"
+    },
+    {
+      "product_id": "3468575581",
+      "filename": "coupang_3468575581.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3468575581.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/0e03/d6acce90156e1372546c893079f11a37c70b3c3e76d0559013001ee437b6.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 47424,
+      "downloaded_at": "2025-09-17T18:37:01.999624"
+    },
+    {
+      "product_id": "3233564439",
+      "filename": "coupang_3233564439.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3233564439.jpg",
+      "image_url": "https://thumbnail7.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/9f24/8c8aee6eb507bd153c314b95908b9abb8419fd50688a08d85486f2cf78ca.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 42480,
+      "downloaded_at": "2025-09-17T18:37:02.174393"
+    },
+    {
+      "product_id": "74795094721",
+      "filename": "coupang_74795094721.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_74795094721.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/4ff0/b34a1aae3e2327bcd6f617a77e7c2318ac33fe06ca8fee85f5a16d49feab.JPG",
+      "width": 600,
+      "height": 600,
+      "file_size": 58527,
+      "downloaded_at": "2025-09-17T18:37:02.542696"
+    },
+    {
+      "product_id": "70009656495",
+      "filename": "coupang_70009656495.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_70009656495.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/5cf0/e40c8b15294a5075ebf67207e099742ed3769e19513eb1b36b2745d54f32.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 50272,
+      "downloaded_at": "2025-09-17T18:37:02.590835"
+    },
+    {
+      "product_id": "3275455820",
+      "filename": "coupang_3275455820.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3275455820.jpg",
+      "image_url": "https://thumbnail7.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/2ffa/79516ebbf3c5d9fe521406418c4a579e4748fd9bd88295ccd1eb3c6ab53a.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 44418,
+      "downloaded_at": "2025-09-17T18:37:02.835862"
+    },
+    {
+      "product_id": "74795093407",
+      "filename": "coupang_74795093407.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_74795093407.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/0616/d071559629558965a524db597a59041904de45a8c468fc877051f8c300cb.JPG",
+      "width": 600,
+      "height": 600,
+      "file_size": 65473,
+      "downloaded_at": "2025-09-17T18:37:03.065371"
+    },
+    {
+      "product_id": "3226499952",
+      "filename": "coupang_3226499952.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3226499952.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/9311/22db6bee7019e123545c93c2774c4a68662ead39fcf39eef34b12c7948a4.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 43775,
+      "downloaded_at": "2025-09-17T18:37:03.314837"
+    },
+    {
+      "product_id": "3231058573",
+      "filename": "coupang_3231058573.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231058573.jpg",
+      "image_url": "https://img1a.coupangcdn.com/image/coupang/list/adultProduct_plp.png",
+      "width": 294,
+      "height": 294,
+      "file_size": 9634,
+      "downloaded_at": "2025-09-17T18:37:03.378335"
+    },
+    {
+      "product_id": "3720481481",
+      "filename": "coupang_3720481481.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3720481481.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/8378/0939eb42af82c6a518378779c6a2e4403762cc787f62d506b5c1d6a05786.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 42378,
+      "downloaded_at": "2025-09-17T18:37:03.691418"
+    },
+    {
+      "product_id": "91328939532",
+      "filename": "coupang_91328939532.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_91328939532.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/0729/460371467d5ccfe74803e95a793cc9894c899d6fbe78e2e302ad3a663502.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 39107,
+      "downloaded_at": "2025-09-17T18:37:03.736470"
+    },
+    {
+      "product_id": "3226479783",
+      "filename": "coupang_3226479783.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3226479783.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/3336/7328661d50bea157df6a0ffd9a98feaffd91986cac3647b7c6ea5e7b56ed.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 42929,
+      "downloaded_at": "2025-09-17T18:37:03.784092"
+    },
+    {
+      "product_id": "91328939591",
+      "filename": "coupang_91328939591.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_91328939591.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/543b/38edf8b1a6415d8ca4eb6649077a407c5ebb549478e74092304d5216541f.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 37367,
+      "downloaded_at": "2025-09-17T18:37:04.054187"
+    },
+    {
+      "product_id": "3231058420",
+      "filename": "coupang_3231058420.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231058420.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/9a37/d7efd807e10cbca244c62039b248bf1468bc64e98e9aa07ae50ef4231379.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 41981,
+      "downloaded_at": "2025-09-17T18:37:04.383298"
+    },
+    {
+      "product_id": "3468574170",
+      "filename": "coupang_3468574170.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3468574170.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/3870/711df4510b54c167353b7ddd5877bdd9864575b54d33a86e1739d15497c1.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 41663,
+      "downloaded_at": "2025-09-17T18:37:04.587517"
+    },
+    {
+      "product_id": "3231052157",
+      "filename": "coupang_3231052157.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231052157.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/04/3004870510/0d30a9dc-7c61-4ea8-8a0d-75cf30a83c97.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 35367,
+      "downloaded_at": "2025-09-17T18:37:04.775863"
+    },
+    {
+      "product_id": "3226477775",
+      "filename": "coupang_3226477775.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3226477775.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/03/3004869913/8514dbf5-6c38-4db5-b2e1-2f3a76defb3d.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 43686,
+      "downloaded_at": "2025-09-17T18:37:04.992831"
+    },
+    {
+      "product_id": "3259985356",
+      "filename": "coupang_3259985356.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3259985356.jpg",
+      "image_url": "https://thumbnail7.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/903a/268661813ee10e98b44e9d1684487a3ece82214e0389c8e0ea001676576b.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 45665,
+      "downloaded_at": "2025-09-17T18:37:05.236806"
+    },
+    {
+      "product_id": "3233527566",
+      "filename": "coupang_3233527566.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3233527566.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/7ecd/f2d89a9c9771aa7cc9a92a0b453cb723158ae55f56ba2b1970d52a3bcd4d.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 44813,
+      "downloaded_at": "2025-09-17T18:37:32.753438"
+    },
+    {
+      "product_id": "74795092954",
+      "filename": "coupang_74795092954.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_74795092954.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/8f87/4e17289e75b6caaaca5a1aedee5026ca679e1480531ac6bfd01380442d3a.JPG",
+      "width": 600,
+      "height": 600,
+      "file_size": 41093,
+      "downloaded_at": "2025-09-17T18:37:33.241602"
+    },
+    {
+      "product_id": "3205282924",
+      "filename": "coupang_3205282924.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3205282924.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/d9aa/f8b9cb2e0095a220577a4d390121fbe62a96a5a08b7f512f4a915d589c28.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 46448,
+      "downloaded_at": "2025-09-17T18:37:33.439404"
+    },
+    {
+      "product_id": "3661789776",
+      "filename": "coupang_3661789776.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3661789776.jpg",
+      "image_url": "https://thumbnail7.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/images/2018/04/27/14/1/8b01a214-803c-40eb-ba24-a038b23dc00d.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 50094,
+      "downloaded_at": "2025-09-17T18:37:33.657909"
+    },
+    {
+      "product_id": "74795090603",
+      "filename": "coupang_74795090603.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_74795090603.jpg",
+      "image_url": "https://thumbnail7.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/32ff/f55ddf73e56d65d1bea6a9e38bc1a5cceac3b4fa01033feed34149646e8e.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 113315,
+      "downloaded_at": "2025-09-17T18:37:33.891008"
+    },
+    {
+      "product_id": "91328939709",
+      "filename": "coupang_91328939709.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_91328939709.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/image_audit/prod/6b669300-7e94-4da4-a8be-dd45eae37216_fixing_v2.png",
+      "width": 600,
+      "height": 600,
+      "file_size": 247743,
+      "downloaded_at": "2025-09-17T18:37:34.646084"
+    },
+    {
+      "product_id": "3235096017",
+      "filename": "coupang_3235096017.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3235096017.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/f4f5/7ced35a77ab3a46241239e779c67a56bb959193fc63fdbc3ea25d5088347.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 40228,
+      "downloaded_at": "2025-09-17T18:37:34.869794"
+    },
+    {
+      "product_id": "3231058596",
+      "filename": "coupang_3231058596.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231058596.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/2b33/2703dbacb34dbde5954f8fb12e9da128de41fbb82b18d71bab40dddbd1a7.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 45771,
+      "downloaded_at": "2025-09-17T18:37:35.133795"
+    },
+    {
+      "product_id": "3231058393",
+      "filename": "coupang_3231058393.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231058393.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/04/3004870070/0dc4eb45-3ae6-4c14-b5c1-3501be901394.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 47427,
+      "downloaded_at": "2025-09-17T18:37:35.527165"
+    },
+    {
+      "product_id": "3233505083",
+      "filename": "coupang_3233505083.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3233505083.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/7e5e/f9edb30cb68f7f99d746f4a30e526d2ddbf4e7b57d20b2a9b3a7e4f34f7e.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 44943,
+      "downloaded_at": "2025-09-17T18:37:35.588548"
+    },
+    {
+      "product_id": "3279335814",
+      "filename": "coupang_3279335814.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3279335814.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/d330/9c86f82a1622917f3106f19c0afe14c551ff2fba8f86ccd41288d8d00531.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 41340,
+      "downloaded_at": "2025-09-17T18:37:35.764500"
+    },
+    {
+      "product_id": "3468574108",
+      "filename": "coupang_3468574108.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3468574108.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/c0b8/a8b005ed8eeabd451ff85fc1e9acb22e76f7792148de83768f050052358a.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 39674,
+      "downloaded_at": "2025-09-17T18:37:35.951967"
+    },
+    {
+      "product_id": "3226477396",
+      "filename": "coupang_3226477396.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3226477396.jpg",
+      "image_url": "https://thumbnail7.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/7ed7/0cf11b95e92db88b512da63903baa4c553162bbfa940660ccd73eb17609a.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 46801,
+      "downloaded_at": "2025-09-17T18:37:36.145842"
+    },
+    {
+      "product_id": "3231052296",
+      "filename": "coupang_3231052296.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231052296.jpg",
+      "image_url": "https://thumbnail7.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/04/3004870499/a912aaea-f08c-455d-b7da-83dfb22bd6d7.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 38058,
+      "downloaded_at": "2025-09-17T18:37:36.357982"
+    },
+    {
+      "product_id": "3231052259",
+      "filename": "coupang_3231052259.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231052259.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/00fd/e8cfca1270833ebeec4cff9dc1c2b817a04827a15058dc2b99970796c1e6.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 44614,
+      "downloaded_at": "2025-09-17T18:37:36.412882"
+    },
+    {
+      "product_id": "74795095433",
+      "filename": "coupang_74795095433.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_74795095433.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/image_audit/prod/4bb889f4-c677-414b-ae13-cdabc31b60d9_fixing_v2.png",
+      "width": 600,
+      "height": 600,
+      "file_size": 188630,
+      "downloaded_at": "2025-09-17T18:37:36.487089"
+    },
+    {
+      "product_id": "3231064623",
+      "filename": "coupang_3231064623.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231064623.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/03/3004869781/bc14413f-1774-43ca-b6a4-c557264e75c8.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 39310,
+      "downloaded_at": "2025-09-17T18:37:36.710495"
+    },
+    {
+      "product_id": "74812857225",
+      "filename": "coupang_74812857225.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_74812857225.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/04ab/6e41f0a68f6398e1c2c85b93487ea7e89b18b6fe127f354879031e4766a8.JPG",
+      "width": 600,
+      "height": 600,
+      "file_size": 78073,
+      "downloaded_at": "2025-09-17T18:37:37.066904"
+    },
+    {
+      "product_id": "3270592343",
+      "filename": "coupang_3270592343.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3270592343.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/71ee/9347eca7d4c6bcecbdc2ad52f39668133fbfa310a93e96cc1fc317adee43.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 39417,
+      "downloaded_at": "2025-09-17T18:37:37.298734"
+    },
+    {
+      "product_id": "3267072576",
+      "filename": "coupang_3267072576.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3267072576.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/e7e4/bc529c55436a94d8835f0dff66c4848809c6287a8d92b2bc304ffda5bc08.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 49540,
+      "downloaded_at": "2025-09-17T18:37:37.634232"
+    },
+    {
+      "product_id": "3535351303",
+      "filename": "coupang_3535351303.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3535351303.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/3bca/a811a60af678b50989500e9bee8bfa0ddc4a84221adb71dc75a12169f2c6.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 41155,
+      "downloaded_at": "2025-09-17T18:37:37.713228"
+    },
+    {
+      "product_id": "3283853469",
+      "filename": "coupang_3283853469.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3283853469.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/03/3004869912/14365296-3f19-4c0c-9f44-574d7059b553.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 44464,
+      "downloaded_at": "2025-09-17T18:37:37.956277"
+    },
+    {
+      "product_id": "3231081058",
+      "filename": "coupang_3231081058.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231081058.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/edcb/6bd99fe76a02c14c3c156cacd0acaaeeb04aa7a09263093dfc09fcfb480e.JPG",
+      "width": 600,
+      "height": 600,
+      "file_size": 44513,
+      "downloaded_at": "2025-09-17T18:37:38.125172"
+    },
+    {
+      "product_id": "3531396338",
+      "filename": "coupang_3531396338.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3531396338.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/02/3004869775/6df0605a-50ab-4591-87cb-2bf2bea09d14.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 42843,
+      "downloaded_at": "2025-09-17T18:37:38.358400"
+    },
+    {
+      "product_id": "3913545279",
+      "filename": "coupang_3913545279.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3913545279.jpg",
+      "image_url": "https://thumbnail7.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/images/2018/08/28/16/2/a6bd58f3-fec8-480d-b381-33e95f70cd7f.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 38935,
+      "downloaded_at": "2025-09-17T18:37:38.566854"
+    },
+    {
+      "product_id": "91328938883",
+      "filename": "coupang_91328938883.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_91328938883.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/1455/cac4bfc079be37dacaa1bd4065ad87dd96161747d9801795b519c16b73f9.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 35858,
+      "downloaded_at": "2025-09-17T18:37:38.909476"
+    },
+    {
+      "product_id": "3468575052",
+      "filename": "coupang_3468575052.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3468575052.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/9379/2726db9471fb34bdbd85e966c4bdf3cea973cfd27a7e82ea2d17190702f8.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 39848,
+      "downloaded_at": "2025-09-17T18:37:39.158141"
+    },
+    {
+      "product_id": "3468574516",
+      "filename": "coupang_3468574516.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3468574516.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2018/06/08/3468574516/aaa97623-5b9a-4626-8046-4f117b8e325e.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 35830,
+      "downloaded_at": "2025-09-17T18:37:39.245883"
+    },
+    {
+      "product_id": "91328939742",
+      "filename": "coupang_91328939742.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_91328939742.jpg",
+      "image_url": "https://thumbnail7.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/2dde/7127f308e844411bd3d3b38a4c9cb72f55c4eca76f94fceea7d6d2b978ac.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 42271,
+      "downloaded_at": "2025-09-17T18:37:39.724039"
+    },
+    {
+      "product_id": "3231052226",
+      "filename": "coupang_3231052226.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231052226.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/0cad/58ac29c69fb0825dff5da86cec5e16fa8105977647b5b98f257d1e0b995e.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 38694,
+      "downloaded_at": "2025-09-17T18:38:06.608542"
+    },
+    {
+      "product_id": "3233629854",
+      "filename": "coupang_3233629854.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3233629854.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/03/3004870208/ceb2ef91-bc63-4856-bd0e-0eb82966eb9d.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 46168,
+      "downloaded_at": "2025-09-17T18:38:06.972147"
+    },
+    {
+      "product_id": "74795095039",
+      "filename": "coupang_74795095039.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_74795095039.jpg",
+      "image_url": "https://thumbnail7.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/4bc0/b747436da0503f2bf54616baf69c43ca0b9bd8533426caef8c48a3adfc06.JPG",
+      "width": 600,
+      "height": 600,
+      "file_size": 60957,
+      "downloaded_at": "2025-09-17T18:38:07.190132"
+    },
+    {
+      "product_id": "3233579145",
+      "filename": "coupang_3233579145.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3233579145.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/17af/c74a53b8901f9feb7546cbc6b57b6652fca8023930328174f6f806573a0d.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 37223,
+      "downloaded_at": "2025-09-17T18:38:07.235959"
+    },
+    {
+      "product_id": "91341012123",
+      "filename": "coupang_91341012123.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_91341012123.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/b9ad/fc63eaa5bb004ec2eb6b3098f5f545b16be8fd80a6100cb28d3ebae4ed08.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 36694,
+      "downloaded_at": "2025-09-17T18:38:07.282002"
+    },
+    {
+      "product_id": "4503917263",
+      "filename": "coupang_4503917263.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_4503917263.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/d65b/4ac00214efdea2fd88db6db98ca2bd58dbe7e0f18971dda7368c34a10ae3.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 45013,
+      "downloaded_at": "2025-09-17T18:38:07.468168"
+    },
+    {
+      "product_id": "91328939391",
+      "filename": "coupang_91328939391.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_91328939391.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/63a1/b78f4cf6ea0fdc2f5fc5c598266e7323c5ca4cfe20f49b0c6ff60d7fe45d.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 38897,
+      "downloaded_at": "2025-09-17T18:38:07.693889"
+    },
+    {
+      "product_id": "3226499061",
+      "filename": "coupang_3226499061.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3226499061.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/04/3004870014/098f9518-e22d-4042-a34f-8e62b2cc8900.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 42381,
+      "downloaded_at": "2025-09-17T18:38:07.936616"
+    },
+    {
+      "product_id": "3231064708",
+      "filename": "coupang_3231064708.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231064708.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/02/3004869743/f3de26c9-a335-4e84-9015-4968a1272eb9.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 41371,
+      "downloaded_at": "2025-09-17T18:38:08.155275"
+    },
+    {
+      "product_id": "91328939497",
+      "filename": "coupang_91328939497.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_91328939497.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/84e0/115d3e043315c974fc91bae758b7f33ceca861544f42a81510a0b3a4ed5a.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 39036,
+      "downloaded_at": "2025-09-17T18:38:08.377315"
+    },
+    {
+      "product_id": "3279363742",
+      "filename": "coupang_3279363742.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3279363742.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2018/10/29/3279363742/c73eb0ea-0051-45aa-89ef-e8269acb1a23.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 48583,
+      "downloaded_at": "2025-09-17T18:38:08.431647"
+    },
+    {
+      "product_id": "91328939332",
+      "filename": "coupang_91328939332.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_91328939332.jpg",
+      "image_url": "https://thumbnail7.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/7263/ba350f0e15a1710938629c096f30c5b14707ba134a42dbc561b9adc0ac0b.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 37619,
+      "downloaded_at": "2025-09-17T18:38:08.867806"
+    },
+    {
+      "product_id": "3231090087",
+      "filename": "coupang_3231090087.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231090087.jpg",
+      "image_url": "https://thumbnail7.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/5fce/3e3e180371ce1d172afef33b072bb684778591628a859f6724bc52725b5f.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 49171,
+      "downloaded_at": "2025-09-17T18:38:09.159041"
+    },
+    {
+      "product_id": "3231064632",
+      "filename": "coupang_3231064632.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231064632.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/02/3004869756/4c00a222-4368-4ca6-93fc-7ed603996680.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 44072,
+      "downloaded_at": "2025-09-17T18:38:09.331651"
+    },
+    {
+      "product_id": "3231083355",
+      "filename": "coupang_3231083355.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231083355.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2016/06/30/3004869821/1b58987d-0539-4f9c-b767-bf97444644ea.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 46975,
+      "downloaded_at": "2025-09-17T18:38:09.385714"
+    },
+    {
+      "product_id": "89048652472",
+      "filename": "coupang_89048652472.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_89048652472.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/1c10/3353a3e63b3982f2f8be968c89079aebee8597acefcf0437b80aecdae09f.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 46961,
+      "downloaded_at": "2025-09-17T18:38:09.569544"
+    },
+    {
+      "product_id": "91328938964",
+      "filename": "coupang_91328938964.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_91328938964.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/6c79/ceb076e5dc4412b91b980b10540aaa3aaaa260b8dbbef188bc8ad4bc0442.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 63656,
+      "downloaded_at": "2025-09-17T18:38:09.804878"
+    },
+    {
+      "product_id": "3226477739",
+      "filename": "coupang_3226477739.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3226477739.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/3327/2f9e445c33ea7af6b0f641afa3d205370b1a2a72d16bece4887893189afe.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 45316,
+      "downloaded_at": "2025-09-17T18:38:09.851796"
+    },
+    {
+      "product_id": "91328939587",
+      "filename": "coupang_91328939587.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_91328939587.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/10e9/c83810bf4c6d73fd7caee7cb6abba5e6ac07ab2744893cbdba4c76cd2bbb.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 38780,
+      "downloaded_at": "2025-09-17T18:38:10.056553"
+    },
+    {
+      "product_id": "3231058565",
+      "filename": "coupang_3231058565.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231058565.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/04/3004870076/b34434f2-44b3-40cf-affd-b56e890cbd99.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 41166,
+      "downloaded_at": "2025-09-17T18:38:10.105555"
+    },
+    {
+      "product_id": "3259994589",
+      "filename": "coupang_3259994589.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3259994589.jpg",
+      "image_url": "https://thumbnail7.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/12/02/3006991325/f5f0ca6b-524a-4f9d-89a9-8698cb536f1b.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 36975,
+      "downloaded_at": "2025-09-17T18:38:10.342610"
+    },
+    {
+      "product_id": "3226456130",
+      "filename": "coupang_3226456130.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3226456130.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/04/3004870421/44ccd6d1-0d67-40e8-979e-43ddc9534a90.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 40077,
+      "downloaded_at": "2025-09-17T18:38:10.792382"
+    },
+    {
+      "product_id": "3231058701",
+      "filename": "coupang_3231058701.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231058701.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/04/3004870037/95e5e320-01fe-4349-bb06-b7d0f9bdf9cb.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 45256,
+      "downloaded_at": "2025-09-17T18:38:11.003899"
+    },
+    {
+      "product_id": "91328939381",
+      "filename": "coupang_91328939381.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_91328939381.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/7201/64aea81ad317fc2a395605973d92e68913852f5263d660fa2d9e81b1ad52.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 39040,
+      "downloaded_at": "2025-09-17T18:38:11.048609"
+    },
+    {
+      "product_id": "3279373299",
+      "filename": "coupang_3279373299.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3279373299.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/dddb/b72e5895ed3cf460d1107fabcf7d19c11678571483e54518e5f57c75b179.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 48066,
+      "downloaded_at": "2025-09-17T18:38:11.094313"
+    },
+    {
+      "product_id": "3231064693",
+      "filename": "coupang_3231064693.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231064693.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/02/3004869753/71d0b5af-cb43-430f-8d33-d7d2f727b7fc.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 38493,
+      "downloaded_at": "2025-09-17T18:38:11.137477"
+    },
+    {
+      "product_id": "3231052150",
+      "filename": "coupang_3231052150.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231052150.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/03/3004869908/60a87a94-1255-49ce-8db2-1bceb4797649.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 44585,
+      "downloaded_at": "2025-09-17T18:38:11.378452"
+    },
+    {
+      "product_id": "91328939399",
+      "filename": "coupang_91328939399.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_91328939399.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/70b3/353fdf65c21a4ad0643affe5760bba4d5be510703a4ae0a564d18fcf5b6a.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 50574,
+      "downloaded_at": "2025-09-17T18:38:11.623240"
+    },
+    {
+      "product_id": "91328939931",
+      "filename": "coupang_91328939931.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_91328939931.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/52a5/72268eb003d6a8f56369a2aaad4dda106b95fe1ac9c2963a59ca585bb2b4.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 63944,
+      "downloaded_at": "2025-09-17T18:38:12.074807"
+    },
+    {
+      "product_id": "91328939204",
+      "filename": "coupang_91328939204.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_91328939204.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/4914/3e90a163c6f6f1f6636b74ed83973f8271455666aa53f1be08b6bb19f9ab.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 37030,
+      "downloaded_at": "2025-09-17T18:38:12.313350"
+    },
+    {
+      "product_id": "91328939895",
+      "filename": "coupang_91328939895.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_91328939895.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/b5a4/17d991217c1e2bca7e6737507d01eb006bab3f1e610e179c9a290eaa408e.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 41350,
+      "downloaded_at": "2025-09-17T18:38:12.539008"
+    },
+    {
+      "product_id": "91328939068",
+      "filename": "coupang_91328939068.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_91328939068.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/fb32/18e67fc6353d19bfdacc5a4d82f77282473361900e7f3d38b6a781df7b6f.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 49199,
+      "downloaded_at": "2025-09-17T18:38:13.008766"
+    },
+    {
+      "product_id": "75620543105",
+      "filename": "coupang_75620543105.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_75620543105.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/e484/cee81281dc2979706713cc7ac9baa2a51e0c522900ddeb6d172ba9fb7a44.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 61124,
+      "downloaded_at": "2025-09-17T18:38:13.203725"
+    },
+    {
+      "product_id": "3233534912",
+      "filename": "coupang_3233534912.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3233534912.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/8fd5/089254404231fcb9bc8f64b45cd013d14c7aee8aea31c918b17525d4dfb3.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 42159,
+      "downloaded_at": "2025-09-17T18:38:13.406988"
+    },
+    {
+      "product_id": "3279085481",
+      "filename": "coupang_3279085481.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3279085481.jpg",
+      "image_url": "https://thumbnail7.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/a88d/79c0455070597858176b6a07f50d7438a4a3fc45d52416aae0ca1527aeb3.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 28416,
+      "downloaded_at": "2025-09-17T18:38:13.619196"
+    },
+    {
+      "product_id": "3279277176",
+      "filename": "coupang_3279277176.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3279277176.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/ddd7/6c3dad3d9ed52076a2468bd2de12cb006730bfe70be7d2cac400115d6d3a.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 45390,
+      "downloaded_at": "2025-09-17T18:38:41.356138"
+    },
+    {
+      "product_id": "3233503846",
+      "filename": "coupang_3233503846.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3233503846.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/50c1/85a5a4cc072a2d1f61925ec9e422fe53a3f5247d301cb37f1d20ac2fc53a.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 48167,
+      "downloaded_at": "2025-09-17T18:38:41.865208"
+    },
+    {
+      "product_id": "3231064701",
+      "filename": "coupang_3231064701.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231064701.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/5362/604741d7a58feed2f08eaae1ad4d72b2632c727fbd7d564218c6238ccdd1.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 42043,
+      "downloaded_at": "2025-09-17T18:38:42.087225"
+    },
+    {
+      "product_id": "3279280572",
+      "filename": "coupang_3279280572.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3279280572.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/3b61/2c70f9dd6c7c750a32bf046119a371dd1b509d672430b53a49d092f596bb.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 49608,
+      "downloaded_at": "2025-09-17T18:38:42.140854"
+    },
+    {
+      "product_id": "3226477370",
+      "filename": "coupang_3226477370.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3226477370.jpg",
+      "image_url": "https://thumbnail7.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/b483/e1aec93295db01eaf4e3384006f71ec75163026ae8bd0265cc2d813ee0e3.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 42683,
+      "downloaded_at": "2025-09-17T18:38:42.369439"
+    },
+    {
+      "product_id": "3231097047",
+      "filename": "coupang_3231097047.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231097047.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/ba00/1882cd34b581e2dcf34f3884469f29bfcd643242c9bf77c15fcf00883f5e.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 60565,
+      "downloaded_at": "2025-09-17T18:38:42.426418"
+    },
+    {
+      "product_id": "3468574124",
+      "filename": "coupang_3468574124.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3468574124.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/2126/e8c0cc3c9b478be42d1eb1bad01f90dcf04b44dcaafd6152d213bfed071c.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 39685,
+      "downloaded_at": "2025-09-17T18:38:42.554887"
+    },
+    {
+      "product_id": "91328939948",
+      "filename": "coupang_91328939948.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_91328939948.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/8a77/8e7654cc6cba651dda583de2f1b59ab65c1042890d1605aa075da0210a0a.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 62604,
+      "downloaded_at": "2025-09-17T18:38:43.040258"
+    },
+    {
+      "product_id": "3259985357",
+      "filename": "coupang_3259985357.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3259985357.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/52a2/93659565c2f17d362e17294c05c077a56dd6b59edcbeafb10ae538838019.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 49318,
+      "downloaded_at": "2025-09-17T18:38:43.298658"
+    },
+    {
+      "product_id": "91498995583",
+      "filename": "coupang_91498995583.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_91498995583.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/2480/ef8d87c16ad424ec65c248f501dbeccfecb7fa9b681213216dc6faa86461.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 44178,
+      "downloaded_at": "2025-09-17T18:38:43.483443"
+    },
+    {
+      "product_id": "3226477237",
+      "filename": "coupang_3226477237.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3226477237.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/16d2/ff23ad0eb853e684b1b120bf7c6ae93069f4e35e5a6554d52ce7c595e21f.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 48876,
+      "downloaded_at": "2025-09-17T18:38:43.697361"
+    },
+    {
+      "product_id": "3286062329",
+      "filename": "coupang_3286062329.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3286062329.jpg",
+      "image_url": "https://thumbnail7.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/25de/dacb187a48709c53be723035cbfdeb6e08bdd0ef98c396e5db5a87e36f1b.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 38684,
+      "downloaded_at": "2025-09-17T18:38:43.950721"
+    },
+    {
+      "product_id": "3226494969",
+      "filename": "coupang_3226494969.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3226494969.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/8dcb/0c595590263fa077055e6ec60ac7d9f21013dae8370320d7219f235f36d7.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 49148,
+      "downloaded_at": "2025-09-17T18:38:44.019704"
+    },
+    {
+      "product_id": "3075020538",
+      "filename": "coupang_3075020538.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3075020538.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/30b4/3f0017128b0964d462ef6cdda238f46fd0fb9045151dc4902782332e561d.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 42096,
+      "downloaded_at": "2025-09-17T18:38:44.077681"
+    },
+    {
+      "product_id": "3075020266",
+      "filename": "coupang_3075020266.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3075020266.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/1777/cf9f00617c9055f667a1640d60d44f2d244654102c1b88e2a7a5f5a7a807.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 41820,
+      "downloaded_at": "2025-09-17T18:38:44.275811"
+    },
+    {
+      "product_id": "3279461981",
+      "filename": "coupang_3279461981.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3279461981.jpg",
+      "image_url": "https://thumbnail7.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/2e9f/14e9fd07d42ca2b17642046aac32428866c6c6db2aed4211d8f9face20fa.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 44854,
+      "downloaded_at": "2025-09-17T18:38:44.455789"
+    },
+    {
+      "product_id": "3279021048",
+      "filename": "coupang_3279021048.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3279021048.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/9a82/e61641a714fb2a075efbde04ba163c9cc6e715cc44c302b823f699c7744a.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 40494,
+      "downloaded_at": "2025-09-17T18:38:44.501180"
+    },
+    {
+      "product_id": "3231058644",
+      "filename": "coupang_3231058644.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231058644.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/f4c2/d60c1d53775526b86f19a06bd07ffe94fb84fadb1fe0ca24eb216b5287a1.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 44822,
+      "downloaded_at": "2025-09-17T18:38:44.677221"
+    },
+    {
+      "product_id": "70531044176",
+      "filename": "coupang_70531044176.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_70531044176.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/a69c/0e48d2a21d9f6fff7448ccc70f220117474aa8eecd1784410c2a5978b15e.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 53991,
+      "downloaded_at": "2025-09-17T18:38:45.083357"
+    },
+    {
+      "product_id": "3231096981",
+      "filename": "coupang_3231096981.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231096981.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/02/3004869701/034c8bec-4afe-47ad-a679-ae9eb7029c1a.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 42466,
+      "downloaded_at": "2025-09-17T18:38:45.287036"
+    },
+    {
+      "product_id": "4557781217",
+      "filename": "coupang_4557781217.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_4557781217.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/50e3/9d39b66c2198a9bb7ba057175240e9489602605cbe242bead4b0724d9f2e.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 48728,
+      "downloaded_at": "2025-09-17T18:38:45.361218"
+    },
+    {
+      "product_id": "3226486111",
+      "filename": "coupang_3226486111.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3226486111.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/04/3004870394/bfa78ddc-b77a-4ab9-b52d-027028a68ee8.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 42544,
+      "downloaded_at": "2025-09-17T18:38:45.574390"
+    },
+    {
+      "product_id": "3279281327",
+      "filename": "coupang_3279281327.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3279281327.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/1f5f/c7e50ecff9571d127fcf02ca673af8e110e42230ed6a7421f3cc1e303407.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 44835,
+      "downloaded_at": "2025-09-17T18:38:45.770780"
+    },
+    {
+      "product_id": "70187083185",
+      "filename": "coupang_70187083185.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_70187083185.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/b290/bbafc2b858061f2b86cdc359f9900706f08c275685562088a3713aa6ae53.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 53624,
+      "downloaded_at": "2025-09-17T18:38:45.938127"
+    },
+    {
+      "product_id": "4038526323",
+      "filename": "coupang_4038526323.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_4038526323.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/images/2018/10/16/17/7/1ff96b80-8fee-4110-be0c-69fd09ff506e.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 41789,
+      "downloaded_at": "2025-09-17T18:38:46.093771"
+    },
+    {
+      "product_id": "3233569297",
+      "filename": "coupang_3233569297.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3233569297.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2018/11/15/3233569297/e75d3f3a-a1a4-4f82-b9d1-41e56a307a6e.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 43203,
+      "downloaded_at": "2025-09-17T18:38:46.264473"
+    },
+    {
+      "product_id": "74795094636",
+      "filename": "coupang_74795094636.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_74795094636.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/6213/5a448db149f0904fdeae7e1e4ba47e21f0de81ae97d1434a128758d994a3.JPG",
+      "width": 600,
+      "height": 600,
+      "file_size": 57059,
+      "downloaded_at": "2025-09-17T18:38:46.322476"
+    },
+    {
+      "product_id": "3267072640",
+      "filename": "coupang_3267072640.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3267072640.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2018/10/29/3267072640/2c5ab4d9-a16e-425a-90fa-3be2423574a4.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 58046,
+      "downloaded_at": "2025-09-17T18:38:46.379562"
+    },
+    {
+      "product_id": "88835675734",
+      "filename": "coupang_88835675734.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_88835675734.jpg",
+      "image_url": "https://thumbnail7.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/bd10/28565df773bec0c3ea50348eb9f626c8a8ed20012b3c96c6cc237c4ddf01.JPG",
+      "width": 600,
+      "height": 600,
+      "file_size": 42308,
+      "downloaded_at": "2025-09-17T18:38:46.759306"
+    },
+    {
+      "product_id": "3231052293",
+      "filename": "coupang_3231052293.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231052293.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/a3c8/34123cbd5e2e5728238f9cf0dd59f551713d574bc12901524b6baffc9cc2.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 48624,
+      "downloaded_at": "2025-09-17T18:38:46.925512"
+    },
+    {
+      "product_id": "70009657136",
+      "filename": "coupang_70009657136.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_70009657136.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/c4b6/cf7c063c34019b8391253119bf7ec9fe022764cc750047c73a4b31501c58.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 45534,
+      "downloaded_at": "2025-09-17T18:38:47.129254"
+    },
+    {
+      "product_id": "3270592320",
+      "filename": "coupang_3270592320.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3270592320.jpg",
+      "image_url": "https://thumbnail7.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2018/10/29/3270592320/2c7ae5d4-bd33-413c-a15a-00a18e9c2fd4.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 43587,
+      "downloaded_at": "2025-09-17T18:38:47.344153"
+    },
+    {
+      "product_id": "3278979773",
+      "filename": "coupang_3278979773.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3278979773.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2016/05/23/3025223320/d5e5a2fc-056b-46a7-96d1-82ace14c3eb5.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 37249,
+      "downloaded_at": "2025-09-17T18:38:47.495351"
+    },
+    {
+      "product_id": "3231091552",
+      "filename": "coupang_3231091552.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231091552.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/03/3004869806/ca9dff10-d56e-45ef-a479-8b00fcc292ac.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 44919,
+      "downloaded_at": "2025-09-17T18:39:16.556807"
+    },
+    {
+      "product_id": "3279022089",
+      "filename": "coupang_3279022089.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3279022089.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2016/05/23/3025321539/6067d0fa-37eb-467e-9e56-e068b7841180.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 20823,
+      "downloaded_at": "2025-09-17T18:39:17.317049"
+    },
+    {
+      "product_id": "3231080939",
+      "filename": "coupang_3231080939.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231080939.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/03/3004869860/4fab6bcf-2ae5-4ee8-9de3-988267d1fb24.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 36545,
+      "downloaded_at": "2025-09-17T18:39:17.934664"
+    },
+    {
+      "product_id": "3253305484",
+      "filename": "coupang_3253305484.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3253305484.jpg",
+      "image_url": "https://thumbnail7.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/a378/63484b0a887d16459bdc5e883d30d303c3fcca27b74b2adb0978c59e6310.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 18688,
+      "downloaded_at": "2025-09-17T18:39:18.621697"
+    },
+    {
+      "product_id": "70187083152",
+      "filename": "coupang_70187083152.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_70187083152.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/e52a/7a086a28af5db1e037b27f979884023d796d0b1b516963a9e5c29a0d7cf2.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 31503,
+      "downloaded_at": "2025-09-17T18:39:19.456086"
+    },
+    {
+      "product_id": "3231082352",
+      "filename": "coupang_3231082352.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231082352.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/03/3004869820/054800f2-1a67-40a8-a11d-ff30099d8a71.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 41604,
+      "downloaded_at": "2025-09-17T18:39:20.152077"
+    },
+    {
+      "product_id": "5310926592",
+      "filename": "coupang_5310926592.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_5310926592.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/aff7/eeabf4d8b5f3cd1acf950e403e16ca8429681cc21cad7202a1bbdc2477f1.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 42675,
+      "downloaded_at": "2025-09-17T18:39:20.716367"
+    },
+    {
+      "product_id": "3468575358",
+      "filename": "coupang_3468575358.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3468575358.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/images/2017/12/28/17/7/98412078-c3fd-4411-98bf-5eb22eae5ee0.JPG",
+      "width": 600,
+      "height": 600,
+      "file_size": 39174,
+      "downloaded_at": "2025-09-17T18:39:21.137092"
+    },
+    {
+      "product_id": "3231052262",
+      "filename": "coupang_3231052262.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231052262.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/04/3004870437/ad56d26d-05a6-4ede-aed7-b0b405f4d9da.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 40545,
+      "downloaded_at": "2025-09-17T18:39:21.373876"
+    },
+    {
+      "product_id": "3231080933",
+      "filename": "coupang_3231080933.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231080933.jpg",
+      "image_url": "https://thumbnail7.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2017/10/19/3231080933/a2469ec4-1661-4649-a3e0-b7169a6c18fd.JPG",
+      "width": 600,
+      "height": 600,
+      "file_size": 54549,
+      "downloaded_at": "2025-09-17T18:39:21.509955"
+    },
+    {
+      "product_id": "3231080952",
+      "filename": "coupang_3231080952.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231080952.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/03/3004869851/b12ee23d-38e9-4e90-b498-6c29872b671b.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 38626,
+      "downloaded_at": "2025-09-17T18:39:21.651170"
+    },
+    {
+      "product_id": "70009656325",
+      "filename": "coupang_70009656325.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_70009656325.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/21d6/edc9335ae681ccd85b3a2f1d947c50526a742a9988921c1e23c537ee883e.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 46629,
+      "downloaded_at": "2025-09-17T18:39:22.026413"
+    },
+    {
+      "product_id": "3278966113",
+      "filename": "coupang_3278966113.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3278966113.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/c775/4aa4c32648ff794f714b7e035ec96b0a7ad5882f50a844c5c2f6509236fd.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 42179,
+      "downloaded_at": "2025-09-17T18:39:22.174536"
+    },
+    {
+      "product_id": "3231081011",
+      "filename": "coupang_3231081011.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231081011.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/f0d1/a51b5b2b5bf5641a7d9aca550bc4166f14504d00a08a18b7f295dea76ee7.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 44556,
+      "downloaded_at": "2025-09-17T18:39:22.333303"
+    },
+    {
+      "product_id": "3231081069",
+      "filename": "coupang_3231081069.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231081069.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/03/3004869839/f0e08395-4847-4341-a791-268f8d018128.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 40130,
+      "downloaded_at": "2025-09-17T18:39:22.495619"
+    },
+    {
+      "product_id": "3226477388",
+      "filename": "coupang_3226477388.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3226477388.jpg",
+      "image_url": "https://thumbnail7.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/04/3004869970/5ff1102e-d4ca-4823-89b3-f5d60ba66bde.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 45013,
+      "downloaded_at": "2025-09-17T18:39:22.555611"
+    },
+    {
+      "product_id": "3250907453",
+      "filename": "coupang_3250907453.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3250907453.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/d6c9/df6b0e10aba0ef70dc93e96fdc2f0ad3fa72f6d2b6016c97c2a78b8411c2.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 39153,
+      "downloaded_at": "2025-09-17T18:39:22.744145"
+    },
+    {
+      "product_id": "88835675435",
+      "filename": "coupang_88835675435.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_88835675435.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/d8a7/89486b1e7e3d96b0ff5b9e551e2606a1ea6f3ed0eae59cf4404293b22b2d.JPG",
+      "width": 600,
+      "height": 600,
+      "file_size": 44505,
+      "downloaded_at": "2025-09-17T18:39:22.920665"
+    },
+    {
+      "product_id": "3468574088",
+      "filename": "coupang_3468574088.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3468574088.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/images/2017/12/28/17/8/bc658469-7067-4afa-b35d-f2702a1dd626.JPG",
+      "width": 600,
+      "height": 600,
+      "file_size": 38255,
+      "downloaded_at": "2025-09-17T18:39:23.118365"
+    },
+    {
+      "product_id": "3279118498",
+      "filename": "coupang_3279118498.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3279118498.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/c850/ce149148e468b5f036933be616479fb474b8b81238bc920ad6684474a703.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 38479,
+      "downloaded_at": "2025-09-17T18:39:23.362428"
+    },
+    {
+      "product_id": "4041700010",
+      "filename": "coupang_4041700010.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_4041700010.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/ebc3/26918bb13be22a425bb17ba3e5cd431e76a95baf8d839e68f56d03fc61d4.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 46406,
+      "downloaded_at": "2025-09-17T18:39:23.598922"
+    },
+    {
+      "product_id": "3233618602",
+      "filename": "coupang_3233618602.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3233618602.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/04/3004870169/cd350ade-7fe1-461f-86c9-7607c3a9dd73.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 40037,
+      "downloaded_at": "2025-09-17T18:39:24.016872"
+    },
+    {
+      "product_id": "3279010012",
+      "filename": "coupang_3279010012.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3279010012.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/b05f/2f2a3e0301d1e5940b59128a237f6ea4168d2e5717adc44ba3ed1b2ec82d.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 28249,
+      "downloaded_at": "2025-09-17T18:39:24.207737"
+    },
+    {
+      "product_id": "3253283100",
+      "filename": "coupang_3253283100.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3253283100.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/c46b/6e273ee9d746d151d8b42969222d1459e5cfd4595a4c3573f881851d7f2c.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 40873,
+      "downloaded_at": "2025-09-17T18:39:24.371656"
+    },
+    {
+      "product_id": "78338361221",
+      "filename": "coupang_78338361221.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_78338361221.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/13e9/b4e5bcc65bdae6dbe1f3adfca7e589ccb84c8dd01b34ef20cbcfd85f6618.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 41705,
+      "downloaded_at": "2025-09-17T18:39:24.505446"
+    },
+    {
+      "product_id": "3226500303",
+      "filename": "coupang_3226500303.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3226500303.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/03/3004869895/0ac87a59-4b3c-4f8c-81d9-0e2221acefd6.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 42390,
+      "downloaded_at": "2025-09-17T18:39:24.660901"
+    },
+    {
+      "product_id": "78329214861",
+      "filename": "coupang_78329214861.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_78329214861.jpg",
+      "image_url": "https://thumbnail7.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/8b96/c5ff55d7f7c6c257d225344370cecc0594950d6e42c92abdb660c6d44d58.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 72831,
+      "downloaded_at": "2025-09-17T18:39:24.820554"
+    },
+    {
+      "product_id": "3235098106",
+      "filename": "coupang_3235098106.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3235098106.jpg",
+      "image_url": "https://thumbnail7.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/85ca/5e82736591265c0e41648d49d5f7b0d16d27670f984c21e31f916242dc2f.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 37666,
+      "downloaded_at": "2025-09-17T18:39:24.862960"
+    },
+    {
+      "product_id": "3226496574",
+      "filename": "coupang_3226496574.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3226496574.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/03/3004869919/c5b8a87c-4740-423f-b8f7-07a64e8ca24f.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 39578,
+      "downloaded_at": "2025-09-17T18:39:25.069147"
+    },
+    {
+      "product_id": "3231058676",
+      "filename": "coupang_3231058676.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231058676.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/04/3004870071/f41eb0f6-e9fe-45a9-8aae-ce1af0ad2d72.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 44719,
+      "downloaded_at": "2025-09-17T18:39:25.250330"
+    },
+    {
+      "product_id": "4656109466",
+      "filename": "coupang_4656109466.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_4656109466.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/images/2019/04/19/15/3/984863be-2d8b-4c23-bb37-bc6526a49a53.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 21294,
+      "downloaded_at": "2025-09-17T18:39:25.374212"
+    },
+    {
+      "product_id": "3279030067",
+      "filename": "coupang_3279030067.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3279030067.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/4339/2ca3ee304cfba4b4f83854978a1302bbcd02276a20a8e02a23990ede0935.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 21713,
+      "downloaded_at": "2025-09-17T18:39:25.575745"
+    },
+    {
+      "product_id": "3275591811",
+      "filename": "coupang_3275591811.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3275591811.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/20/3006062040/953beb90-c4d7-471d-b103-b6533babe306.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 28888,
+      "downloaded_at": "2025-09-17T18:39:25.615245"
+    },
+    {
+      "product_id": "88835675216",
+      "filename": "coupang_88835675216.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_88835675216.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/0b31/9a6d7f22608d6071f088d70659868b236acef10752b04164c0eda538060b.JPG",
+      "width": 600,
+      "height": 600,
+      "file_size": 61018,
+      "downloaded_at": "2025-09-17T18:39:25.805254"
+    },
+    {
+      "product_id": "3279293441",
+      "filename": "coupang_3279293441.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3279293441.jpg",
+      "image_url": "https://thumbnail7.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/ca95/1dd0a81e1086bf0d213d02be8f01dca5ee0b517c39ff58644236be6d68ad.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 45651,
+      "downloaded_at": "2025-09-17T18:39:25.855994"
+    },
+    {
+      "product_id": "3912314356",
+      "filename": "coupang_3912314356.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3912314356.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/images/2018/08/28/16/0/a68e4f06-0e6f-4cba-8ed6-840c54887cf2.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 37852,
+      "downloaded_at": "2025-09-17T18:39:25.998577"
+    },
+    {
+      "product_id": "3233627145",
+      "filename": "coupang_3233627145.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3233627145.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/f08d/faacfc232a575011274648b19e78173f6deda0fd7fc22aa96f4d80984004.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 50673,
+      "downloaded_at": "2025-09-17T18:39:50.933178"
+    },
+    {
+      "product_id": "3226497413",
+      "filename": "coupang_3226497413.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3226497413.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/03/3004869937/f96d8e66-2bfa-4084-95ad-c0b13a977607.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 44304,
+      "downloaded_at": "2025-09-17T18:39:51.328227"
+    },
+    {
+      "product_id": "3231052240",
+      "filename": "coupang_3231052240.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231052240.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/04/3004870446/2921d8c1-5427-41b4-8c84-adaf6db9ca65.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 44394,
+      "downloaded_at": "2025-09-17T18:39:51.544918"
+    },
+    {
+      "product_id": "3267072914",
+      "filename": "coupang_3267072914.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3267072914.jpg",
+      "image_url": "https://thumbnail7.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/eb34/ba04b8315a638156f3cea2b97674035af12fb5f1361fda3157c4ce53db1d.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 55153,
+      "downloaded_at": "2025-09-17T18:39:51.860268"
+    },
+    {
+      "product_id": "3075020306",
+      "filename": "coupang_3075020306.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3075020306.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/3d07/1e7a85b1dcfc88783010aefb38a04e8ccc44aa3730a531e2b4738b3ab930.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 78790,
+      "downloaded_at": "2025-09-17T18:39:52.035344"
+    },
+    {
+      "product_id": "3231058385",
+      "filename": "coupang_3231058385.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231058385.jpg",
+      "image_url": "https://thumbnail7.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/978d/4d2d0d901691d3522087b6c28428fefc8fe50c899aa18164a20aec4804e3.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 45582,
+      "downloaded_at": "2025-09-17T18:39:52.081807"
+    },
+    {
+      "product_id": "3233673969",
+      "filename": "coupang_3233673969.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3233673969.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/04/3004870159/4a49c927-356b-473b-893c-8f9a5b759bd3.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 44930,
+      "downloaded_at": "2025-09-17T18:39:52.271982"
+    },
+    {
+      "product_id": "70009656787",
+      "filename": "coupang_70009656787.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_70009656787.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/b3dd/e2778c45f9f8abc55a1dfe8b9d526ad99750d5f42ab4970b19d6e2c0e9b6.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 66260,
+      "downloaded_at": "2025-09-17T18:39:52.457185"
+    },
+    {
+      "product_id": "3233629968",
+      "filename": "coupang_3233629968.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3233629968.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/04/3004870093/0e8083e9-0747-47f6-a3b2-f059b4c0cb5b.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 39727,
+      "downloaded_at": "2025-09-17T18:39:52.614702"
+    },
+    {
+      "product_id": "3468574487",
+      "filename": "coupang_3468574487.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3468574487.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/ebd9/123f23f4f4cabdd4193988e960b6e71bceceb84a2c55ee384ffe05b8ba8f.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 45599,
+      "downloaded_at": "2025-09-17T18:39:52.758836"
+    },
+    {
+      "product_id": "3231058609",
+      "filename": "coupang_3231058609.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231058609.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/04/3004870077/553cff82-7e77-4d1a-b6a0-fc2ad5ea18d5.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 39369,
+      "downloaded_at": "2025-09-17T18:39:52.909488"
+    },
+    {
+      "product_id": "3226492530",
+      "filename": "coupang_3226492530.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3226492530.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/03/3004869890/7499fe4e-3519-4782-acbc-a33c7857274e.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 41274,
+      "downloaded_at": "2025-09-17T18:39:53.368128"
+    },
+    {
+      "product_id": "4041700087",
+      "filename": "coupang_4041700087.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_4041700087.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/92cf/e6f37b6e335af93cf1a11d5317764bd4249567c22dbd03d114a5bd5e35db.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 46901,
+      "downloaded_at": "2025-09-17T18:39:53.584381"
+    },
+    {
+      "product_id": "3231080980",
+      "filename": "coupang_3231080980.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231080980.jpg",
+      "image_url": "https://thumbnail7.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/03/3004869844/0447234e-6da2-4461-82da-b2ed39cd755c.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 39840,
+      "downloaded_at": "2025-09-17T18:39:53.722893"
+    },
+    {
+      "product_id": "3231064635",
+      "filename": "coupang_3231064635.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231064635.jpg",
+      "image_url": "https://thumbnail7.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/1a74/d8e93924815afef428362a7b4bc1250b9c845cef5733be22cf4d3f3e3bd6.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 42348,
+      "downloaded_at": "2025-09-17T18:39:53.769605"
+    },
+    {
+      "product_id": "3279047128",
+      "filename": "coupang_3279047128.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3279047128.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/0348/7dcada7a75c395b07e68124b153675e13ba9b8a183fe93b2317a4dcc6fb9.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 29529,
+      "downloaded_at": "2025-09-17T18:39:53.910244"
+    },
+    {
+      "product_id": "3278941930",
+      "filename": "coupang_3278941930.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3278941930.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/a7dc/35f736627c127fcc3b59d1eb4e6c45678304bfc8dbb71b98162ef0c94010.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 41044,
+      "downloaded_at": "2025-09-17T18:39:54.050722"
+    },
+    {
+      "product_id": "70009657087",
+      "filename": "coupang_70009657087.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_70009657087.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/cbb0/50694abf9aaa22de9f3d1e9cb8778da7e6ddde525de10455a6469a6f8816.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 44370,
+      "downloaded_at": "2025-09-17T18:39:54.209155"
+    },
+    {
+      "product_id": "3231058597",
+      "filename": "coupang_3231058597.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231058597.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/5f05/9d03f1d881fc708356daff5cb770a68d7503fef49cd54f883c0f57328cb7.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 41255,
+      "downloaded_at": "2025-09-17T18:39:54.389366"
+    },
+    {
+      "product_id": "78329212392",
+      "filename": "coupang_78329212392.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_78329212392.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/7bf3/e18aba01db001bfa47bca3e2d4439d4a3f777d002be15b5f4eab7de46fd5.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 75654,
+      "downloaded_at": "2025-09-17T18:39:54.528002"
+    },
+    {
+      "product_id": "3267072641",
+      "filename": "coupang_3267072641.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3267072641.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2018/10/29/3267072641/3911f0ad-6905-497e-8841-951973d1be9d.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 55526,
+      "downloaded_at": "2025-09-17T18:39:54.716152"
+    },
+    {
+      "product_id": "3226447339",
+      "filename": "coupang_3226447339.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3226447339.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/03/3004870243/18ad549d-1d27-4e8a-b42c-b43795cd42a8.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 39743,
+      "downloaded_at": "2025-09-17T18:39:55.105485"
+    },
+    {
+      "product_id": "3279056263",
+      "filename": "coupang_3279056263.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3279056263.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/6071/c5e47ab648f29efdc2306f723f322258e87e8c5bf829628a8f5e030892bf.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 40826,
+      "downloaded_at": "2025-09-17T18:39:55.316730"
+    },
+    {
+      "product_id": "3231052160",
+      "filename": "coupang_3231052160.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231052160.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/04/3004870484/41a5acf2-963f-4bd6-b46f-17672074a1dc.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 42470,
+      "downloaded_at": "2025-09-17T18:39:55.381288"
+    },
+    {
+      "product_id": "78329213784",
+      "filename": "coupang_78329213784.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_78329213784.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/c7da/c47bd92fcf92c87ddef15ac0929f497eb463e5be41380239b0743160e775.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 69679,
+      "downloaded_at": "2025-09-17T18:39:55.554554"
+    },
+    {
+      "product_id": "3226463972",
+      "filename": "coupang_3226463972.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3226463972.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/04/3004870371/7f342751-5d39-4d1c-bce7-bed29f74dd01.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 45449,
+      "downloaded_at": "2025-09-17T18:39:55.708036"
+    },
+    {
+      "product_id": "3279148403",
+      "filename": "coupang_3279148403.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3279148403.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/0c2f/291bd951616c1e71c4a2c2728bfbaadaa69c08b073f082fdf297f30b6faa.png",
+      "width": 600,
+      "height": 600,
+      "file_size": 239032,
+      "downloaded_at": "2025-09-17T18:39:55.796322"
+    },
+    {
+      "product_id": "3468575971",
+      "filename": "coupang_3468575971.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3468575971.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/3874/e2ae418b1e8f3746b9c9e09a42bfa8ce2b6ab841c7f37c064e8f779ddad1.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 44975,
+      "downloaded_at": "2025-09-17T18:39:55.845765"
+    },
+    {
+      "product_id": "3259984766",
+      "filename": "coupang_3259984766.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3259984766.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2018/10/29/3259984766/d6f2b364-14c1-4176-8e8f-c2248fddc89f.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 42508,
+      "downloaded_at": "2025-09-17T18:39:56.061430"
+    },
+    {
+      "product_id": "89452778422",
+      "filename": "coupang_89452778422.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_89452778422.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/4e03/78e564e253c3d449944502643b2b12a2729bce51a9379d2b242248e59b2c.JPG",
+      "width": 600,
+      "height": 600,
+      "file_size": 44888,
+      "downloaded_at": "2025-09-17T18:39:56.188215"
+    },
+    {
+      "product_id": "3259994068",
+      "filename": "coupang_3259994068.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3259994068.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2017/10/23/3259994068/17f09c2a-b732-4dcd-a0e6-ae39d22e8c92.JPG",
+      "width": 600,
+      "height": 600,
+      "file_size": 60318,
+      "downloaded_at": "2025-09-17T18:39:56.325788"
+    },
+    {
+      "product_id": "3231082349",
+      "filename": "coupang_3231082349.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231082349.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/03/3004869829/294850be-3d8b-49a9-85e1-bcb36f54ebec.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 37073,
+      "downloaded_at": "2025-09-17T18:39:56.677763"
+    },
+    {
+      "product_id": "3231091570",
+      "filename": "coupang_3231091570.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231091570.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/03/3004869792/b39e0942-77a5-498a-86ad-6447c53fe491.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 43423,
+      "downloaded_at": "2025-09-17T18:39:56.837491"
+    },
+    {
+      "product_id": "3231064703",
+      "filename": "coupang_3231064703.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231064703.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/02/3004869746/25898211-bbb3-408f-ac10-b32d851be915.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 40574,
+      "downloaded_at": "2025-09-17T18:39:56.997078"
+    },
+    {
+      "product_id": "3235092296",
+      "filename": "coupang_3235092296.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3235092296.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/04/3004870112/cd75c0c8-1647-42cf-88ec-18264fff78e6.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 39016,
+      "downloaded_at": "2025-09-17T18:39:57.183898"
+    },
+    {
+      "product_id": "3226499794",
+      "filename": "coupang_3226499794.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3226499794.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/03/3004869905/8ec599da-c787-475a-a90a-7246c7e2555e.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 42974,
+      "downloaded_at": "2025-09-17T18:39:57.337642"
+    },
+    {
+      "product_id": "3267072489",
+      "filename": "coupang_3267072489.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3267072489.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2016/02/11/3011654801/4dd24c12-2af4-40e1-afbc-dfeea18d7e23.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 46519,
+      "downloaded_at": "2025-09-17T18:40:26.841915"
+    },
+    {
+      "product_id": "3527491937",
+      "filename": "coupang_3527491937.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3527491937.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/77ee/a67057ecbf5d0eab9b9ed8a7232f6d7660b51e026c48b4bfb96ec627d449.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 44351,
+      "downloaded_at": "2025-09-17T18:40:27.967616"
+    },
+    {
+      "product_id": "3279273552",
+      "filename": "coupang_3279273552.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3279273552.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2018/10/29/3279273552/7170b410-bbab-4859-8ae7-2bffd902ccb4.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 47644,
+      "downloaded_at": "2025-09-17T18:40:28.546206"
+    },
+    {
+      "product_id": "3468574533",
+      "filename": "coupang_3468574533.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3468574533.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/b1b5/77b5f82d38f5e0db858e323d64c6d24b7a49d027de49d696ce92759c4386.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 39415,
+      "downloaded_at": "2025-09-17T18:40:28.776937"
+    },
+    {
+      "product_id": "3661824012",
+      "filename": "coupang_3661824012.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3661824012.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/images/2018/04/27/14/8/54a64fc5-b2f1-49c4-8f13-3dface75ebc0.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 51355,
+      "downloaded_at": "2025-09-17T18:40:29.032750"
+    },
+    {
+      "product_id": "3253294202",
+      "filename": "coupang_3253294202.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3253294202.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/4b30/6bdf7643ae1172f70f1082283fec6add656306174863db467d5892b077e9.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 33970,
+      "downloaded_at": "2025-09-17T18:40:29.376070"
+    },
+    {
+      "product_id": "3231081068",
+      "filename": "coupang_3231081068.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231081068.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/ccb7/437c34de25ae75f70ec8ceeed74f72b266cad60a5004ee43232b2a5c3660.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 47251,
+      "downloaded_at": "2025-09-17T18:40:29.524264"
+    },
+    {
+      "product_id": "3231096990",
+      "filename": "coupang_3231096990.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231096990.jpg",
+      "image_url": "https://thumbnail7.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/03/3004869881/e598649c-b931-4e3f-9701-fcf2e05ce22d.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 30102,
+      "downloaded_at": "2025-09-17T18:40:29.599365"
+    },
+    {
+      "product_id": "3226477405",
+      "filename": "coupang_3226477405.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3226477405.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/04/3004870006/a531a309-4cb3-4b6d-b2b2-27b291cd7d24.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 42082,
+      "downloaded_at": "2025-09-17T18:40:29.786820"
+    },
+    {
+      "product_id": "3231097264",
+      "filename": "coupang_3231097264.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231097264.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/03/3004869864/e3f7880b-ae80-4581-963f-2b5dab3fca18.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 39794,
+      "downloaded_at": "2025-09-17T18:40:29.840448"
+    },
+    {
+      "product_id": "3231096987",
+      "filename": "coupang_3231096987.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231096987.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/03/3004870490/4d2022dc-f9e6-4fca-a2cc-9cbf84de53cb.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 31104,
+      "downloaded_at": "2025-09-17T18:40:30.008178"
+    },
+    {
+      "product_id": "4622065571",
+      "filename": "coupang_4622065571.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_4622065571.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/images/2019/04/12/14/1/f51375dc-df9d-48be-934d-cbf494905230.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 45903,
+      "downloaded_at": "2025-09-17T18:40:30.404210"
+    },
+    {
+      "product_id": "3468574474",
+      "filename": "coupang_3468574474.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3468574474.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/3d13/81b4e7665f3879b0976b20e605312b496fecaa52066fcb2f280548e6da01.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 41553,
+      "downloaded_at": "2025-09-17T18:40:30.564268"
+    },
+    {
+      "product_id": "3231080960",
+      "filename": "coupang_3231080960.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231080960.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/03/3004869842/c4b5d209-a79e-4641-b75b-47ffb4621df0.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 47660,
+      "downloaded_at": "2025-09-17T18:40:30.741386"
+    },
+    {
+      "product_id": "78329213382",
+      "filename": "coupang_78329213382.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_78329213382.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/b0d2/03ca9c19d847852f8d12180735006a9f6a3b1cbabd7bdd34497ea0eff7fc.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 81082,
+      "downloaded_at": "2025-09-17T18:40:31.024058"
+    },
+    {
+      "product_id": "3233651033",
+      "filename": "coupang_3233651033.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3233651033.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/04/3004870140/144b6cd6-5fc6-4070-8d49-36768549eaed.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 47361,
+      "downloaded_at": "2025-09-17T18:40:31.228581"
+    },
+    {
+      "product_id": "3259995715",
+      "filename": "coupang_3259995715.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3259995715.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/61f1/664aa851d7f58b55133ae89c138afe1111f60c01faa60b85a2c47182af87.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 47042,
+      "downloaded_at": "2025-09-17T18:40:31.382078"
+    },
+    {
+      "product_id": "5221993067",
+      "filename": "coupang_5221993067.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_5221993067.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/images/2019/08/09/17/4/65ff32f4-1d59-4747-b1bc-1eb26820754c.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 47139,
+      "downloaded_at": "2025-09-17T18:40:31.794515"
+    },
+    {
+      "product_id": "3231091440",
+      "filename": "coupang_3231091440.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231091440.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/03/3004869811/fa211fdb-70aa-40b6-9db3-4a2dc83f2fbd.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 41007,
+      "downloaded_at": "2025-09-17T18:40:31.840386"
+    },
+    {
+      "product_id": "78329212275",
+      "filename": "coupang_78329212275.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_78329212275.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/b85c/6da2b433c10eafe0d7cbc1b474ca7bd9e0328eae7b71df22eab25eb751ce.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 59195,
+      "downloaded_at": "2025-09-17T18:40:32.203844"
+    },
+    {
+      "product_id": "3267072647",
+      "filename": "coupang_3267072647.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3267072647.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2016/02/11/3011654795/177fd575-9cf0-4cc3-a489-e5e04a989f07.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 47702,
+      "downloaded_at": "2025-09-17T18:40:32.403685"
+    },
+    {
+      "product_id": "3270592411",
+      "filename": "coupang_3270592411.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3270592411.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/75e7/6afd7267dda399b579cc279c6cbcbef1fff84912481b2fd876e87b5a5291.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 46097,
+      "downloaded_at": "2025-09-17T18:40:32.570393"
+    },
+    {
+      "product_id": "3278956348",
+      "filename": "coupang_3278956348.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3278956348.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2018/10/29/3278956348/c4c1e882-1d1d-469e-a428-9a75d0962b2e.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 46659,
+      "downloaded_at": "2025-09-17T18:40:32.784992"
+    },
+    {
+      "product_id": "3231097662",
+      "filename": "coupang_3231097662.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231097662.jpg",
+      "image_url": "https://thumbnail7.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/03/3004870409/e391342b-5da1-4037-a68e-38ccf4b8fc22.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 41860,
+      "downloaded_at": "2025-09-17T18:40:32.959784"
+    },
+    {
+      "product_id": "3231091441",
+      "filename": "coupang_3231091441.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231091441.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/03/3004869808/5442c1cc-d857-4ae6-9bb8-01b0043794cd.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 43462,
+      "downloaded_at": "2025-09-17T18:40:33.163009"
+    },
+    {
+      "product_id": "3231091556",
+      "filename": "coupang_3231091556.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231091556.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/03/3004869793/716f899f-5237-4f28-96ab-1a94b7a89095.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 40223,
+      "downloaded_at": "2025-09-17T18:40:33.205126"
+    },
+    {
+      "product_id": "3233704572",
+      "filename": "coupang_3233704572.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3233704572.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/02/3004869723/aeab81dd-cb72-43e3-9e87-b73e5cef242d.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 42029,
+      "downloaded_at": "2025-09-17T18:40:33.263303"
+    },
+    {
+      "product_id": "3233580778",
+      "filename": "coupang_3233580778.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3233580778.jpg",
+      "image_url": "https://thumbnail7.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/02/3004869738/b0089605-0cde-4766-bfb5-1bd33ed4f5fe.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 34504,
+      "downloaded_at": "2025-09-17T18:40:33.419461"
+    },
+    {
+      "product_id": "78329214254",
+      "filename": "coupang_78329214254.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_78329214254.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/ae1d/a85f5d141b07d28cdafee254419bc6e391fad591809b54bce89e9e68e2f4.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 72492,
+      "downloaded_at": "2025-09-17T18:40:33.502375"
+    },
+    {
+      "product_id": "3231052232",
+      "filename": "coupang_3231052232.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231052232.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/04/3004870456/fc962c17-c1e1-4e99-92c8-5d88b119cc7f.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 41619,
+      "downloaded_at": "2025-09-17T18:40:33.696604"
+    },
+    {
+      "product_id": "3233704497",
+      "filename": "coupang_3233704497.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3233704497.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/02ff/f38cf083ef0fd6dfcc0be47d373756f0f2e42064316f2c8ddd0a8642676f.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 52342,
+      "downloaded_at": "2025-09-17T18:40:33.754252"
+    },
+    {
+      "product_id": "3226489815",
+      "filename": "coupang_3226489815.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3226489815.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/03/3004869955/41674679-7cfe-418f-9391-5bb56a3d5a61.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 40135,
+      "downloaded_at": "2025-09-17T18:40:34.156810"
+    },
+    {
+      "product_id": "78329211900",
+      "filename": "coupang_78329211900.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_78329211900.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/f212/206153f987a972e6fe070470c763be04decc397492aa9bee6d4f0f08c335.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 80888,
+      "downloaded_at": "2025-09-17T18:40:34.343614"
+    },
+    {
+      "product_id": "3231052215",
+      "filename": "coupang_3231052215.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231052215.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/04/3004870480/e314d6f1-d46b-43fb-9ca9-f58a72b90205.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 41159,
+      "downloaded_at": "2025-09-17T18:40:34.576582"
+    },
+    {
+      "product_id": "3231058588",
+      "filename": "coupang_3231058588.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231058588.jpg",
+      "image_url": "https://thumbnail7.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/12/02/3006991304/29b84579-fe74-4c65-959a-7eab07078247.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 35598,
+      "downloaded_at": "2025-09-17T18:40:34.758729"
+    },
+    {
+      "product_id": "89233778904",
+      "filename": "coupang_89233778904.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_89233778904.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/cfab/947fe3a9c5cab735f57796ffb3e4295ed2d9aac40f227018f7f01aba4b39.JPG",
+      "width": 600,
+      "height": 600,
+      "file_size": 70002,
+      "downloaded_at": "2025-09-17T18:40:34.954661"
+    },
+    {
+      "product_id": "3468574475",
+      "filename": "coupang_3468574475.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3468574475.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/058b/d6d44aee9460cc5b8f09b726523ffde2c16816a4bfb151b3724ff52c3a9a.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 41935,
+      "downloaded_at": "2025-09-17T18:41:00.449993"
+    },
+    {
+      "product_id": "3233721468",
+      "filename": "coupang_3233721468.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3233721468.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/02/3004869717/9c1c6de7-6bbd-49cd-ba14-778a660cc282.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 41991,
+      "downloaded_at": "2025-09-17T18:41:00.676312"
+    },
+    {
+      "product_id": "3259984768",
+      "filename": "coupang_3259984768.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3259984768.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/f9f8/e3fd3c674ab68606907d0e56d2c9b12ca03a4efd15c1ed1a6d02f00eae47.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 49321,
+      "downloaded_at": "2025-09-17T18:41:00.812480"
+    },
+    {
+      "product_id": "3702161925",
+      "filename": "coupang_3702161925.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3702161925.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/images/2018/05/15/17/0/a8fcf578-0e37-414f-b677-6a674adf8450.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 58438,
+      "downloaded_at": "2025-09-17T18:41:00.874290"
+    },
+    {
+      "product_id": "3279362037",
+      "filename": "coupang_3279362037.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3279362037.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2018/10/29/3279362037/4ce2da49-93fb-407a-a85f-c8cd85ff705f.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 46607,
+      "downloaded_at": "2025-09-17T18:41:01.028546"
+    },
+    {
+      "product_id": "3231091495",
+      "filename": "coupang_3231091495.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231091495.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/7cef/e3cfc256b4272bd2acc4f2da09d58e1229fc5cf8233cbc7af9b81317e593.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 30967,
+      "downloaded_at": "2025-09-17T18:41:01.162782"
+    },
+    {
+      "product_id": "3278813123",
+      "filename": "coupang_3278813123.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3278813123.jpg",
+      "image_url": "https://thumbnail7.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2016/05/23/3025321543/79cfbe1b-8917-497c-9bbc-dbd01e7ec1b9.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 26990,
+      "downloaded_at": "2025-09-17T18:41:01.348808"
+    },
+    {
+      "product_id": "70009657275",
+      "filename": "coupang_70009657275.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_70009657275.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/a95b/dbef3731b4dabb7eea26637dbbbe77c9284a3dba16cff89359cc4490954d.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 46702,
+      "downloaded_at": "2025-09-17T18:41:01.628230"
+    },
+    {
+      "product_id": "3279174443",
+      "filename": "coupang_3279174443.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3279174443.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2016/05/24/3026246580/66061861-c72e-4dd3-99fb-f25f62bc570a.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 57745,
+      "downloaded_at": "2025-09-17T18:41:01.679990"
+    },
+    {
+      "product_id": "70531032782",
+      "filename": "coupang_70531032782.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_70531032782.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/686c/57a3cc1cfc8f4d1d61c9d8f9a79547b695122b79b52174fa90bdac22cce2.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 45819,
+      "downloaded_at": "2025-09-17T18:41:01.894288"
+    },
+    {
+      "product_id": "3279143255",
+      "filename": "coupang_3279143255.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3279143255.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/4265/4eab4b31e84cb482f115ff439e7727955ec9d3298366eb1e7299b7b1e836.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 47480,
+      "downloaded_at": "2025-09-17T18:41:02.306411"
+    },
+    {
+      "product_id": "3233545778",
+      "filename": "coupang_3233545778.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3233545778.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/02/3004869715/d59b9bae-e318-47ee-a1bd-b82eca615416.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 42533,
+      "downloaded_at": "2025-09-17T18:41:02.498818"
+    },
+    {
+      "product_id": "3233520244",
+      "filename": "coupang_3233520244.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3233520244.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/02/3004869736/d04673d1-89fe-403c-8a75-00f86f2a0ee4.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 41118,
+      "downloaded_at": "2025-09-17T18:41:02.548448"
+    },
+    {
+      "product_id": "3234947777",
+      "filename": "coupang_3234947777.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3234947777.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/b616/89f5c8c6e8eb48879292d09e4901c9e1a9a14cab640792ddd48196c6b6f0.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 33944,
+      "downloaded_at": "2025-09-17T18:41:02.604313"
+    },
+    {
+      "product_id": "3231096976",
+      "filename": "coupang_3231096976.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231096976.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/03/3004870503/ba24827a-edf4-4622-8e36-1ff66f2cdbb2.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 55481,
+      "downloaded_at": "2025-09-17T18:41:02.656094"
+    },
+    {
+      "product_id": "89058016542",
+      "filename": "coupang_89058016542.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_89058016542.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/44ec/7dd64dad24bc175a605af8dc8cedab4ff7ea8fd6d9c4a22336b73c87b586.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 50178,
+      "downloaded_at": "2025-09-17T18:41:02.706351"
+    },
+    {
+      "product_id": "3226470837",
+      "filename": "coupang_3226470837.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3226470837.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/04/3004870231/f702d18f-b57e-4fb2-b842-ab48100fe9c1.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 41045,
+      "downloaded_at": "2025-09-17T18:41:02.857424"
+    },
+    {
+      "product_id": "3279079384",
+      "filename": "coupang_3279079384.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3279079384.jpg",
+      "image_url": "https://thumbnail7.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/3aa7/894f8b772df4ce5a36a736da429f0dcda10b9474fd1ec0af0fa2309d2183.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 39627,
+      "downloaded_at": "2025-09-17T18:41:03.102769"
+    },
+    {
+      "product_id": "3278865207",
+      "filename": "coupang_3278865207.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3278865207.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2016/05/23/3025321549/a3395fb3-d829-403d-b1d6-ad0496e04409.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 22169,
+      "downloaded_at": "2025-09-17T18:41:03.235584"
+    },
+    {
+      "product_id": "78329213116",
+      "filename": "coupang_78329213116.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_78329213116.jpg",
+      "image_url": "https://thumbnail7.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/c025/e6207ca50b44a69cdd253956769f4acb080d1ee4ba5b0c973625cefc6fa5.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 85970,
+      "downloaded_at": "2025-09-17T18:41:03.394608"
+    },
+    {
+      "product_id": "3231096983",
+      "filename": "coupang_3231096983.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231096983.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/02/3004869699/be5c353f-f4a7-4e0f-9b76-b5b2d1b7f84f.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 42691,
+      "downloaded_at": "2025-09-17T18:41:03.439341"
+    },
+    {
+      "product_id": "3231096986",
+      "filename": "coupang_3231096986.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231096986.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/02/3004869696/1e71aa10-cc4d-452a-bb82-86a87df4c6f4.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 39702,
+      "downloaded_at": "2025-09-17T18:41:03.938157"
+    },
+    {
+      "product_id": "3267072440",
+      "filename": "coupang_3267072440.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3267072440.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/82bc/409c56676100ecafa1defde787e2ace429d181e4665740fea09c91a73ef3.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 55009,
+      "downloaded_at": "2025-09-17T18:41:04.078826"
+    },
+    {
+      "product_id": "3231082362",
+      "filename": "coupang_3231082362.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231082362.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/03/3004869817/2e1db146-dfc9-4a22-857b-8f241c80ee60.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 39485,
+      "downloaded_at": "2025-09-17T18:41:04.117940"
+    },
+    {
+      "product_id": "3275587784",
+      "filename": "coupang_3275587784.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3275587784.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/20/3006062037/a42e4232-00df-464c-97ee-0ac20615ebcf.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 49006,
+      "downloaded_at": "2025-09-17T18:41:04.252908"
+    },
+    {
+      "product_id": "3231064642",
+      "filename": "coupang_3231064642.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231064642.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/02/3004869767/2e76a7af-b01b-443f-9cf7-289c6be84fbd.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 46557,
+      "downloaded_at": "2025-09-17T18:41:04.393861"
+    },
+    {
+      "product_id": "3253285900",
+      "filename": "coupang_3253285900.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3253285900.jpg",
+      "image_url": "https://thumbnail7.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/00dd/72444423abc2b55715bf346cfc0fedbf2b8fe945fdecf9e0afed708c91d0.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 44967,
+      "downloaded_at": "2025-09-17T18:41:04.547128"
+    },
+    {
+      "product_id": "3226479423",
+      "filename": "coupang_3226479423.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3226479423.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/04/3004870263/95b86115-f746-437d-8cc1-8743f334618d.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 40905,
+      "downloaded_at": "2025-09-17T18:41:04.701045"
+    },
+    {
+      "product_id": "3468574120",
+      "filename": "coupang_3468574120.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3468574120.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/2f1d/923adcbfada285303343517c312f52b2fa493d172374ea02489a4aec959a.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 43187,
+      "downloaded_at": "2025-09-17T18:41:04.850814"
+    },
+    {
+      "product_id": "3279441497",
+      "filename": "coupang_3279441497.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3279441497.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2018/10/29/3279441497/002f6479-a70b-4863-b59a-27c1cfec1a30.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 46690,
+      "downloaded_at": "2025-09-17T18:41:04.897197"
+    },
+    {
+      "product_id": "5513512641",
+      "filename": "coupang_5513512641.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_5513512641.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/images/2019/10/30/13/5/2d18cfa9-9996-44c8-ab2d-7cb524d7097b.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 58999,
+      "downloaded_at": "2025-09-17T18:41:05.073329"
+    },
+    {
+      "product_id": "4045846402",
+      "filename": "coupang_4045846402.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_4045846402.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/4517/ba914131e3665d0729a791a140b38e168f935a338d86e7809ff8aa1fdb34.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 32166,
+      "downloaded_at": "2025-09-17T18:41:05.425996"
+    },
+    {
+      "product_id": "3468575790",
+      "filename": "coupang_3468575790.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3468575790.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/f1ea/0149478f381e69150f8313999f99971cc226806735d18341640e0477d794.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 42499,
+      "downloaded_at": "2025-09-17T18:41:05.483671"
+    },
+    {
+      "product_id": "3231081057",
+      "filename": "coupang_3231081057.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231081057.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/03/3004869834/62c00210-68d9-4660-9fbc-af5a9d2f7fc0.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 43511,
+      "downloaded_at": "2025-09-17T18:41:05.609750"
+    },
+    {
+      "product_id": "4041699979",
+      "filename": "coupang_4041699979.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_4041699979.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/3e79/e594562c2b066e96cbdd96f2abe53ad5af37f85fdf11b998ac63e9ebd9d5.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 44357,
+      "downloaded_at": "2025-09-17T18:41:05.656936"
+    },
+    {
+      "product_id": "3279030170",
+      "filename": "coupang_3279030170.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3279030170.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/f426/b9d48904efcc9743352b28be6a23d4cf0423b980a8cdd4dfaa5bbcf531c2.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 25065,
+      "downloaded_at": "2025-09-17T18:41:05.747877"
+    },
+    {
+      "product_id": "3226477399",
+      "filename": "coupang_3226477399.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3226477399.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/bb56/7f032f9c71d67ff76226750151f59a7577d442ccabf2dcf3b299a108e867.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 47258,
+      "downloaded_at": "2025-09-17T18:41:29.427481"
+    },
+    {
+      "product_id": "3231064702",
+      "filename": "coupang_3231064702.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231064702.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/2a9b/06266a8aec8f59f2a6c2dceada0cd59d0ca68f13e12847b4157f954d1b62.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 47384,
+      "downloaded_at": "2025-09-17T18:41:29.783315"
+    },
+    {
+      "product_id": "3089531060",
+      "filename": "coupang_3089531060.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3089531060.jpg",
+      "image_url": "https://thumbnail7.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/images/2017/01/26/10/4/65f59d97-f5a0-4f82-9f4a-ec74f4ed3d80.JPG",
+      "width": 600,
+      "height": 600,
+      "file_size": 54276,
+      "downloaded_at": "2025-09-17T18:41:29.995867"
+    },
+    {
+      "product_id": "3235093526",
+      "filename": "coupang_3235093526.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3235093526.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/04/3004870103/cba2564f-1739-4be5-b5b0-7c081e7dd272.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 40711,
+      "downloaded_at": "2025-09-17T18:41:30.132383"
+    },
+    {
+      "product_id": "3231097046",
+      "filename": "coupang_3231097046.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231097046.jpg",
+      "image_url": "https://thumbnail7.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/03/3004869990/3a31c0aa-accc-408f-9ac3-6a4e179f3854.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 62151,
+      "downloaded_at": "2025-09-17T18:41:30.330241"
+    },
+    {
+      "product_id": "3627067904",
+      "filename": "coupang_3627067904.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3627067904.jpg",
+      "image_url": "https://thumbnail7.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/4248/1aaae33017f621703236e60b7a76e1dbcfcc80c39621cca7c1a620745ce8.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 84649,
+      "downloaded_at": "2025-09-17T18:41:30.558595"
+    },
+    {
+      "product_id": "3075021997",
+      "filename": "coupang_3075021997.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3075021997.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2018/09/07/3075021997/76487324-9712-47d2-92fc-1b9b4ce915ca.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 79519,
+      "downloaded_at": "2025-09-17T18:41:30.616642"
+    },
+    {
+      "product_id": "4041699978",
+      "filename": "coupang_4041699978.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_4041699978.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/1ddc/ce40d7f90548696b14d4bf24d69dcf09fc5b346469b81d8bb00a4a6fc1bf.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 43529,
+      "downloaded_at": "2025-09-17T18:41:30.686848"
+    },
+    {
+      "product_id": "3233513660",
+      "filename": "coupang_3233513660.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3233513660.jpg",
+      "image_url": "https://thumbnail7.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/04/3004870097/e68b85ee-d1d8-4243-b02a-a8074d90f081.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 45175,
+      "downloaded_at": "2025-09-17T18:41:30.847932"
+    },
+    {
+      "product_id": "3468574193",
+      "filename": "coupang_3468574193.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3468574193.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/8179/e1fa67390c588e8766ea2d0dd88636f56da093d1fe321aae4a3831a4df57.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 69221,
+      "downloaded_at": "2025-09-17T18:41:31.058143"
+    },
+    {
+      "product_id": "3253287458",
+      "filename": "coupang_3253287458.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3253287458.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/eeaf/a5f1553866cabfe874a472100e0ae216089ca57d293d0613375f8cb55a46.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 33613,
+      "downloaded_at": "2025-09-17T18:41:31.265432"
+    },
+    {
+      "product_id": "3231097687",
+      "filename": "coupang_3231097687.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231097687.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/03/3004869998/b3ac8708-1995-4cb4-a569-55468340cf61.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 50615,
+      "downloaded_at": "2025-09-17T18:41:31.703605"
+    },
+    {
+      "product_id": "3279101772",
+      "filename": "coupang_3279101772.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3279101772.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2016/05/23/3025321555/6bb33423-0337-4830-8ec3-ce7f083eabd4.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 48215,
+      "downloaded_at": "2025-09-17T18:41:31.749628"
+    },
+    {
+      "product_id": "3776490992",
+      "filename": "coupang_3776490992.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3776490992.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/a611/9069020d35307125a7c443083efa7e59c0b8c4c75fe0a7294ec80ba34248.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 44124,
+      "downloaded_at": "2025-09-17T18:41:31.903583"
+    },
+    {
+      "product_id": "3231058574",
+      "filename": "coupang_3231058574.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231058574.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/04/3004870063/a52079f1-e949-4c95-ad57-1a3c2809b44c.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 43682,
+      "downloaded_at": "2025-09-17T18:41:32.105802"
+    },
+    {
+      "product_id": "3279086350",
+      "filename": "coupang_3279086350.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3279086350.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/3fc0/efbf44ebd10c347a040afe431083265e62ee752cf2fbb4002e3a5c45dddc.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 25102,
+      "downloaded_at": "2025-09-17T18:41:32.201985"
+    },
+    {
+      "product_id": "3231082359",
+      "filename": "coupang_3231082359.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231082359.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/03/3004869807/67cd3559-b14f-4027-a3ca-ddbab5433d91.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 42187,
+      "downloaded_at": "2025-09-17T18:41:32.415474"
+    },
+    {
+      "product_id": "3468574127",
+      "filename": "coupang_3468574127.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3468574127.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/75e6/a2c7f77b2c68764c30790702fb77ee471c5f3a10e761e2b88e5a33686f3b.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 36019,
+      "downloaded_at": "2025-09-17T18:41:32.560017"
+    },
+    {
+      "product_id": "4476494056",
+      "filename": "coupang_4476494056.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_4476494056.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/images/2019/03/08/15/1/2655a603-e512-4fd4-a262-cff6e6b1bc81.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 57086,
+      "downloaded_at": "2025-09-17T18:41:32.705024"
+    },
+    {
+      "product_id": "3231096985",
+      "filename": "coupang_3231096985.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231096985.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/02/3004869697/a019e327-fb5b-4d3d-924b-2513514ee68b.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 37165,
+      "downloaded_at": "2025-09-17T18:41:32.857861"
+    },
+    {
+      "product_id": "74795093589",
+      "filename": "coupang_74795093589.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_74795093589.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/8c75/57ae76d22095ce02db99eb3a917e08f49419e2fddeee79aa68a8ddc224a0.JPG",
+      "width": 600,
+      "height": 600,
+      "file_size": 62658,
+      "downloaded_at": "2025-09-17T18:41:33.007658"
+    },
+    {
+      "product_id": "78329213883",
+      "filename": "coupang_78329213883.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_78329213883.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/172a/b3b1e17d1c3febee7e95258dee60bd13ee595483ff28b18815d7287c5fb8.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 50289,
+      "downloaded_at": "2025-09-17T18:41:33.315576"
+    },
+    {
+      "product_id": "3279047409",
+      "filename": "coupang_3279047409.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3279047409.jpg",
+      "image_url": "https://thumbnail7.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2016/05/23/3025321545/32c6fd64-e49e-4930-b315-15849cbe4c27.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 26303,
+      "downloaded_at": "2025-09-17T18:41:33.588044"
+    },
+    {
+      "product_id": "3226487865",
+      "filename": "coupang_3226487865.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3226487865.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/04/3004870413/647c42b7-bfbf-48d0-a345-fa13f28b1eaf.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 41234,
+      "downloaded_at": "2025-09-17T18:41:34.144658"
+    },
+    {
+      "product_id": "3275557717",
+      "filename": "coupang_3275557717.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3275557717.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/8bf9/34f16ea4df846f81e416b7c5499dc1ca72e9685314be02c87a0c078eaef4.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 36548,
+      "downloaded_at": "2025-09-17T18:41:34.526844"
+    },
+    {
+      "product_id": "88835675202",
+      "filename": "coupang_88835675202.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_88835675202.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/43c4/1fcffdf4e5e888b00b93f3a6ea8134e1919c7ebd726beeef15c4618423fd.JPG",
+      "width": 600,
+      "height": 600,
+      "file_size": 41498,
+      "downloaded_at": "2025-09-17T18:41:34.681310"
+    },
+    {
+      "product_id": "3253301492",
+      "filename": "coupang_3253301492.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3253301492.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/b32c/1a8f4da62f4c155bd3f2d23501306b5d75eeae421c826ba326c8f643dfa7.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 51022,
+      "downloaded_at": "2025-09-17T18:41:34.825970"
+    },
+    {
+      "product_id": "3231058445",
+      "filename": "coupang_3231058445.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231058445.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/04/3004870075/d9ccdb8e-ed02-4b82-8cb3-a88524516b77.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 41430,
+      "downloaded_at": "2025-09-17T18:41:34.979166"
+    },
+    {
+      "product_id": "3280149007",
+      "filename": "coupang_3280149007.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3280149007.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2018/10/22/3280149007/97aaeca4-872e-46cc-a5a4-3f507b70f13d.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 194499,
+      "downloaded_at": "2025-09-17T18:41:35.299192"
+    },
+    {
+      "product_id": "3234947724",
+      "filename": "coupang_3234947724.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3234947724.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/20/3006062044/a2dc4ff6-c246-4d6c-a34a-1b0c97f6e4cc.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 29748,
+      "downloaded_at": "2025-09-17T18:41:35.437024"
+    },
+    {
+      "product_id": "91328938949",
+      "filename": "coupang_91328938949.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_91328938949.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/cd7e/4ecfeb67abc2f7e69cce26e550d29c5f5c1977cd2cd86a0bf2769b899ee3.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 44655,
+      "downloaded_at": "2025-09-17T18:41:35.609656"
+    },
+    {
+      "product_id": "74795092438",
+      "filename": "coupang_74795092438.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_74795092438.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/4f02/986d9d6860c955bd23bd5f112f79b33f053d6dcc0dc1a8ef38700092dcd1.JPG",
+      "width": 600,
+      "height": 600,
+      "file_size": 82773,
+      "downloaded_at": "2025-09-17T18:41:35.947472"
+    },
+    {
+      "product_id": "91328939676",
+      "filename": "coupang_91328939676.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_91328939676.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/f32a/1c7b8557c1adb073e70b41b1034262b18ed1d36abb034e7df004cc758f26.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 40730,
+      "downloaded_at": "2025-09-17T18:41:36.119924"
+    },
+    {
+      "product_id": "78329212020",
+      "filename": "coupang_78329212020.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_78329212020.jpg",
+      "image_url": "https://thumbnail7.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/b4eb/bcf9a26fc7c012358016306bffe4eb6dce06300e771526448f5d92c389b1.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 86673,
+      "downloaded_at": "2025-09-17T18:41:36.193271"
+    },
+    {
+      "product_id": "3279131761",
+      "filename": "coupang_3279131761.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3279131761.jpg",
+      "image_url": "https://thumbnail9.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/330b/fab72803641f19835a84b7a2394dfa0ae94b3c9a36fc08ac7d21e7df1087.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 32595,
+      "downloaded_at": "2025-09-17T18:41:36.408001"
+    },
+    {
+      "product_id": "89233778805",
+      "filename": "coupang_89233778805.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_89233778805.jpg",
+      "image_url": "https://thumbnail7.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/71ac/bfbef9baf21284b847f9b7873f32cb624991097575611ec15fcf08427623.JPG",
+      "width": 600,
+      "height": 600,
+      "file_size": 79148,
+      "downloaded_at": "2025-09-17T18:41:36.600626"
+    },
+    {
+      "product_id": "88835675780",
+      "filename": "coupang_88835675780.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_88835675780.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/8856/6087f067a987074a3f896a74a7ec443985fbbdee9a63b99c97d1d17e671a.JPG",
+      "width": 600,
+      "height": 600,
+      "file_size": 45995,
+      "downloaded_at": "2025-09-17T18:42:03.225716"
+    },
+    {
+      "product_id": "70427266221",
+      "filename": "coupang_70427266221.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_70427266221.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/9984/b37c4a99025108a904105b4b8689bccdb939a1cb3a0f0f4ecb31dc35faaa.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 90630,
+      "downloaded_at": "2025-09-17T18:42:03.600763"
+    },
+    {
+      "product_id": "89452778676",
+      "filename": "coupang_89452778676.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_89452778676.jpg",
+      "image_url": "https://thumbnail7.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/0e9b/a26bc8d80d2022f4e561a0f964668e68ac25ba169016fd62c946bfd92bbe.JPG",
+      "width": 600,
+      "height": 600,
+      "file_size": 56371,
+      "downloaded_at": "2025-09-17T18:42:03.752193"
+    },
+    {
+      "product_id": "3231052153",
+      "filename": "coupang_3231052153.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3231052153.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/04/3004870501/45464823-aea6-40d0-b2b7-4732c9787c4a.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 41718,
+      "downloaded_at": "2025-09-17T18:42:03.928084"
+    },
+    {
+      "product_id": "3468574493",
+      "filename": "coupang_3468574493.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3468574493.jpg",
+      "image_url": "https://thumbnail10.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/bd75/195d4ebb88e593fe76e0b111f64bbf406f94704e2b50a8d2b66fc7929b81.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 45588,
+      "downloaded_at": "2025-09-17T18:42:04.173050"
+    },
+    {
+      "product_id": "85977236237",
+      "filename": "coupang_85977236237.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_85977236237.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/vendor_inventory/0616/d071559629558965a524db597a59041904de45a8c468fc877051f8c300cb.JPG",
+      "width": 600,
+      "height": 600,
+      "file_size": 65473,
+      "downloaded_at": "2025-09-17T18:42:04.227578"
+    },
+    {
+      "product_id": "3278201129",
+      "filename": "coupang_3278201129.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3278201129.jpg",
+      "image_url": "https://thumbnail6.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/06/17/3000393148/4602fe6f-2524-42d6-a4c4-17dce0fee895.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 27952,
+      "downloaded_at": "2025-09-17T18:42:04.365634"
+    },
+    {
+      "product_id": "3233697776",
+      "filename": "coupang_3233697776.jpg",
+      "filepath": "/Users/brich/Desktop/iherb_price/coupang_images/coupang_3233697776.jpg",
+      "image_url": "https://thumbnail8.coupangcdn.com/thumbnails/remote/600x600ex/image/product/image/vendoritem/2015/11/02/3004869739/14dc77f7-f095-42df-91fc-ff87923010e8.jpg",
+      "width": 600,
+      "height": 600,
+      "file_size": 41108,
+      "downloaded_at": "2025-09-17T18:42:04.567990"
+    }
+  ],
+  "gemini_matching_ready": true,
+  "filename_pattern": "coupang_{product_id}.jpg",
+  "html_structure_version": "v2_tailwind_css",
+  "data_quality_improved": true
+}
