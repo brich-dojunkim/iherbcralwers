@@ -4,7 +4,7 @@ from PIL import Image
 from datetime import datetime
 
 class ImageDownloader:
-    def __init__(self, image_dir="/coupang_images"):
+    def __init__(self, image_dir="./coupang_images"):
         self.image_dir = image_dir
         self.downloaded_images = []
         self.image_download_stats = {

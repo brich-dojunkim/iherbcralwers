@@ -308,8 +308,8 @@ def main():
     translator = GeminiCSVTranslator(API_KEY)
     
     # 파일 경로 설정 (현재 프로젝트 구조에 맞게)
-    input_file = '/Users/brich/Desktop/iherb_price/coupang/coupang_products_v2_20250917_184204.csv'
-    output_file = '/Users/brich/Desktop/iherb_price/coupang/coupang_products_v2_20250917_184204_translated.csv'
+    input_file = '/Users/brich/Desktop/iherb_price/coupang/coupang_products_v2_20250918_155843.csv'
+    output_file = '/Users/brich/Desktop/iherb_price/coupang/coupang_products_v2_20250918_155843_translated.csv'
         
     try:
         print(f"번역 시작: {input_file}")
