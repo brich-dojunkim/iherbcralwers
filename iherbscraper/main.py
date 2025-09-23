@@ -12,7 +12,7 @@ import pandas as pd
 import subprocess
 import time
 import google.generativeai as genai
-from browser_manager import BrowserManager
+from iherb_manager import BrowserManager
 from iherb_client import IHerbClient
 from product_matcher import ProductMatcher
 from data_manager import DataManager
@@ -543,8 +543,8 @@ if __name__ == "__main__":
             max_products_to_compare=4
         )
         
-        input_csv = "/Users/brich/Desktop/iherb_price/coupang/coupang_products_v2_20250918_155843_translated.csv"
-        output_csv = "./output/sportsresearch_250918.csv"
+        input_csv = "/Users/brich/Desktop/iherb_price/coupang/coupang_products_v2_20250922_170009_translated.csv"
+        output_csv = "./output/jarrowsformula_250922.csv"
         
         # 영어명 기반 처리 (자동 재시작 지원)
         results = scraper.process_products_complete(

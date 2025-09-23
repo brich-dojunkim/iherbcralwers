@@ -4,7 +4,7 @@ iHerb 스크래퍼 패키지 초기화
 
 from .main import EnglishIHerbScraper
 from .config import Config
-from .browser_manager import BrowserManager
+from .iherb_manager import BrowserManager
 from .iherb_client import IHerbClient
 from .product_matcher import ProductMatcher
 from .data_manager import DataManager

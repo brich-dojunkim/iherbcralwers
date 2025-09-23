@@ -1,4 +1,4 @@
-from browser_manager import BrowserManager
+from coupang_manager import BrowserManager
 from scraper import ProductScraper
 from image_downloader import ImageDownloader
 from page_navigator import PageNavigator
@@ -91,7 +91,7 @@ if __name__ == "__main__":
     )
     
     # 검색 URL
-    search_url = "https://www.coupang.com/np/search?listSize=36&filterType=coupang_global&rating=0&isPriceRange=false&minPrice=&maxPrice=&component=&sorter=scoreDesc&brand=47295&offerCondition=&filter=194176%23attr_7652%2431823%40DEFAULT&fromComponent=N&channel=user&selectedPlpKeepFilter=&q=%EC%8A%A4%ED%8F%AC%EC%B8%A0+%EB%A6%AC%EC%84%9C%EC%B9%98"
+    search_url = "https://www.coupang.com/np/search?listSize=36&filterType=coupang_global&rating=0&isPriceRange=false&minPrice=&maxPrice=&component=&sorter=scoreDesc&brand=4302&offerCondition=&filter=194176%23attr_7652%2431823%40DEFAULT&fromComponent=N&channel=user&selectedPlpKeepFilter=&q=Jarrow+Formulas"
     
     print("\n브라우저가 열리면 필요시 수동으로 처리해주세요.")
     print("Ctrl+C로 언제든지 중단할 수 있습니다.")
