@@ -1,6 +1,5 @@
 """
-상품 업데이터 모듈 - 쿠팡 크롤링 + 아이허브 매칭 통합
-모듈 이름 충돌 완전 해결 버전 (coupang_browser, iherb_browser)
+상품 업데이터 모듈 - 통합 이미지 관리 시스템
 """
 
 import pandas as pd
@@ -25,7 +24,7 @@ from iherbscraper.config import Config
 
 
 class ProductUpdater:
-    """쿠팡 크롤링과 아이허브 매칭을 통합한 상품 업데이터"""
+    """쿠팡 크롤링과 아이허브 매칭을 통합한 상품 업데이터 - 단순화된 버전"""
     
     def __init__(self, enable_images: bool = True):
         """
@@ -41,7 +40,7 @@ class ProductUpdater:
     
     def crawl_coupang_products(self, search_url: str) -> pd.DataFrame:
         """
-        쿠팡 상품 크롤링
+        쿠팡 상품 크롤링 - 기본 이미지 경로 사용
         
         Args:
             search_url: 쿠팡 검색 결과 URL
@@ -51,13 +50,14 @@ class ProductUpdater:
         """
         try:
             print(f"   크롤링 시작: {search_url}")
+            print(f"   이미지 저장: coupang/coupang_images (기본 경로)")
             
-            # 크롤러 초기화
+            # 크롤러 초기화 - 기본 이미지 경로 사용
             self.coupang_crawler = CoupangCrawlerMacOS(
                 headless=False,
                 delay_range=(3, 6),
                 download_images=self.enable_images,
-                image_dir=f"./temp_images"
+                image_dir=None  # 🆕 기본 경로 사용 (coupang/coupang_images)
             )
             
             # 크롤링 실행
@@ -77,23 +77,20 @@ class ProductUpdater:
                 return crawled_df
             else:
                 print(f"   크롤링 결과 없음")
-                # 빈 DataFrame이라도 필수 컬럼은 생성
                 empty_df = pd.DataFrame(columns=['product_id', 'product_name', 'current_price', 'original_price', 'discount_rate'])
                 return empty_df
                 
         except Exception as e:
             print(f"   크롤링 실패: {e}")
-            # 상세 오류 정보 출력
             import traceback
             print(f"   상세 오류: {traceback.format_exc()}")
             
-            # 오류 발생 시에도 빈 DataFrame 반환 (필수 컬럼 포함)
             empty_df = pd.DataFrame(columns=['product_id', 'product_name', 'current_price', 'original_price', 'discount_rate'])
             return empty_df
     
     def match_iherb_products(self, new_products_df: pd.DataFrame) -> pd.DataFrame:
         """
-        신규 상품들을 아이허브와 매칭
+        신규 상품들을 아이허브와 매칭 - 단순화된 버전
         
         Args:
             new_products_df: 신규 쿠팡 상품 DataFrame
@@ -128,8 +125,9 @@ class ProductUpdater:
             )
             print(f"   번역 완료")
             
-            # 2. 아이허브 매칭 수행
+            # 2. 아이허브 매칭 수행 (기본 이미지 경로 사용)
             print(f"   아이허브 매칭 시작")
+            
             self.iherb_scraper = EnglishIHerbScraper(
                 headless=False,
                 delay_range=(2, 4),
