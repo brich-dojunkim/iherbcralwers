@@ -25,6 +25,7 @@ env/
 *.feather
 *.db
 *.sqlite
+*.jpg
 
 # Scrap Images & large outputs
 coupang_images/
