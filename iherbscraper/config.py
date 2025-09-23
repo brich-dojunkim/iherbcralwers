@@ -1,9 +1,5 @@
 """
-iHerb 스크래퍼 설정 관리 - Gemini 2.5 Flash 적용
-주요 업데이트:
-1. Gemini 2.5 Flash 모델 사용
-2. 성능 최적화된 설정
-3. 콘솔 로그 분석 반영
+iHerb 스크래퍼 설정 관리 - 다양한 HTML 패턴 대응 강화
 """
 
 class FailureType:
@@ -64,44 +60,43 @@ class FailureType:
         }
         return descriptions.get(failure_type, "알 수 없는 오류")
 
-
 class Config:
-    """스크래퍼 전역 설정 - Gemini 2.5 Flash 최적화 버전"""
+    """스크래퍼 전역 설정 - 다양한 HTML 패턴 대응 강화"""
     
     # ========== Gemini 2.5 Flash 설정 ==========
     GEMINI_API_KEY = "AIzaSyA2r-_8ePWcmP-5o9esScT2pcOgj_57J3M"
-    GEMINI_TEXT_MODEL = "models/gemini-2.0-flash"  # 🆕 2.0 Flash 적용
-    GEMINI_VISION_MODEL = "models/gemini-2.0-flash"  # 🆕 2.0 Flash 적용
+    GEMINI_TEXT_MODEL = "models/gemini-2.0-flash"
+    GEMINI_VISION_MODEL = "models/gemini-2.0-flash"
     GEMINI_MAX_RETRIES = 3
-    GEMINI_TIMEOUT = 25  # 2.5 모델이 더 빨라서 25초로 단축
-    GEMINI_RATE_LIMIT_DELAY = 5  # 2.5 모델 성능 향상으로 1.5초로 단축
+    GEMINI_TIMEOUT = 25
+    GEMINI_RATE_LIMIT_DELAY = 5
     
-    # ========== 이미지 비교 설정 (성능 최적화) ==========
+    # ========== 이미지 비교 설정 ==========
     COUPANG_IMAGES_DIR = "/Users/brich/Desktop/iherb_price/coupang/coupang_images"
     IHERB_IMAGES_DIR = "/Users/brich/Desktop/iherb_price/iherbscraper/iherb_images"
     IMAGE_COMPARISON_ENABLED = True
-    IMAGE_DOWNLOAD_TIMEOUT = 12  # 타임아웃 단축
-    MAX_IMAGE_SIZE_MB = 8  # 크기 제한 강화
+    IMAGE_DOWNLOAD_TIMEOUT = 12
+    MAX_IMAGE_SIZE_MB = 8
     
-    # ========== 브라우저 설정 (검증된 설정 유지) ==========
-    DEFAULT_DELAY_RANGE = (1.5, 3)  # 성공 확인으로 딜레이 단축
+    # ========== 브라우저 설정 ==========
+    DEFAULT_DELAY_RANGE = (1.5, 3)
     MAX_RETRIES = 3
-    BROWSER_RESTART_INTERVAL = 25  # 조금 늘려서 안정성 확보
+    BROWSER_RESTART_INTERVAL = 25
     PAGE_LOAD_TIMEOUT = 18
     IMPLICIT_WAIT = 2.5
     
-    # ========== 검색 설정 (성능 검증됨) ==========
-    MAX_PRODUCTS_TO_COMPARE = 4  # 3→4로 증가 (2.5 모델 성능 향상)
+    # ========== 검색 설정 ==========
+    MAX_PRODUCTS_TO_COMPARE = 4
     BASE_URL = "https://www.iherb.com"
     KOREA_URL = "https://kr.iherb.com"
     
-    # ========== 매칭 설정 (2.5 모델 최적화) ==========
+    # ========== 매칭 설정 ==========
     MATCHING_THRESHOLDS = {
-        'min_similarity': 0.4,  # 2.5 모델이 더 정확해서 임계값 낮춤
-        'success_threshold': 0.7  # 성공 기준은 높임
+        'min_similarity': 0.4,
+        'success_threshold': 0.7
     }
     
-    # ========== 브라우저 옵션 (안정성 검증됨) ==========
+    # ========== 브라우저 옵션 ==========
     CHROME_OPTIONS = [
         "--no-sandbox",
         "--disable-dev-shm-usage",
@@ -146,7 +141,7 @@ class Config:
         'part_number': '[data-part-number]',
     }
     
-    # ========== 정규표현식 패턴 ==========
+    # ========== 정규표현식 패턴 (강화 버전) ==========
     PATTERNS = {
         # 기본 패턴들
         'item_code': r'item\s*code:\s*([A-Z0-9-]+)',
@@ -154,34 +149,44 @@ class Config:
         'english_count': r'(\d+)\s+(?:count|ct|tablets?|capsules?|softgels?|veg\s*capsules?|vcaps?|pieces?|servings?|tab)(?!\w)',
         'dosage_mg': r'(\d+(?:,\d+)*)\s*mg',
         
-        # 정밀한 가격 패턴들 (검증된 패턴)
+        # 정밀한 가격 패턴들 (강화된 패턴)
         'krw_discount_price_red': r'<b[^>]*class="[^"]*discount-price[^"]*"[^>]*style="[^"]*color:\s*rgb\(211,\s*47,\s*47\)[^"]*"[^>]*>₩([\d,]+)</b>',
         'krw_discount_price_simple': r'<b[^>]*discount-price[^>]*>₩([\d,]+)</b>',
+        'krw_discount_price_inline': r'<b[^>]*style="[^"]*color:\s*rgb\(211,\s*47,\s*47\)[^"]*"[^>]*>₩([\d,]+)</b>',  # 신규
         'krw_out_of_stock_price': r'data-testid="product-price"[^>]*>\s*<p>\s*₩([\d,]+)\s*</p>',
         'krw_list_price_span': r'<span[^>]*class="[^"]*list-price[^"]*"[^>]*>₩([\d,]+)</span>',
         'krw_list_price_general': r'class="list-price[^"]*"[^>]*>₩([\d,]+)',
         
-        # 할인율 패턴
+        # 할인율 패턴 (강화)
         'percent_off_bracket': r'<span[^>]*percent-off[^>]*>\((\d+)%\s*off\)</span>',
         'percent_off_simple': r'(\d+)%\s*off',
+        'percent_off_parentheses': r'\((\d+)%\s*할인\)',  # 신규
         
-        # 단위당 가격 패턴
+        # 단위당 가격 패턴 (다양한 형태 대응)
         'price_per_unit_span': r'<span[^>]*price-per-unit[^>]*>₩(\d+)/(serving|unit|tablet|capsule)</span>',
         'price_per_unit_text': r'₩(\d+)/(serving|unit|tablet|capsule)(?![^<]*</[^>]*>)',
         'price_per_serving_direct': r'₩(\d+)/serving',
+        'price_per_unit_small': r'<div[^>]*class="[^"]*small[^"]*price-per-unit[^"]*"[^>]*>₩(\d+)/(\w+)</div>',  # 신규
+        'discount_price_per_unit': r'<span[^>]*discount-price-per-unit[^>]*>₩(\d+)/(\w+)</span>',  # 신규
+        'list_price_per_unit': r'<div[^>]*list-price-per-unit[^>]*>₩(\d+)/(\w+)</div>',  # 신규
+        'price_per_unit_korean': r'₩([\d,]+)/(제공량|정|캡슐)',  # 신규 (한국어)
         
         # 정기배송 할인 패턴
         'subscription_discount_future': r'(\d+)%\s*off\s+on.*?future.*?orders',
         'subscription_discount_autoship': r'(\d+)%\s*off.*?autoship',
         
-        # 품절 상태 패턴
+        # 품절 상태 패턴 (강화)
         'out_of_stock_testid': r'data-testid="product-stock-status"[^>]*>[^<]*out\s+of\s+stock',
+        'out_of_stock_testid_korean': r'data-testid="product-stock-status"[^>]*>[^<]*품절',  # 신규
         'out_of_stock_text': r'out\s+of\s+stock',
+        'out_of_stock_korean': r'품절',  # 신규
         'notify_me_button': r'notify\s+me',
+        'notify_me_button_korean': r'알림\s*받기',  # 신규
         
-        # 재입고 날짜 패턴
+        # 재입고 날짜 패턴 (강화)
         'back_in_stock_date_testid': r'data-testid="product-stock-status-text"[^>]*>([^<]+)',
         'back_in_stock_general': r'back\s+in\s+stock\s+date\s*:?\s*([^<\n]+)',
+        'back_in_stock_korean': r'재입고\s*일자\s*([^<\n]+)',  # 신규
         
         # 백업용 일반 원화 패턴
         'krw_price_general': r'₩([\d,]+)',
@@ -199,24 +204,8 @@ class Config:
         'is_in_stock', 'stock_message', 'back_in_stock_date',
         'price_difference_krw', 'cheaper_platform', 'savings_amount', 'savings_percentage',
         'price_difference_note', 'processed_at', 'actual_index', 'search_language',
-        'gemini_api_calls', 'gemini_model_version'  # 모델 버전 추적 추가
+        'gemini_api_calls', 'gemini_model_version'
     ]
-    
-    # ========== 성능 모니터링 설정 ==========
-    PERFORMANCE_TRACKING = {
-        'enable_detailed_logging': True,
-        'log_api_response_times': True,
-        'track_matching_confidence': True,
-        'monitor_memory_usage': False  # 필요시 활성화
-    }
-    
-    # ========== 배치 처리 설정 ==========
-    BATCH_PROCESSING = {
-        'checkpoint_interval': 50,  # 50개마다 체크포인트
-        'auto_backup_interval': 100,  # 100개마다 백업
-        'progress_report_interval': 10,  # 10개마다 진행률 리포트
-        'memory_cleanup_interval': 200  # 200개마다 메모리 정리
-    }
     
     @classmethod
     def validate_api_key(cls):

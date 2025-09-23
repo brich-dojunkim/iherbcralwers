@@ -49,16 +49,6 @@ class CoupangCrawlerMacOS:
         """CSV 저장"""
         return self.data_saver.save_to_csv(self.products, filename)
     
-    def save_image_manifest(self, filename=None):
-        """이미지 매니페스트 저장"""
-        if not self.image_downloader:
-            return None
-        return self.data_saver.save_image_manifest(
-            self.image_downloader.downloaded_images, 
-            self.image_downloader.image_dir, 
-            filename
-        )
-    
     def print_summary(self):
         """결과 요약"""
         self.data_saver.print_summary(self.products, self.image_downloader)
@@ -75,7 +65,7 @@ if __name__ == "__main__":
     print("  - 새로운 Tailwind CSS 구조 완전 대응")
     print("  - 자동 이미지 저장 (coupang/coupang_images)")
     print("  - Gemini 이미지 매칭 지원")
-    print("  - 단순화된 구조")
+    print("  - 단순화된 구조 (매니페스트 제거)")
     
     # 크롤러 생성
     crawler = CoupangCrawlerMacOS(
@@ -86,7 +76,7 @@ if __name__ == "__main__":
     )
     
     # 검색 URL (예시)
-    search_url = "https://www.coupang.com/np/search?listSize=36&filterType=coupang_global&rating=0&isPriceRange=false&minPrice=&maxPrice=&component=&sorter=scoreDesc&brand=4302&offerCondition=&filter=194176%23attr_7652%2431823%40DEFAULT&fromComponent=N&channel=user&selectedPlpKeepFilter=&q=Jarrow+Formulas"
+    search_url = "https://www.coupang.com/np/search?listSize=36&filterType=coupang_global&rating=0&isPriceRange=false&minPrice=&maxPrice=&component=&sorter=scoreDesc&brand=14420&offerCondition=&filter=194176%23attr_7652%2431823%40DEFAULT&fromComponent=N&channel=user&selectedPlpKeepFilter=&q=thorne"
     
     try:
         # 크롤링 실행
@@ -95,18 +85,15 @@ if __name__ == "__main__":
         # 결과 저장
         if products:
             csv_filename = crawler.save_to_csv()
-            manifest_filename = crawler.save_image_manifest()
-            
             crawler.print_summary()
             
             print(f"\n🎉 크롤링 완료!")
             print(f"CSV 파일: {csv_filename}")
-            if manifest_filename:
-                print(f"이미지 매니페스트: {manifest_filename}")
+            print(f"이미지 저장: {crawler.image_downloader.image_dir if crawler.image_downloader else 'None'}")
             
             print(f"\n✅ 단순화된 구조 적용:")
-            print(f"  - 불필요한 컬럼 제거")
-            print(f"  - 자동 이미지 경로 관리")
+            print(f"  - 불필요한 매니페스트 제거")
+            print(f"  - 핵심 기능만 유지")
             print(f"  - Gemini 매칭 준비 완료")
         else:
             print("❌ 크롤링된 상품이 없습니다.")
@@ -115,8 +102,6 @@ if __name__ == "__main__":
         print("\n👋 크롤링을 중단했습니다.")
         if crawler.products:
             crawler.save_to_csv()
-            if crawler.image_downloader:
-                crawler.save_image_manifest()
             print("지금까지 수집한 데이터를 저장했습니다.")
     
     finally:

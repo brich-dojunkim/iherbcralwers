@@ -30,7 +30,7 @@ class ProductScraper:
         return ""
     
     def extract_product_info(self, product_item):
-        """개별 상품 정보 추출 - 새로운 HTML 구조 대응"""
+        """개별 상품 정보 추출 - 핵심 개선만"""
         try:
             product = {}
             
@@ -76,10 +76,11 @@ class ProductScraper:
             if price_area:
                 # 현재 가격 - 새로운 구조
                 current_price_selectors = [
-                    'div.custom-oos.fw-text-\\[20px\\]\\/\\[24px\\].fw-font-bold.fw-mr-\\[4px\\].fw-text-red-700',  # 할인 가격
+                    'div.custom-oos.fw-text-\\[20px\\]\\/\\[24px\\].fw-font-bold.fw-mr-\\[4px\\].fw-text-red-700',       # 할인 가격
                     'div.custom-oos.fw-text-\\[20px\\]\\/\\[24px\\].fw-font-bold.fw-mr-\\[4px\\].fw-text-bluegray-900',  # 일반 가격
-                    'div[class*="fw-text-[20px]"][class*="fw-font-bold"]',  # 포괄적 선택자
-                    'strong.Price_priceValue__A4KOr',  # 기존 구조 (백업)
+                    'div.custom-oos.fw-text-\\[20px\\]\\/\\[24px\\].fw-font-bold.fw-mr-\\[4px\\].fw-text-bluegray-400',  # 품절 가격
+                    'div[class*="fw-text-[20px]"][class*="fw-font-bold"]',                                                # 포괄적 선택자
+                    'strong.Price_priceValue__A4KOr',                                                                      # 기존 구조 (백업)
                 ]
                 
                 current_price = ''
@@ -97,7 +98,7 @@ class ProductScraper:
                 
                 # 원래 가격 - 새로운 구조
                 original_price_selectors = [
-                    'del.custom-oos.fw-text-\\[12px\\]\\/\\[14px\\].fw-line-through.fw-text-bluegray-600',
+                    'del.custom-oos.fw-text-\\[12px\\]\\/\\[14px\\].fw-line-through.fw-text-bluegray-400',
                     'del[class*="custom-oos"]',
                     'del.PriceInfo_basePrice__8BQ32',  # 기존 구조 (백업)
                 ]
@@ -135,12 +136,23 @@ class ProductScraper:
                         continue
                 
                 product['discount_rate'] = discount_rate
+                
+                # 🆕 단위당 가격 (간단 추출)
+                unit_price_elem = price_area.select_one('span[class*="fw-text-bluegray-400"]')
+                unit_price = ''
+                if unit_price_elem:
+                    unit_text = self.clean_text(unit_price_elem.get_text())
+                    if '당' in unit_text and '원' in unit_text:
+                        unit_price = unit_text
+                product['unit_price'] = unit_price
+                
             else:
                 product['current_price'] = ''
                 product['original_price'] = ''
                 product['discount_rate'] = ''
+                product['unit_price'] = ''
             
-            # 평점 및 리뷰 - 기존 구조 유지 (변경 없음)
+            # 평점 및 리뷰 - 기존 구조 유지
             rating_area = product_item.select_one('div.ProductRating_productRating__jjf7W')
             
             if rating_area:
@@ -170,10 +182,10 @@ class ProductScraper:
                 product['rating'] = ''
                 product['review_count'] = ''
             
-            # 배송 정보 - 새로운 구조와 기존 구조 모두 지원
+            # 배송 정보
             delivery_selectors = [
-                'div.TextBadge_delivery__STgTC',  # 기존 구조
-                'div.TextBadge_feePrice__n_gta',  # 새로운 구조
+                'div.TextBadge_delivery__STgTC',
+                'div.TextBadge_feePrice__n_gta',
                 '[data-badge-type="delivery"]',
                 '[data-badge-type="feePrice"]',
             ]
@@ -192,16 +204,37 @@ class ProductScraper:
             
             product['delivery_badge'] = delivery_badge
             
-            # 로켓직구 여부 - 이미지 alt 속성으로 확인
+            # 로켓직구 여부
             rocket_imgs = product_item.select('img')
             is_rocket = False
             for img in rocket_imgs:
                 alt_text = img.get('alt', '')
-                if '로켓직구' in alt_text or 'rocket' in alt_text.lower():
+                src_text = img.get('src', '')
+                if ('로켓직구' in alt_text or 'rocket' in alt_text.lower() or 
+                    'logo_jikgu' in src_text):
                     is_rocket = True
                     break
             
             product['is_rocket'] = is_rocket
+            
+            # 🆕 품절 상태 (간단 체크)
+            stock_elem = product_item.select_one('div[class*="fw-font-bold"][class*="fw-text-bluegray-800"]')
+            if stock_elem and '품절' in stock_elem.get_text():
+                product['stock_status'] = 'out_of_stock'
+            else:
+                product['stock_status'] = 'in_stock'
+            
+            # 🆕 원산지 (간단 추출)
+            origin_elem = product_item.select_one('span.fw-text-\\[14px\\].fw-text-bluegray-900')
+            origin_country = ''
+            if origin_elem:
+                origin_text = self.clean_text(origin_elem.get_text())
+                countries = ['한국', '미국', '독일', '일본', '중국', '프랑스']
+                for country in countries:
+                    if country in origin_text:
+                        origin_country = origin_text
+                        break
+            product['origin_country'] = origin_country
             
             # 크롤링 시간
             product['crawled_at'] = datetime.now().isoformat()
