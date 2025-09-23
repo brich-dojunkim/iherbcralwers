@@ -32,6 +32,7 @@ coupang_images/
 iherb_images/
 naver/*result*.csv
 coupang/*.csv
+updater/temp_images
 
 # Models / binaries (store via LFS or external)
 *.onnx
