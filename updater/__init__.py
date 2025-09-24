@@ -3,7 +3,7 @@ Updater 패키지 초기화
 가격 비교 업데이터
 """
 
-from .main import PriceUpdater
+from .updater_main import PriceUpdater
 from .data_processor import DataProcessor
 from .product_updater import ProductUpdater
 
