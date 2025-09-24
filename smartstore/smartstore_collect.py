@@ -16,10 +16,10 @@
   pip install undetected-chromedriver
 
 예:
-  python smartstore_collect.py \
-    --start-url "https://search.shopping.naver.com/search/all?query=오쏘몰&pagingIndex=1&pagingSize=40" \
+  python3 smartstore_collect.py \
+    --start-url "https://search.shopping.naver.com/search/all?adQuery=%ED%97%8C%ED%84%B0&agency=true&origQuery=%ED%97%8C%ED%84%B0&pagingIndex=1&pagingSize=40&productSet=total&query=%ED%97%8C%ED%84%B0&sort=rel&timestamp=&viewType=list" \
     --pages 10 \
-    --out stores.txt
+    --out stores_hunter.txt
 """
 
 import os, re, time, html, argparse, json
