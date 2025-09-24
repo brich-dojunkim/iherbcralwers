@@ -1,5 +1,5 @@
 """
-데이터 관리 모듈 - 필요한 컬럼만 생성
+데이터 관리 모듈 - 미사용 컬럼 제거 버전
 """
 
 import os
@@ -41,7 +41,7 @@ class DataManager:
             raise
     
     def initialize_output_csv(self, output_file_path):
-        """CSV 파일 헤더 초기화 - 핵심 컬럼만"""
+        """CSV 파일 헤더 초기화 - iHerb 매칭 전용"""
         essential_columns = [
             # 기본 상품 정보
             'iherb_product_name',
@@ -52,6 +52,11 @@ class DataManager:
             'coupang_product_id',
             'iherb_product_code',
             'status',
+            
+            # 매칭 정보
+            'similarity_score',
+            'matching_reason',
+            'gemini_confidence',
             
             # 가격 정보
             'coupang_current_price_krw',
@@ -72,45 +77,33 @@ class DataManager:
             'cheaper_platform',
             'savings_amount',
             'savings_percentage', 
-            'price_difference_note',
-            
-            # 상품 상태 추적
-            'product_status',
-            'status_changed_at',
-            'last_status_change',
-            
-            # 시간 정보
-            'price_updated_at',
-            'last_updated'
+            'price_difference_note'
         ]
         
         try:
             empty_df = pd.DataFrame(columns=essential_columns)
             empty_df.to_csv(output_file_path, index=False, encoding='utf-8-sig')
             print(f"  결과 파일 초기화: {output_file_path}")
-            print(f"  핵심 컬럼 {len(essential_columns)}개 사용")
+            print(f"  매칭 전용 컬럼 {len(essential_columns)}개 사용")
             
         except Exception as e:
             print(f"  CSV 초기화 실패: {e}")
     
     def create_result_record(self, row, product_url, product_code, iherb_product_name, 
-                            coupang_price_info, iherb_price_info):
-        """결과 레코드 생성 - 필요한 것만"""
+                            coupang_price_info, iherb_price_info, similarity_score, 
+                            matching_reason, gemini_confidence):
+        """결과 레코드 생성 - iHerb 매칭 전용 (상태 추적 제거)"""
         
         # 가격 비교 계산
         price_comparison = self._calculate_price_comparison(coupang_price_info, iherb_price_info)
         
-        # 상태 결정
+        # 매칭 상태 결정 (단순화)
         if product_code:
             status = 'success'
-            product_status = 'active'
         else:
-            status = 'not_found' 
-            product_status = 'new'
+            status = 'not_found'
         
-        current_time = datetime.now().isoformat()
-        
-        # 핵심 정보만 포함
+        # 매칭 결과만 포함 (상태 추적 제거)
         result = {
             # 기본 상품 정보
             'iherb_product_name': iherb_product_name or '',
@@ -121,6 +114,11 @@ class DataManager:
             'coupang_product_id': row.get('product_id', ''),
             'iherb_product_code': product_code or '',
             'status': status,
+            
+            # 매칭 정보
+            'similarity_score': similarity_score,
+            'matching_reason': matching_reason,
+            'gemini_confidence': gemini_confidence,
             
             # 가격 정보
             'coupang_current_price_krw': coupang_price_info.get('current_price', ''),
@@ -141,15 +139,7 @@ class DataManager:
             'cheaper_platform': price_comparison['cheaper_platform'],
             'savings_amount': price_comparison['savings_amount'],
             'savings_percentage': price_comparison['savings_percentage'],
-            'price_difference_note': price_comparison['price_difference_note'],
-            
-            # 상품 상태 추적
-            'product_status': product_status,
-            'status_changed_at': current_time,
-            'last_status_change': current_time,
-            
-            # 시간 정보
-            'last_updated': current_time
+            'price_difference_note': price_comparison['price_difference_note']
         }
         
         return result
@@ -248,11 +238,43 @@ class DataManager:
         return price_info
     
     def print_summary(self, results_df):
-        """결과 요약"""
+        """결과 요약 - iHerb 매칭 전용"""
         total = len(results_df)
         successful = len(results_df[results_df['status'] == 'success'])
         
-        print(f"\n아이허브 매칭 완료")
-        print(f"  총 처리: {total}개")
-        print(f"  매칭 성공: {successful}개 ({successful/total*100:.1f}%)")
-        print(f"  핵심 데이터만 저장됨")
+        print(f"\n=== iHerb 매칭 결과 ===")
+        print(f"총 처리: {total}개")
+        print(f"매칭 성공: {successful}개 ({successful/total*100:.1f}%)")
+        print(f"매칭 실패: {total-successful}개")
+    
+    def auto_detect_start_point(self, input_csv_path, output_csv_path):
+        """자동 시작점 감지 - iHerb 매칭 전용"""
+        start_from = 0
+        failed_indices = []
+        
+        try:
+            if not os.path.exists(output_csv_path):
+                return start_from, failed_indices
+            
+            existing_df = pd.read_csv(output_csv_path, encoding='utf-8-sig')
+            
+            if len(existing_df) == 0:
+                return start_from, failed_indices
+            
+            # 처리된 마지막 인덱스 (단순히 행 개수)
+            start_from = len(existing_df)
+            
+            # 매칭 실패한 항목들 찾기
+            if 'status' in existing_df.columns:
+                failed_mask = existing_df['status'] != 'success'
+                failed_indices = existing_df[failed_mask].index.tolist()
+            
+            if start_from > 0:
+                print(f"  기존 처리: {start_from}개")
+                if failed_indices:
+                    print(f"  재시도 대상: {len(failed_indices)}개")
+            
+        except Exception as e:
+            print(f"  시작점 감지 오류: {e}")
+        
+        return start_from, failed_indices
