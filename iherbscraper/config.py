@@ -1,13 +1,12 @@
 """
-iHerb 스크래퍼 설정 관리 - Gemini 2.5 Flash 적용
-주요 업데이트:
-1. Gemini 2.5 Flash 모델 사용
-2. 성능 최적화된 설정
-3. 콘솔 로그 분석 반영
+iHerb 스크래퍼 설정 관리 - Gemini 2.5 Flash 적용 (정리된 버전)
+사용하지 않는 항목들 제거:
+- FailureType.DOSAGE_MISMATCH 제거
+- OUTPUT_COLUMNS에서 내부 처리용 컬럼들 제거
 """
 
 class FailureType:
-    """실패 유형 분류 - Gemini API 오류 추가"""
+    """실패 유형 분류 - Gemini API 오류 추가 (정리된 버전)"""
     
     # 시스템 오류 (재시도 필요)
     BROWSER_ERROR = "BROWSER_ERROR"
@@ -26,7 +25,6 @@ class FailureType:
     NO_SEARCH_RESULTS = "NO_SEARCH_RESULTS"
     NO_MATCHING_PRODUCT = "NO_MATCHING_PRODUCT"
     COUNT_MISMATCH = "COUNT_MISMATCH"
-    DOSAGE_MISMATCH = "DOSAGE_MISMATCH"
     GEMINI_NO_MATCH = "GEMINI_NO_MATCH"
     
     # 성공
@@ -58,7 +56,6 @@ class FailureType:
             cls.NO_SEARCH_RESULTS: "검색 결과 없음",
             cls.NO_MATCHING_PRODUCT: "매칭되는 상품 없음",
             cls.COUNT_MISMATCH: "개수 불일치",
-            cls.DOSAGE_MISMATCH: "용량 불일치",
             cls.GEMINI_NO_MATCH: "Gemini 판단: 동일 제품 없음",
             cls.SUCCESS: "성공"
         }
@@ -188,7 +185,7 @@ class Config:
         'krw_price_quoted': r'"₩([\d,]+)"',
     }
     
-    # ========== 출력 컬럼 ==========
+    # ========== 출력 컬럼 (정리된 버전 - 28개) ==========
     OUTPUT_COLUMNS = [
         'iherb_product_name', 'coupang_product_name_english', 'coupang_product_name', 
         'similarity_score', 'matching_reason', 'gemini_confidence', 'failure_type',
@@ -198,8 +195,7 @@ class Config:
         'iherb_subscription_discount', 'iherb_price_per_unit',
         'is_in_stock', 'stock_message', 'back_in_stock_date',
         'price_difference_krw', 'cheaper_platform', 'savings_amount', 'savings_percentage',
-        'price_difference_note', 'processed_at', 'actual_index', 'search_language',
-        'gemini_api_calls', 'gemini_model_version'  # 모델 버전 추적 추가
+        'price_difference_note'
     ]
     
     # ========== 성능 모니터링 설정 ==========
