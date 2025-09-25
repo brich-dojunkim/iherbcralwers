@@ -25,17 +25,17 @@ class EnglishIHerbScraper:
         self.delay_range = delay_range or Config.DEFAULT_DELAY_RANGE
         self.max_products_to_compare = max_products_to_compare or Config.MAX_PRODUCTS_TO_COMPARE
         self.success_count = 0
-        
+
         # Gemini 번역 모델 초기화
         genai.configure(api_key=Config.GEMINI_API_KEY)
         self.translator = genai.GenerativeModel(Config.GEMINI_TEXT_MODEL)
-        
+
         # 모듈 초기화
         self.browser_manager = BrowserManager(headless, self.delay_range)
         self.iherb_client = IHerbClient(self.browser_manager)
         self.product_matcher = ProductMatcher(self.iherb_client)
         self.data_manager = DataManager()
-        
+
         # 아이허브 언어를 영어로 설정
         self.iherb_client.set_language_to_english()
     
@@ -247,6 +247,7 @@ class EnglishIHerbScraper:
             self.iherb_client = IHerbClient(self.browser_manager)
             self.product_matcher = ProductMatcher(self.iherb_client)
             
+            # 🔁 여기서 다시 영어 설정 호출
             self.iherb_client.set_language_to_english()
             
             time.sleep(8)
@@ -306,7 +307,7 @@ class EnglishIHerbScraper:
         print(f"  쿠팡: {price_text}")
         if stock_text:
             print(f"  쿠팡 정보: {stock_text}")
-                
+
     def _search_and_extract_iherb_info(self, search_name, coupang_product_id, actual_idx):
         """아이허브 검색 및 정보 추출 - 단순화된 버전"""
         product_url = None
