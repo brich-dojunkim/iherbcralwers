@@ -9,7 +9,7 @@ import undetected_chromedriver as uc
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, WebDriverException
-from config import Config
+from iherbscraper.iherb_settings import Config
 
 
 class BrowserManager:
