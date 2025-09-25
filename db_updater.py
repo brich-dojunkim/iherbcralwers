@@ -2,7 +2,9 @@ import os
 import sqlite3
 from config import DatabaseConfig, PathConfig
 
-db_path = os.path.join(PathConfig.PROJECT_ROOT, DatabaseConfig.DATABASE_NAME)
+os.makedirs(PathConfig.DATA_ROOT, exist_ok=True)
+db_path = os.path.join(PathConfig.DATA_ROOT, DatabaseConfig.DATABASE_NAME)
+
 conn = sqlite3.connect(db_path)
 cursor = conn.cursor()
 cursor.execute("""

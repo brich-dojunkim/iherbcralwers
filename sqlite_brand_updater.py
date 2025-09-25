@@ -36,8 +36,8 @@ import sys
 from config import DatabaseConfig, PathConfig
 from improved_updater import run_pipeline
 
-DB_PATH = os.path.join(PathConfig.PROJECT_ROOT, DatabaseConfig.DATABASE_NAME)
-
+os.makedirs(PathConfig.DATA_ROOT, exist_ok=True)
+DB_PATH = os.path.join(PathConfig.DATA_ROOT, DatabaseConfig.DATABASE_NAME)
 
 def init_db() -> sqlite3.Connection:
     """SQLite 데이터베이스를 초기화하고 테이블을 생성합니다."""

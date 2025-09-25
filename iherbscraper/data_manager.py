@@ -96,8 +96,12 @@ class DataManager:
             raise
     
     def initialize_output_csv(self, output_file_path):
-        """CSV 파일 헤더 초기화"""
         try:
+            # 출력 디렉토리 확인 및 생성
+            output_dir = os.path.dirname(output_file_path)
+            if output_dir:
+                os.makedirs(output_dir, exist_ok=True)
+                
             empty_df = pd.DataFrame(columns=IHerbConfig.OUTPUT_COLUMNS)
             empty_df.to_csv(output_file_path, index=False, encoding='utf-8-sig')
             print(f"  결과 파일 초기화: {output_file_path}")

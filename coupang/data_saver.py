@@ -1,5 +1,8 @@
+import sys
+import os
 import csv
 from datetime import datetime
+from config import PathConfig
 from coupang_config import CoupangConfig
 
 class DataSaver:
@@ -10,10 +13,10 @@ class DataSaver:
             return
         
         if not filename:
+            sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))            
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f'coupang_products_{timestamp}.csv'
+            filename = os.path.join(PathConfig.UNIFIED_OUTPUTS_DIR, f'coupang_products_{timestamp}.csv')
         
-        # 핵심 필드만 추가
         essential_fieldnames = CoupangConfig.REQUIRED_COLUMNS
         
         try:

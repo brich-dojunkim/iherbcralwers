@@ -75,9 +75,9 @@ class IHerbConfig:
     GEMINI_VISION_MODEL = APIConfig.GEMINI_VISION_MODEL
     
     # 이미지 디렉토리 (전역 기본 경로 사용)
-    COUPANG_IMAGES_DIR = os.path.join(PathConfig.PROJECT_ROOT, "coupang", PathConfig.COUPANG_IMAGES_DEFAULT_DIR)
-    IHERB_IMAGES_DIR = os.path.join(PathConfig.PROJECT_ROOT, "iherbscraper", PathConfig.IHERB_IMAGES_DEFAULT_DIR)
-    
+    COUPANG_IMAGES_DIR = PathConfig.UNIFIED_COUPANG_IMAGES_DIR
+    IHERB_IMAGES_DIR = PathConfig.UNIFIED_IHERB_IMAGES_DIR
+        
     # ========== 아이허브 전용 Gemini 설정 ==========
     GEMINI_MAX_RETRIES = 3
     GEMINI_TIMEOUT = 25

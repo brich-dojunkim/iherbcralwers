@@ -29,14 +29,14 @@ def run_pipeline(search_url: str, base_csv: str = None) -> str:
     validate_config()
     
     # outputs 디렉토리 생성 - 전역 설정 사용
-    outputs_dir = PathConfig.OUTPUTS_DIR
+    outputs_dir = PathConfig.UNIFIED_OUTPUTS_DIR
     os.makedirs(outputs_dir, exist_ok=True)
     
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     
     # 파일 경로 정의
-    coupang_csv = os.path.join(outputs_dir, f"coupang_crawled_{timestamp}.csv")
-    final_csv = os.path.join(outputs_dir, f"final_results_{timestamp}.csv")
+    coupang_csv = os.path.join(PathConfig.UNIFIED_OUTPUTS_DIR, f"coupang_crawled_{timestamp}.csv")
+    final_csv = os.path.join(PathConfig.UNIFIED_OUTPUTS_DIR, f"final_results_{timestamp}.csv")
     
     product_updater = ProductUpdater(enable_images=True)
     data_processor = DataProcessor()

@@ -28,7 +28,7 @@ class PriceUpdater:
     """가격 비교 업데이터"""
     
     def __init__(self, output_dir: str = None):
-        self.output_dir = output_dir or PathConfig.OUTPUTS_DIR
+        self.output_dir = output_dir or PathConfig.UNIFIED_OUTPUTS_DIR
         os.makedirs(self.output_dir, exist_ok=True)
         
         self.timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -117,7 +117,7 @@ class PriceUpdater:
 def main():
     """메인 실행 함수"""
     # 업데이터 실행
-    updater = PriceUpdater(output_dir="./output")
+    updater = PriceUpdater(output_dir=PathConfig.UNIFIED_OUTPUTS_DIR)
     
     try:
         result_csv = updater.run(

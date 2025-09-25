@@ -1,14 +1,17 @@
 import os
+import sys
 import requests
 from PIL import Image
 from datetime import datetime
+from config import PathConfig
 from coupang_config import CoupangConfig
 
 class ImageDownloader:
     def __init__(self, image_dir=None):
         if image_dir is None:
-            current_dir = os.path.dirname(os.path.abspath(__file__))
-            self.image_dir = os.path.join(current_dir, CoupangConfig.DEFAULT_IMAGE_DIR_NAME)
+            # Global config 사용
+            sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            self.image_dir = PathConfig.UNIFIED_COUPANG_IMAGES_DIR
         else:
             self.image_dir = image_dir
         

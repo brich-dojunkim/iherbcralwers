@@ -7,16 +7,21 @@
 4. 진행률 표시 단순화
 """
 
+import sys
 import os
 import pandas as pd
 import subprocess
 import time
 import google.generativeai as genai
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from config import PathConfig
+
+from iherb_config import IHerbConfig, FailureType
 from iherb_manager import BrowserManager
 from iherb_client import IHerbClient
 from product_matcher import ProductMatcher
 from data_manager import DataManager
-from iherb_config import IHerbConfig, FailureType
 
 class EnglishIHerbScraper:
     """영어명 기반 상품 매칭 - Gemini AI 통합"""
@@ -479,7 +484,7 @@ if __name__ == "__main__":
         )
         
         input_csv = "/Users/brich/Desktop/iherb_price/coupang/coupang_csv/coupang_products_v2_20250918_141436_translated.csv"
-        output_csv = "./output/final_results.csv"
+        output_csv = os.path.join(PathConfig.UNIFIED_OUTPUTS_DIR, "coupang_iherb_products_{timestamp}.csv")
         
         results = scraper.process_products_complete(
             csv_file_path=input_csv,

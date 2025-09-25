@@ -121,14 +121,14 @@ class ProductUpdater:
             print(f"   🔄 아이허브 매칭 시작: {len(new_products_df)}개 상품")
 
             # 1. outputs 폴더 생성
-            os.makedirs(PathConfig.OUTPUTS_DIR, exist_ok=True)
+            os.makedirs(PathConfig.UNIFIED_OUTPUTS_DIR, exist_ok=True)
             
             # 2. 출력 경로 설정
             if output_path:
                 matched_csv_path = output_path
             else:
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                matched_csv_path = f"./outputs/matched_products_{timestamp}.csv"
+                matched_csv_path = os.path.join(PathConfig.UNIFIED_OUTPUTS_DIR, f"matched_products_{timestamp}.csv")
 
             # 3. 입력 CSV를 outputs 폴더에 저장 (아이허브 스크래퍼 입력용)
             input_csv_path = matched_csv_path.replace('.csv', '_input.csv')
