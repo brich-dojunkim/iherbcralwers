@@ -16,19 +16,19 @@ from iherb_manager import BrowserManager
 from iherb_client import IHerbClient
 from product_matcher import ProductMatcher
 from data_manager import DataManager
-from config import Config, FailureType
+from iherb_config import IHerbConfig, FailureType
 
 class EnglishIHerbScraper:
     """영어명 기반 상품 매칭 - Gemini AI 통합"""
     
     def __init__(self, headless=False, delay_range=None, max_products_to_compare=None):
-        self.delay_range = delay_range or Config.DEFAULT_DELAY_RANGE
-        self.max_products_to_compare = max_products_to_compare or Config.MAX_PRODUCTS_TO_COMPARE
+        self.delay_range = delay_range or IHerbConfig.DEFAULT_DELAY_RANGE
+        self.max_products_to_compare = max_products_to_compare or IHerbConfig.MAX_PRODUCTS_TO_COMPARE
         self.success_count = 0
 
         # Gemini 번역 모델 초기화
-        genai.configure(api_key=Config.GEMINI_API_KEY)
-        self.translator = genai.GenerativeModel(Config.GEMINI_TEXT_MODEL)
+        genai.configure(api_key=IHerbConfig.GEMINI_API_KEY)
+        self.translator = genai.GenerativeModel(IHerbConfig.GEMINI_TEXT_MODEL)
 
         # 모듈 초기화
         self.browser_manager = BrowserManager(headless, self.delay_range)
@@ -179,7 +179,7 @@ class EnglishIHerbScraper:
                 print(f"  번역 실패 - 한글명 사용: {search_name}")
         
         # 브라우저 재시작 체크
-        if process_idx > 0 and process_idx % Config.BROWSER_RESTART_INTERVAL == 0:
+        if process_idx > 0 and process_idx % IHerbConfig.BROWSER_RESTART_INTERVAL == 0:
             self._restart_browser_if_needed()
         
         # 쿠팡 가격 정보 표시
@@ -215,7 +215,7 @@ class EnglishIHerbScraper:
     
     def _restart_browser_if_needed(self):
         """브라우저 재시작 처리"""
-        print(f"\n  === 브라우저 완전 재시작 (매 {Config.BROWSER_RESTART_INTERVAL}개마다) ===")
+        print(f"\n  === 브라우저 완전 재시작 (매 {IHerbConfig.BROWSER_RESTART_INTERVAL}개마다) ===")
         try:
             self._safe_browser_restart()
         except Exception as e:
@@ -316,10 +316,10 @@ class EnglishIHerbScraper:
         iherb_price_info = {}
         failure_type = FailureType.UNPROCESSED
         
-        for retry in range(Config.MAX_RETRIES):
+        for retry in range(IHerbConfig.MAX_RETRIES):
             try:
                 if retry > 0:
-                    print(f"  재시도 {retry + 1}/{Config.MAX_RETRIES}")
+                    print(f"  재시도 {retry + 1}/{IHerbConfig.MAX_RETRIES}")
                     time.sleep(5)
                 
                 # Gemini AI 기반 검색 실행
@@ -377,7 +377,7 @@ class EnglishIHerbScraper:
                 else:
                     failure_type = FailureType.PROCESSING_ERROR
                 
-                if retry == Config.MAX_RETRIES - 1:
+                if retry == IHerbConfig.MAX_RETRIES - 1:
                     print("  최대 재시도 횟수 초과 - 건너뜀")
                 else:
                     if self.browser_manager._is_critical_error(error_msg):

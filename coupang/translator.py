@@ -5,18 +5,13 @@ import os
 import re
 from typing import List, Optional
 import json
+from coupang_config import CoupangConfig
 
 class GeminiCSVTranslator:
-    def __init__(self, api_key: str):
-        """
-        Gemini API를 사용한 CSV 번역기 초기화
-        
-        Args:
-            api_key: Google Gemini API 키
-        """
+    def __init__(self, api_key: str = None):
+        api_key = api_key or CoupangConfig.GEMINI_API_KEY
         genai.configure(api_key=api_key)
-        # 유료 계정용 최신 모델 사용 (할당량 제한 없음)
-        self.model = genai.GenerativeModel('gemini-2.5-flash')
+        self.model = genai.GenerativeModel(CoupangConfig.GEMINI_TEXT_MODEL)
     
     def preprocess_korean_text(self, text: str) -> str:
         """
@@ -301,11 +296,8 @@ class GeminiCSVTranslator:
 
 # 사용 예시
 def main():
-    # API 키 설정
-    API_KEY = 'AIzaSyDNB7zwp36ICInpj3SRV9GiX7ovBxyFHHE'
-    
     # 번역기 초기화
-    translator = GeminiCSVTranslator(API_KEY)
+    translator = GeminiCSVTranslator()
     
     # 파일 경로 설정 (현재 프로젝트 구조에 맞게)
     input_file = '/Users/brich/Desktop/iherb_price/coupang/coupang_products_v2_20250922_170009.csv'

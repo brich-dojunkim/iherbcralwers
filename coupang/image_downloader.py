@@ -2,19 +2,13 @@ import os
 import requests
 from PIL import Image
 from datetime import datetime
+from coupang_config import CoupangConfig
 
 class ImageDownloader:
     def __init__(self, image_dir=None):
-        """
-        이미지 다운로더 초기화
-        
-        Args:
-            image_dir: 이미지 저장 디렉토리 (None이면 기본 경로 사용)
-        """
-        # 기본 경로: coupang/coupang_images
         if image_dir is None:
-            current_dir = os.path.dirname(os.path.abspath(__file__))  # coupang 폴더
-            self.image_dir = os.path.join(current_dir, 'coupang_images')
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            self.image_dir = os.path.join(current_dir, CoupangConfig.DEFAULT_IMAGE_DIR_NAME)
         else:
             self.image_dir = image_dir
         
@@ -255,11 +249,7 @@ class ImageDownloader:
                 image_url = 'https:' + image_url if image_url.startswith('//') else 'https://' + image_url
             
             # 이미지 다운로드
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-                'Referer': 'https://www.coupang.com/',
-                'Accept': 'image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
-            }
+            headers = CoupangConfig.DEFAULT_HEADERS
             
             response = requests.get(image_url, headers=headers, timeout=10, stream=True)
             response.raise_for_status()

@@ -1,14 +1,18 @@
 """
-iHerb 스크래퍼 설정 관리 - Gemini 2.5 Flash 적용 (최종 수정 버전)
-주요 변경사항:
-1. 매칭 관련 4개 컬럼 제거 (similarity_score, matching_reason, gemini_confidence, failure_type)
-2. 쿠팡 재고 관련 5개 컬럼 추가
-3. DOSAGE_MISMATCH 제거
-4. 최종 34개 컬럼 구조
+아이허브 스크래퍼 전용 설정 - 리팩토링된 버전
+전역 공통 설정은 config 모듈에서 import하고, 아이허브 전용 설정만 유지
 """
 
+import sys
+import os
+
+# 전역 설정 import
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from config import APIConfig, PathConfig
+
+
 class FailureType:
-    """실패 유형 분류 - 정리된 버전"""
+    """실패 유형 분류 - 아이허브 전용"""
     
     # 시스템 오류 (재시도 필요)
     BROWSER_ERROR = "BROWSER_ERROR"
@@ -26,7 +30,6 @@ class FailureType:
     # 정당한 실패 (재시도 불필요)
     NO_SEARCH_RESULTS = "NO_SEARCH_RESULTS"
     NO_MATCHING_PRODUCT = "NO_MATCHING_PRODUCT"
-    COUNT_MISMATCH = "COUNT_MISMATCH"
     GEMINI_NO_MATCH = "GEMINI_NO_MATCH"
     
     # 성공
@@ -57,44 +60,47 @@ class FailureType:
             cls.GEMINI_QUOTA_EXCEEDED: "Gemini API 할당량 초과",
             cls.NO_SEARCH_RESULTS: "검색 결과 없음",
             cls.NO_MATCHING_PRODUCT: "매칭되는 상품 없음",
-            cls.COUNT_MISMATCH: "개수 불일치",
             cls.GEMINI_NO_MATCH: "Gemini 판단: 동일 제품 없음",
             cls.SUCCESS: "성공"
         }
         return descriptions.get(failure_type, "알 수 없는 오류")
 
 
-class Config:
-    """스크래퍼 전역 설정 - Gemini 2.5 Flash 최적화 버전"""
+class IHerbConfig:
+    """아이허브 스크래퍼 설정 - 리팩토링된 버전"""
     
-    # ========== Gemini 2.5 Flash 설정 ==========
-    GEMINI_API_KEY = "AIzaSyA2r-_8ePWcmP-5o9esScT2pcOgj_57J3M"
-    GEMINI_TEXT_MODEL = "models/gemini-2.0-flash"
-    GEMINI_VISION_MODEL = "models/gemini-2.0-flash"
+    # ========== 전역 설정에서 가져오는 것들 ==========
+    GEMINI_API_KEY = APIConfig.GEMINI_API_KEY
+    GEMINI_TEXT_MODEL = APIConfig.GEMINI_TEXT_MODEL
+    GEMINI_VISION_MODEL = APIConfig.GEMINI_VISION_MODEL
+    
+    # 이미지 디렉토리 (전역 기본 경로 사용)
+    COUPANG_IMAGES_DIR = os.path.join(PathConfig.PROJECT_ROOT, "coupang", PathConfig.COUPANG_IMAGES_DEFAULT_DIR)
+    IHERB_IMAGES_DIR = os.path.join(PathConfig.PROJECT_ROOT, "iherbscraper", PathConfig.IHERB_IMAGES_DEFAULT_DIR)
+    
+    # ========== 아이허브 전용 Gemini 설정 ==========
     GEMINI_MAX_RETRIES = 3
     GEMINI_TIMEOUT = 25
     GEMINI_RATE_LIMIT_DELAY = 5
     
-    # ========== 이미지 비교 설정 ==========
-    COUPANG_IMAGES_DIR = "/Users/brich/Desktop/iherb_price/coupang/coupang_images"
-    IHERB_IMAGES_DIR = "/Users/brich/Desktop/iherb_price/iherbscraper/iherb_images"
+    # ========== 아이허브 전용 이미지 비교 설정 ==========
     IMAGE_COMPARISON_ENABLED = True
     IMAGE_DOWNLOAD_TIMEOUT = 12
     MAX_IMAGE_SIZE_MB = 8
     
-    # ========== 브라우저 설정 ==========
+    # ========== 아이허브 전용 브라우저 설정 ==========
     DEFAULT_DELAY_RANGE = (1.5, 3)
     MAX_RETRIES = 3
     BROWSER_RESTART_INTERVAL = 25
     PAGE_LOAD_TIMEOUT = 18
     IMPLICIT_WAIT = 2.5
     
-    # ========== 검색 설정 ==========
+    # ========== 아이허브 전용 검색 설정 ==========
     MAX_PRODUCTS_TO_COMPARE = 4
     BASE_URL = "https://www.iherb.com"
     KOREA_URL = "https://kr.iherb.com"
     
-    # ========== 브라우저 옵션 ==========
+    # ========== 아이허브 전용 브라우저 옵션 ==========
     CHROME_OPTIONS = [
         "--no-sandbox",
         "--disable-dev-shm-usage",
@@ -116,7 +122,7 @@ class Config:
         "--page-load-strategy=eager"
     ]
     
-    # ========== CSS 선택자 ==========
+    # ========== 아이허브 전용 CSS 선택자 ==========
     SELECTORS = {
         'settings_button': '.selected-country-wrapper',
         'english_option': '[data-val="en-US"]',
@@ -134,7 +140,7 @@ class Config:
         'part_number': '[data-part-number]',
     }
     
-    # ========== 정규표현식 패턴 ==========
+    # ========== 아이허브 전용 정규표현식 패턴 ==========
     PATTERNS = {
         'item_code': r'item\s*code:\s*([A-Z0-9-]+)',
         'product_code_url': r'/pr/([A-Z0-9-]+)',
@@ -168,7 +174,7 @@ class Config:
         'krw_price_quoted': r'"₩([\d,]+)"',
     }
     
-    # ========== 출력 컬럼 (최종 34개) - 매칭 컬럼 제거 + 쿠팡 재고 추가 ==========
+    # ========== 아이허브 전용 출력 컬럼 ==========
     OUTPUT_COLUMNS = [
         # 상품정보 (5개)
         'iherb_product_name', 
@@ -195,11 +201,11 @@ class Config:
         'iherb_discount_percent',
         'iherb_subscription_discount',
         
-        # 쿠팡재고 (5개) - 🆕 추가
-        'coupang_stock_status',      # 쿠팡 재고 상태
-        'coupang_delivery_badge',    # 배송 정보
-        'coupang_origin_country',    # 원산지
-        'coupang_unit_price',        # 단위가격
+        # 쿠팡재고 (5개)
+        'coupang_stock_status',
+        'coupang_delivery_badge',
+        'coupang_origin_country',
+        'coupang_unit_price',
         
         # 아이허브재고 (4개)
         'iherb_price_per_unit',

@@ -5,6 +5,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
 from bs4 import BeautifulSoup
+from coupang_config import CoupangConfig
 
 class PageNavigator:
     def __init__(self, browser_manager, scraper, image_downloader):
@@ -13,9 +14,10 @@ class PageNavigator:
         self.image_downloader = image_downloader
         self.products = []
     
-    def wait_for_page_load(self, timeout=20):
+    def wait_for_page_load(self, timeout=None):
         """페이지 로딩 대기"""
         try:
+            timeout = timeout or CoupangConfig.PAGE_LOAD_TIMEOUT
             wait = WebDriverWait(self.browser.driver, timeout)
             
             # 상품 리스트 또는 에러 메시지 대기

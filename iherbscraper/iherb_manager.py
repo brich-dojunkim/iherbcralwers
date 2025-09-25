@@ -9,15 +9,14 @@ import undetected_chromedriver as uc
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, WebDriverException
-from iherbscraper.iherb_settings import Config
-
+from iherb_config import IHerbConfig
 
 class BrowserManager:
     """브라우저 초기화, 관리, 안전한 페이지 로딩 담당"""
     
     def __init__(self, headless=False, delay_range=None):
         self.headless = headless
-        self.delay_range = delay_range or Config.DEFAULT_DELAY_RANGE
+        self.delay_range = delay_range or IHerbConfig.DEFAULT_DELAY_RANGE
         self.driver = None
         
         self._initialize_browser()
@@ -32,14 +31,14 @@ class BrowserManager:
                 options.add_argument("--headless=new")
             
             # 설정에서 옵션 추가
-            for option in Config.CHROME_OPTIONS:
+            for option in IHerbConfig.CHROME_OPTIONS:
                 options.add_argument(option)
             
             self.driver = uc.Chrome(options=options, version_main=None)
             
             # 타임아웃 설정
-            self.driver.set_page_load_timeout(Config.PAGE_LOAD_TIMEOUT)
-            self.driver.implicitly_wait(Config.IMPLICIT_WAIT)
+            self.driver.set_page_load_timeout(IHerbConfig.PAGE_LOAD_TIMEOUT)
+            self.driver.implicitly_wait(IHerbConfig.IMPLICIT_WAIT)
             
             # WebDriver 감지 방지
             self.driver.execute_script("""
@@ -56,7 +55,7 @@ class BrowserManager:
     
     def safe_get(self, url, max_retries=None):
         """안전한 페이지 로딩"""
-        max_retries = max_retries or Config.MAX_RETRIES
+        max_retries = max_retries or IHerbConfig.MAX_RETRIES
         
         for attempt in range(max_retries):
             try:

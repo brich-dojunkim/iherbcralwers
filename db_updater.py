@@ -1,6 +1,9 @@
+import os
 import sqlite3
+from config import DatabaseConfig, PathConfig
 
-conn = sqlite3.connect('updater.db')
+db_path = os.path.join(PathConfig.PROJECT_ROOT, DatabaseConfig.DATABASE_NAME)
+conn = sqlite3.connect(db_path)
 cursor = conn.cursor()
 cursor.execute("""
     CREATE TABLE IF NOT EXISTS brand_info (

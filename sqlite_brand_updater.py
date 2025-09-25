@@ -33,16 +33,10 @@ import datetime
 import os
 import sqlite3
 import sys
+from config import DatabaseConfig, PathConfig
+from improved_updater import run_pipeline
 
-# 개선된 파이프라인 함수 임포트
-try:
-    from improved_updater import run_pipeline
-except ImportError as e:
-    print(f"improved_updater 모듈을 로드할 수 없습니다: {e}")
-    sys.exit(1)
-
-
-DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'updater.db')
+DB_PATH = os.path.join(PathConfig.PROJECT_ROOT, DatabaseConfig.DATABASE_NAME)
 
 
 def init_db() -> sqlite3.Connection:

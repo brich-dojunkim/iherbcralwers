@@ -10,9 +10,8 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
-from config import Config
 from PIL import Image
-
+from iherb_config import IHerbConfig
 
 class IHerbClient:
     """아이허브 사이트와의 모든 상호작용 담당 - 이미지 크롤링 포함"""
@@ -29,7 +28,7 @@ class IHerbClient:
             print("  아이허브 언어 설정 (자동)...")
             
             # 1. 한국 아이허브 페이지 접속
-            if not self.browser.safe_get(Config.KOREA_URL):
+            if not self.browser.safe_get(IHerbConfig.KOREA_URL):
                 print("  아이허브 접속 실패 - 기본 설정으로 진행")
                 return False
             
@@ -148,7 +147,7 @@ class IHerbClient:
             # 검색 결과 로딩 대기
             try:
                 WebDriverWait(self.driver, 5).until(
-                    EC.presence_of_element_located((By.CSS_SELECTOR, Config.SELECTORS['product_containers']))
+                    EC.presence_of_element_located((By.CSS_SELECTOR, IHerbConfig.SELECTORS['product_containers']))
                 )
             except TimeoutException:
                 print("    검색 결과 로딩 실패")
@@ -156,15 +155,15 @@ class IHerbClient:
             
             product_elements = self.driver.find_elements(
                 By.CSS_SELECTOR, 
-                Config.SELECTORS['product_containers']
-            )[:Config.MAX_PRODUCTS_TO_COMPARE]
+                IHerbConfig.SELECTORS['product_containers']
+            )[:IHerbConfig.MAX_PRODUCTS_TO_COMPARE]
             
             for i, element in enumerate(product_elements):
                 try:
-                    link_elem = element.find_element(By.CSS_SELECTOR, Config.SELECTORS['product_link'])
+                    link_elem = element.find_element(By.CSS_SELECTOR, IHerbConfig.SELECTORS['product_link'])
                     product_url = link_elem.get_attribute("href")
                     
-                    title_elem = element.find_element(By.CSS_SELECTOR, Config.SELECTORS['product_title'])
+                    title_elem = element.find_element(By.CSS_SELECTOR, IHerbConfig.SELECTORS['product_title'])
                     product_title = title_elem.text.strip()
                     
                     if product_url and "/pr/" in product_url and product_title:
@@ -187,7 +186,7 @@ class IHerbClient:
     
     def extract_product_name(self):
         """상품명 추출 - 타임아웃 단축"""
-        for selector in Config.SELECTORS['product_name']:
+        for selector in IHerbConfig.SELECTORS['product_name']:
             try:
                 element = self.driver.find_element(By.CSS_SELECTOR, selector)
                 name = element.text.strip()
@@ -201,7 +200,7 @@ class IHerbClient:
         """상품코드 추출 - 빠른 우선순위"""
         # 방법 1: URL에서 추출 (가장 빠름)
         try:
-            url_match = re.search(Config.PATTERNS['product_code_url'], product_url)
+            url_match = re.search(IHerbConfig.PATTERNS['product_code_url'], product_url)
             if url_match:
                 return url_match.group(1)
         except:
@@ -209,7 +208,7 @@ class IHerbClient:
         
         # 방법 2: data 속성에서 찾기
         try:
-            elements = self.driver.find_elements(By.CSS_SELECTOR, Config.SELECTORS['part_number'])
+            elements = self.driver.find_elements(By.CSS_SELECTOR, IHerbConfig.SELECTORS['part_number'])
             for element in elements:
                 value = element.get_attribute("data-part-number")
                 if value and re.match(r'^[A-Z0-9-]+$', value):
@@ -219,9 +218,9 @@ class IHerbClient:
         
         # 방법 3: product-specs-list에서 찾기 (가장 느림)
         try:
-            specs_element = self.driver.find_element(By.CSS_SELECTOR, Config.SELECTORS['product_specs'])
+            specs_element = self.driver.find_element(By.CSS_SELECTOR, IHerbConfig.SELECTORS['product_specs'])
             text = specs_element.text
-            match = re.search(Config.PATTERNS['item_code'], text, re.IGNORECASE)
+            match = re.search(IHerbConfig.PATTERNS['item_code'], text, re.IGNORECASE)
             if match:
                 return match.group(1)
         except:
@@ -257,9 +256,9 @@ class IHerbClient:
         try:
             # 1. 할인가 추출 (우선순위별)
             discount_patterns = [
-                Config.PATTERNS['krw_discount_price_red'],      # 빨간색 할인가 (가장 정확)
-                Config.PATTERNS['krw_discount_price_simple'],   # 일반 할인가
-                Config.PATTERNS['krw_out_of_stock_price'],      # 품절 상품 가격
+                IHerbConfig.PATTERNS['krw_discount_price_red'],      # 빨간색 할인가 (가장 정확)
+                IHerbConfig.PATTERNS['krw_discount_price_simple'],   # 일반 할인가
+                IHerbConfig.PATTERNS['krw_out_of_stock_price'],      # 품절 상품 가격
             ]
             
             for pattern in discount_patterns:
@@ -270,8 +269,8 @@ class IHerbClient:
             
             # 2. 정가 추출 (모든 매치에서 최고가 선택)
             list_patterns = [
-                Config.PATTERNS['krw_list_price_span'],      # span 태그 내 정가
-                Config.PATTERNS['krw_list_price_general'],   # 일반 정가
+                IHerbConfig.PATTERNS['krw_list_price_span'],      # span 태그 내 정가
+                IHerbConfig.PATTERNS['krw_list_price_general'],   # 일반 정가
             ]
             
             all_list_prices = []
@@ -291,8 +290,8 @@ class IHerbClient:
             
             # 3. 할인율 추출
             percent_patterns = [
-                Config.PATTERNS['percent_off_bracket'],   # (29% off) 형태
-                Config.PATTERNS['percent_off_simple'],    # 29% off 형태
+                IHerbConfig.PATTERNS['percent_off_bracket'],   # (29% off) 형태
+                IHerbConfig.PATTERNS['percent_off_simple'],    # 29% off 형태
             ]
             
             for pattern in percent_patterns:
@@ -303,9 +302,9 @@ class IHerbClient:
             
             # 4. 단위당 가격 추출
             unit_patterns = [
-                Config.PATTERNS['price_per_unit_span'],      # span 태그 내
-                Config.PATTERNS['price_per_serving_direct'], # ₩xxx/serving 직접
-                Config.PATTERNS['price_per_unit_text'],      # 일반 텍스트
+                IHerbConfig.PATTERNS['price_per_unit_span'],      # span 태그 내
+                IHerbConfig.PATTERNS['price_per_serving_direct'], # ₩xxx/serving 직접
+                IHerbConfig.PATTERNS['price_per_unit_text'],      # 일반 텍스트
             ]
             
             for pattern in unit_patterns:
@@ -319,8 +318,8 @@ class IHerbClient:
             
             # 5. 정기배송 할인 추출
             subscription_patterns = [
-                Config.PATTERNS['subscription_discount_future'],   # future orders
-                Config.PATTERNS['subscription_discount_autoship'], # autoship
+                IHerbConfig.PATTERNS['subscription_discount_future'],   # future orders
+                IHerbConfig.PATTERNS['subscription_discount_autoship'], # autoship
             ]
             
             for pattern in subscription_patterns:
@@ -331,8 +330,8 @@ class IHerbClient:
             
             # 6. 품절 상태 확인
             stock_patterns = [
-                Config.PATTERNS['out_of_stock_testid'],   # data-testid 기반
-                Config.PATTERNS['out_of_stock_text'],     # 일반 텍스트
+                IHerbConfig.PATTERNS['out_of_stock_testid'],   # data-testid 기반
+                IHerbConfig.PATTERNS['out_of_stock_text'],     # 일반 텍스트
             ]
             
             is_out_of_stock = False
@@ -347,8 +346,8 @@ class IHerbClient:
             # 7. 재입고 날짜 추출 (품절인 경우만)
             if is_out_of_stock:
                 back_stock_patterns = [
-                    Config.PATTERNS['back_in_stock_date_testid'],  # data-testid 기반
-                    Config.PATTERNS['back_in_stock_general'],      # 일반 패턴
+                    IHerbConfig.PATTERNS['back_in_stock_date_testid'],  # data-testid 기반
+                    IHerbConfig.PATTERNS['back_in_stock_general'],      # 일반 패턴
                 ]
                 
                 for pattern in back_stock_patterns:

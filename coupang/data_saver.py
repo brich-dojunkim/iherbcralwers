@@ -1,5 +1,6 @@
 import csv
 from datetime import datetime
+from coupang_config import CoupangConfig
 
 class DataSaver:
     def save_to_csv(self, products, filename=None):
@@ -13,17 +14,7 @@ class DataSaver:
             filename = f'coupang_products_{timestamp}.csv'
         
         # 핵심 필드만 추가
-        essential_fieldnames = [
-            'product_id', 'product_name', 'product_url',
-            'current_price', 'original_price', 'discount_rate',
-            'unit_price',          # 🆕 단위당 가격
-            'rating', 'review_count', 'delivery_badge',
-            'is_rocket', 
-            'stock_status',        # 🆕 품절 상태
-            'origin_country',      # 🆕 원산지 정보
-            'image_url', 'image_local_path', 
-            'image_filename', 'crawled_at'
-        ]
+        essential_fieldnames = CoupangConfig.REQUIRED_COLUMNS
         
         try:
             with open(filename, 'w', newline='', encoding='utf-8-sig') as csvfile:

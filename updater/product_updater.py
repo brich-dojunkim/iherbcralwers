@@ -28,11 +28,12 @@ sys.path.insert(0, parent_dir)
 sys.path.insert(0, coupang_dir)
 sys.path.insert(0, iherbscraper_dir)
 
+from config import PathConfig, APIConfig
+from iherbscraper.iherb_config import IHerbConfig
+from coupang.coupang_config import CoupangConfig
 from coupang.crawler import CoupangCrawlerMacOS
 from iherbscraper.main import EnglishIHerbScraper
 from coupang.translator import GeminiCSVTranslator
-from iherbscraper.config import Config
-
 
 class ProductUpdater:
     """쿠팡 크롤링과 아이허브 매칭을 통합한 상품 업데이터 - 단순화된 버전"""
@@ -55,20 +56,8 @@ class ProductUpdater:
             print(f"   이미지 저장: 기본 경로 (coupang/coupang_images)")
 
     def crawl_coupang_products(self, search_url: str) -> pd.DataFrame:
-        """
-        쿠팡 상품 크롤링 - 기본 이미지 경로 사용
-
-        Args:
-            search_url: 쿠팡 검색 결과 URL
-
-        Returns:
-            크롤링된 상품 DataFrame. 예외 발생 시 또는 중단 시 빈 DataFrame을 반환합니다.
-        """
         # 필수 컬럼을 함수 시작 부분에서 정의하여 예외 상황에서도 참조할 수 있도록 합니다.
-        required_columns = [
-            'product_id', 'product_name', 'current_price',
-            'original_price', 'discount_rate'
-        ]
+        required_columns = CoupangConfig.REQUIRED_COLUMNS[:5]  # 기본 5개만
         try:
             print(f"   🔄 쿠팡 크롤링 시작")
             print(f"   📍 URL: {search_url[:80]}...")
@@ -124,14 +113,6 @@ class ProductUpdater:
             return pd.DataFrame(columns=required_columns)
 
     def match_iherb_products(self, new_products_df: pd.DataFrame, output_path: str | None = None) -> pd.DataFrame:
-        """
-        신규 상품들을 아이허브와 매칭 - 실시간 저장 지원
-        
-        핵심 개선:
-        - output_path를 outputs 폴더에 자동 생성
-        - 실시간 저장으로 중단되어도 결과 보존
-        - 아이허브 스크래퍼의 자동 재시작 기능 활용
-        """
         if len(new_products_df) == 0:
             print(f"   📝 매칭할 신규 상품이 없습니다")
             return pd.DataFrame()
@@ -140,7 +121,7 @@ class ProductUpdater:
             print(f"   🔄 아이허브 매칭 시작: {len(new_products_df)}개 상품")
 
             # 1. outputs 폴더 생성
-            os.makedirs("./outputs", exist_ok=True)
+            os.makedirs(PathConfig.OUTPUTS_DIR, exist_ok=True)
             
             # 2. 출력 경로 설정
             if output_path:
@@ -157,7 +138,7 @@ class ProductUpdater:
             print(f"   📝 번역 시작")
             translated_csv_path = matched_csv_path.replace('.csv', '_translated.csv')
             
-            self.translator = GeminiCSVTranslator(Config.GEMINI_API_KEY)
+            self.translator = GeminiCSVTranslator()
             _ = self.translator.translate_csv(
                 input_file=input_csv_path,
                 output_file=translated_csv_path,

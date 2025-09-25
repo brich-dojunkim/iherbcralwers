@@ -1,5 +1,6 @@
 import re
 from datetime import datetime
+from coupang_config import CoupangConfig
 
 class ProductScraper:
     def clean_text(self, text):
@@ -47,9 +48,9 @@ class ProductScraper:
             
             # 상품명 - 새로운 구조 대응
             name_selectors = [
-                'div.ProductUnit_productNameV2__cV9cw',  # 새로운 V2 구조
-                'div.ProductUnit_productName__gre7e',    # 기존 구조 (백업)
-                '[class*="ProductUnit_productName"]',    # 포괄적 선택자
+                CoupangConfig.SELECTORS['product_name_v2'],
+                CoupangConfig.SELECTORS['product_name_legacy'],
+                CoupangConfig.SELECTORS['product_name_general'],
             ]
             
             product_name = ''

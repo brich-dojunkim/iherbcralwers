@@ -9,8 +9,7 @@
 
 import os
 import pandas as pd
-from config import Config, FailureType
-
+from iherb_config import IHerbConfig, FailureType
 
 class DataManager:
     """CSV 파일 처리, 결과 저장, 진행상황 관리 담당 - Gemini API 지원"""
@@ -99,10 +98,10 @@ class DataManager:
     def initialize_output_csv(self, output_file_path):
         """CSV 파일 헤더 초기화"""
         try:
-            empty_df = pd.DataFrame(columns=Config.OUTPUT_COLUMNS)
+            empty_df = pd.DataFrame(columns=IHerbConfig.OUTPUT_COLUMNS)
             empty_df.to_csv(output_file_path, index=False, encoding='utf-8-sig')
             print(f"  결과 파일 초기화: {output_file_path}")
-            print(f"  총 {len(Config.OUTPUT_COLUMNS)}개 컬럼 생성")
+            print(f"  총 {len(IHerbConfig.OUTPUT_COLUMNS)}개 컬럼 생성")
             
         except Exception as e:
             print(f"  CSV 초기화 실패: {e}")
@@ -110,8 +109,8 @@ class DataManager:
     def append_result_to_csv(self, result, output_file_path):
         """결과를 CSV에 즉시 추가 (누적 방식) - 컬럼 순서 보장"""
         try:
-            ordered_values = [result.get(col, '') for col in Config.OUTPUT_COLUMNS]
-            result_df = pd.DataFrame([ordered_values], columns=Config.OUTPUT_COLUMNS)
+            ordered_values = [result.get(col, '') for col in IHerbConfig.OUTPUT_COLUMNS]
+            result_df = pd.DataFrame([ordered_values], columns=IHerbConfig.OUTPUT_COLUMNS)
             
             result_df.to_csv(
                 output_file_path, 

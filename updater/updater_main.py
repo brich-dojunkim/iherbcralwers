@@ -19,6 +19,7 @@ sys.path.insert(0, parent_dir)
 sys.path.insert(0, coupang_dir)
 sys.path.insert(0, iherbscraper_dir)
 
+from config import PathConfig
 from data_processor import DataProcessor
 from product_updater import ProductUpdater
 
@@ -26,9 +27,9 @@ from product_updater import ProductUpdater
 class PriceUpdater:
     """가격 비교 업데이터"""
     
-    def __init__(self, output_dir: str = "./output"):
-        self.output_dir = output_dir
-        os.makedirs(output_dir, exist_ok=True)
+    def __init__(self, output_dir: str = None):
+        self.output_dir = output_dir or PathConfig.OUTPUTS_DIR
+        os.makedirs(self.output_dir, exist_ok=True)
         
         self.timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         self.final_csv = os.path.join(output_dir, f"updated_price_comparison_{self.timestamp}.csv")

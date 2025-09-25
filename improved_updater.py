@@ -9,6 +9,7 @@ import os
 import sys
 import pandas as pd
 from datetime import datetime
+from config import PathConfig, validate_config
 
 # 모듈 경로 설정
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -24,17 +25,11 @@ except Exception as e:
     raise
 
 def run_pipeline(search_url: str, base_csv: str = None) -> str:
-    """
-    간소화된 파이프라인
+    # 설정 검증 추가
+    validate_config()
     
-    핵심 개선사항:
-    1. outputs 폴더에 모든 결과 저장
-    2. 쿠팡 크롤링 결과 재사용
-    3. 아이허브 매칭 중단점부터 재시작
-    """
-    
-    # outputs 디렉토리 생성
-    outputs_dir = "./outputs"
+    # outputs 디렉토리 생성 - 전역 설정 사용
+    outputs_dir = PathConfig.OUTPUTS_DIR
     os.makedirs(outputs_dir, exist_ok=True)
     
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")

@@ -10,7 +10,7 @@ import os
 import requests
 from PIL import Image
 from io import BytesIO
-from config import Config, FailureType
+from iherb_config import IHerbConfig, FailureType
 
 try:
     import google.generativeai as genai
@@ -37,14 +37,14 @@ class ProductMatcher:
             raise ImportError("google-generativeai 패키지가 설치되지 않았습니다.")
         
         try:
-            genai.configure(api_key=Config.GEMINI_API_KEY)
-            self.text_model = genai.GenerativeModel(Config.GEMINI_TEXT_MODEL)
-            self.vision_model = genai.GenerativeModel(Config.GEMINI_VISION_MODEL)
+            genai.configure(api_key=IHerbConfig.GEMINI_API_KEY)
+            self.text_model = genai.GenerativeModel(IHerbConfig.GEMINI_TEXT_MODEL)
+            self.vision_model = genai.GenerativeModel(IHerbConfig.GEMINI_VISION_MODEL)
             
             print("  Gemini AI 초기화 완료")
-            print(f"    텍스트 모델: {Config.GEMINI_TEXT_MODEL}")
-            print(f"    Vision 모델: {Config.GEMINI_VISION_MODEL}")
-            print(f"    이미지 비교: {'활성화' if Config.IMAGE_COMPARISON_ENABLED else '비활성화'}")
+            print(f"    텍스트 모델: {IHerbConfig.GEMINI_TEXT_MODEL}")
+            print(f"    Vision 모델: {IHerbConfig.GEMINI_VISION_MODEL}")
+            print(f"    이미지 비교: {'활성화' if IHerbConfig.IMAGE_COMPARISON_ENABLED else '비활성화'}")
             
         except Exception as e:
             print(f"  Gemini AI 초기화 실패: {e}")
@@ -60,7 +60,7 @@ class ProductMatcher:
     
     def _safe_gemini_call(self, prompt, max_retries=None, use_vision=False, image_data=None):
         """안전한 Gemini API 호출"""
-        max_retries = max_retries or Config.GEMINI_MAX_RETRIES
+        max_retries = max_retries or IHerbConfig.GEMINI_MAX_RETRIES
         
         safety_settings = [
             {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
@@ -72,8 +72,8 @@ class ProductMatcher:
         for attempt in range(max_retries):
             try:
                 current_time = time.time()
-                if current_time - self.last_api_call_time < Config.GEMINI_RATE_LIMIT_DELAY:
-                    time.sleep(Config.GEMINI_RATE_LIMIT_DELAY)
+                if current_time - self.last_api_call_time < IHerbConfig.GEMINI_RATE_LIMIT_DELAY:
+                    time.sleep(IHerbConfig.GEMINI_RATE_LIMIT_DELAY)
                 
                 generation_config = {
                     'temperature': 0.0,
@@ -159,7 +159,7 @@ class ProductMatcher:
                 return None
             
             file_size_mb = os.path.getsize(image_path) / (1024 * 1024)
-            if file_size_mb > Config.MAX_IMAGE_SIZE_MB:
+            if file_size_mb > IHerbConfig.MAX_IMAGE_SIZE_MB:
                 return None
             
             with Image.open(image_path) as img:
@@ -185,12 +185,12 @@ class ProductMatcher:
     def _download_iherb_image(self, product_url, product_code):
         """아이허브 이미지 다운로드"""
         try:
-            if not Config.IMAGE_COMPARISON_ENABLED:
+            if not IHerbConfig.IMAGE_COMPARISON_ENABLED:
                 return None
             
-            os.makedirs(Config.IHERB_IMAGES_DIR, exist_ok=True)
+            os.makedirs(IHerbConfig.IHERB_IMAGES_DIR, exist_ok=True)
             image_filename = f"iherb_{product_code}.jpg"
-            image_path = os.path.join(Config.IHERB_IMAGES_DIR, image_filename)
+            image_path = os.path.join(IHerbConfig.IHERB_IMAGES_DIR, image_filename)
             
             if os.path.exists(image_path) and os.path.getsize(image_path) > 1024:
                 return image_path
@@ -204,7 +204,7 @@ class ProductMatcher:
                 'Referer': 'https://www.iherb.com/'
             }
             
-            response = requests.get(image_url, headers=headers, timeout=Config.IMAGE_DOWNLOAD_TIMEOUT)
+            response = requests.get(image_url, headers=headers, timeout=IHerbConfig.IMAGE_DOWNLOAD_TIMEOUT)
             response.raise_for_status()
             
             with open(image_path, 'wb') as f:
@@ -225,7 +225,7 @@ class ProductMatcher:
     def _compare_images_with_gemini(self, coupang_image_path, iherb_image_path, search_name):
         """Gemini Vision으로 이미지 비교"""
         try:
-            if not Config.IMAGE_COMPARISON_ENABLED:
+            if not IHerbConfig.IMAGE_COMPARISON_ENABLED:
                 return {'success': False, 'reason': 'image_comparison_disabled'}
             
             coupang_image = self._load_image_for_gemini(coupang_image_path)
@@ -386,7 +386,7 @@ Answer:"""
         
         # UNCERTAIN인 경우에만 이미지 검증
         needs_image_verification = (
-            Config.IMAGE_COMPARISON_ENABLED and 
+            IHerbConfig.IMAGE_COMPARISON_ENABLED and 
             coupang_product_id and
             text_details.get('needs_image_verification', False)
         )
@@ -407,7 +407,7 @@ Answer:"""
             print(f"    " + "-"*40)
             
             coupang_image_path = os.path.join(
-                Config.COUPANG_IMAGES_DIR, 
+                IHerbConfig.COUPANG_IMAGES_DIR, 
                 f"coupang_{coupang_product_id}.jpg"
             )
 
@@ -494,11 +494,11 @@ Answer:"""
         try:
             print("\n" + "="*80)
             print(f"🔍 Gemini 전담 매칭: {search_name}")
-            if coupang_product_id and Config.IMAGE_COMPARISON_ENABLED:
+            if coupang_product_id and IHerbConfig.IMAGE_COMPARISON_ENABLED:
                 print(f"🏷️ 쿠팡 ID: {coupang_product_id}")
             print("="*80)
             
-            search_url = f"{Config.BASE_URL}/search?kw={urllib.parse.quote(search_name)}"
+            search_url = f"{IHerbConfig.BASE_URL}/search?kw={urllib.parse.quote(search_name)}"
             products = self.iherb_client.get_multiple_products(search_url)
             
             if not products:
