@@ -36,7 +36,7 @@ import sys
 
 # 개선된 파이프라인 함수 임포트
 try:
-    from improved_updater import run_enhanced_pipeline
+    from improved_updater import run_pipeline
 except ImportError as e:
     print(f"improved_updater 모듈을 로드할 수 없습니다: {e}")
     sys.exit(1)
@@ -156,7 +156,7 @@ def main() -> int:
 
     # 파이프라인 실행
     try:
-        result_csv = run_enhanced_pipeline(coupang_url, base_csv)
+        result_csv = run_pipeline(coupang_url, base_csv)
         if result_csv:
             # 마지막 업데이트 일자 갱신
             today = datetime.date.today().isoformat()
