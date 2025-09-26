@@ -5,6 +5,7 @@
 2. 쿠팡 재고 관련 5개 컬럼 추가
 3. create_result_record 메서드 수정
 4. 사용되지 않는 메서드 제거
+5. 부분 완성본 감지 로직 추가
 """
 
 import os
@@ -17,12 +18,26 @@ class DataManager:
     def __init__(self):
         pass
     
-    def auto_detect_start_point(self, input_csv_path, output_csv_path):
-        """기존 결과를 분석해서 시작점 자동 감지 - Gemini API 제한 고려"""
+    def auto_detect_start_point(self, input_csv_path, output_csv_path, brand_name=None):
+        """기존 결과를 분석해서 시작점 자동 감지 - 부분 완성본 포함"""
         try:
-            if not os.path.exists(output_csv_path):
-                print("  결과 파일 없음 - 처음부터 시작")
-                return 0, []
+            # 1순위: 지정된 output_csv_path 확인
+            if os.path.exists(output_csv_path):
+                print(f"  지정된 결과 파일 발견: {os.path.basename(output_csv_path)}")
+            else:
+                # 2순위: 브랜드의 부분 완성본 찾기
+                if brand_name:
+                    from config import PathConfig
+                    partial_file = PathConfig.find_partial_data(brand_name)
+                    if partial_file:
+                        print(f"  부분 완성본 발견: {os.path.basename(partial_file)}")
+                        output_csv_path = partial_file
+                    else:
+                        print("  결과 파일 없음 - 처음부터 시작")
+                        return 0, []
+                else:
+                    print("  결과 파일 없음 - 처음부터 시작")
+                    return 0, []
             
             existing_df = pd.read_csv(output_csv_path, encoding='utf-8-sig')
             
@@ -96,6 +111,7 @@ class DataManager:
             raise
     
     def initialize_output_csv(self, output_file_path):
+        """CSV 파일 헤더 초기화"""
         try:
             # 출력 디렉토리 확인 및 생성
             output_dir = os.path.dirname(output_file_path)

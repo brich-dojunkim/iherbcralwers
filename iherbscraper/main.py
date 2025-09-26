@@ -7,16 +7,17 @@
 4. 진행률 표시 단순화
 """
 
-import sys
 import os
+import sys
 import pandas as pd
 import subprocess
 import time
 import google.generativeai as genai
+from datetime import datetime
 
+# 프로젝트 루트를 Python path에 추가
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import PathConfig
-
 from iherb_config import IHerbConfig, FailureType
 from iherb_manager import BrowserManager
 from iherb_client import IHerbClient
@@ -484,7 +485,10 @@ if __name__ == "__main__":
         )
         
         input_csv = "/Users/brich/Desktop/iherb_price/coupang/coupang_csv/coupang_products_v2_20250918_141436_translated.csv"
-        output_csv = os.path.join(PathConfig.UNIFIED_OUTPUTS_DIR, "coupang_iherb_products_{timestamp}.csv")
+        # 브랜드명을 추출하거나 기본값 사용
+        brand_name = "thorne"  # 또는 입력 파일명에서 추출
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_csv = os.path.join(PathConfig.UNIFIED_OUTPUTS_DIR, f"iherb_matched_{brand_name}_{timestamp}_partial.csv")
         
         results = scraper.process_products_complete(
             csv_file_path=input_csv,

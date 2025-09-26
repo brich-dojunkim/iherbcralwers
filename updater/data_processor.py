@@ -1,5 +1,5 @@
 """
-데이터 처리 모듈 - 향상된 상품 상태 추적 (이중 시점 추적)
+데이터 처리 모듈 - 향상된 상품 상태 추적 (이중 시점 추적) + 브랜드 메타데이터
 """
 
 import pandas as pd
@@ -181,8 +181,8 @@ class DataProcessor:
         # 이 메서드는 호환성을 위해 유지하되 실제로는 사용하지 않음
         return base_df
     
-    def integrate_final_data(self, updated_base_df: pd.DataFrame, matched_new_df: pd.DataFrame) -> pd.DataFrame:
-        """최종 데이터 통합 - 향상된 상태 추적"""
+    def integrate_final_data(self, updated_base_df: pd.DataFrame, matched_new_df: pd.DataFrame, brand_name: str = "unknown") -> pd.DataFrame:
+        """최종 데이터 통합 - 향상된 상태 추적 + 메타데이터"""
         
         # 신규 상품이 매칭 완료되면 상태를 'active'로 변경
         if len(matched_new_df) > 0:
@@ -201,12 +201,23 @@ class DataProcessor:
         
         # 메타데이터 추가
         final_df['last_updated'] = self.timestamp
+        final_df['data_brand'] = brand_name
+        final_df['completion_status'] = 'completed'  # 통합 완료 시점에서 completed 표시
+        
+        # 데이터 품질 메타데이터 추가
+        total_products = len(final_df)
+        success_products = len(final_df[final_df.get('status', '') == 'success']) if 'status' in final_df.columns else 0
+        success_rate = (success_products / total_products * 100) if total_products > 0 else 0
+        
+        final_df['total_products'] = total_products
+        final_df['successful_matches'] = success_products
+        final_df['success_rate'] = round(success_rate, 1)
         
         # 상태별 요약 및 분석
         if 'product_status' in final_df.columns:
             self._print_enhanced_status_summary(final_df)
         
-        print(f"   통합 완료: {len(final_df)}개 상품")
+        print(f"   통합 완료: {len(final_df)}개 상품 (매칭률: {success_rate:.1f}%)")
         
         return final_df
     

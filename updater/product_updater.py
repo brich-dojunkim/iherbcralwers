@@ -112,7 +112,7 @@ class ProductUpdater:
             print(f"   상세 오류: {traceback.format_exc()}")
             return pd.DataFrame(columns=required_columns)
 
-    def match_iherb_products(self, new_products_df: pd.DataFrame, output_path: str | None = None) -> pd.DataFrame:
+    def match_iherb_products(self, new_products_df: pd.DataFrame, output_path: str | None = None, brand_name: str = "unknown") -> pd.DataFrame:
         if len(new_products_df) == 0:
             print(f"   📝 매칭할 신규 상품이 없습니다")
             return pd.DataFrame()
@@ -128,13 +128,31 @@ class ProductUpdater:
                 matched_csv_path = output_path
             else:
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                matched_csv_path = os.path.join(PathConfig.UNIFIED_OUTPUTS_DIR, f"matched_products_{timestamp}.csv")
+                matched_csv_path = os.path.join(PathConfig.UNIFIED_OUTPUTS_DIR, f"matched_{brand_name}_{timestamp}_partial.csv")
 
-            # 3. 입력 CSV를 outputs 폴더에 저장 (아이허브 스크래퍼 입력용)
+            # 3. 중단된 작업 확인 및 이어받기
+            existing_results = None
+            if os.path.exists(matched_csv_path):
+                try:
+                    existing_results = pd.read_csv(matched_csv_path, encoding='utf-8-sig')
+                    completed_count = len(existing_results)
+                    print(f"   📂 기존 진행 상황: {completed_count}개 완료")
+                    
+                    # 이미 처리된 상품 ID들 확인
+                    if 'coupang_product_id' in existing_results.columns:
+                        processed_ids = set(existing_results['coupang_product_id'].astype(str))
+                        remaining_df = new_products_df[~new_products_df['product_id'].astype(str).isin(processed_ids)]
+                        print(f"   ⏭️ 남은 작업: {len(remaining_df)}개")
+                        new_products_df = remaining_df
+                except Exception as e:
+                    print(f"   ⚠️ 기존 결과 파일 읽기 실패: {e}")
+                    existing_results = None
+
+            # 4. 입력 CSV를 outputs 폴더에 저장 (아이허브 스크래퍼 입력용)
             input_csv_path = matched_csv_path.replace('.csv', '_input.csv')
             new_products_df.to_csv(input_csv_path, index=False, encoding='utf-8-sig')
 
-            # 4. 번역 (outputs 폴더에 저장)
+            # 5. 번역 (outputs 폴더에 저장)
             print(f"   📝 번역 시작")
             translated_csv_path = matched_csv_path.replace('.csv', '_translated.csv')
             
@@ -147,7 +165,7 @@ class ProductUpdater:
             )
             print(f"   ✅ 번역 완료")
 
-            # 5. 아이허브 매칭 (실시간 저장)
+            # 6. 아이허브 매칭 (실시간 저장)
             print(f"   🔄 아이허브 매칭 수행")
             print(f"   💾 실시간 저장: {matched_csv_path}")
 
@@ -166,9 +184,22 @@ class ProductUpdater:
                 start_from=None
             )
 
-            # 6. 결과 로드
+            # 7. 결과 로드 및 기존 결과와 병합
             if os.path.exists(matched_csv_path):
                 matched_df = pd.read_csv(matched_csv_path, encoding='utf-8-sig')
+                
+                # 기존 결과가 있었다면 병합
+                if existing_results is not None:
+                    # 새로 매칭된 결과와 기존 결과 병합
+                    final_matched_df = pd.concat([existing_results, matched_df], ignore_index=True)
+                    # 중복 제거 (product_id 기준)
+                    if 'coupang_product_id' in final_matched_df.columns:
+                        final_matched_df = final_matched_df.drop_duplicates(subset=['coupang_product_id'], keep='last')
+                    
+                    # 병합된 결과를 다시 저장
+                    final_matched_df.to_csv(matched_csv_path, index=False, encoding='utf-8-sig')
+                    matched_df = final_matched_df
+                    print(f"   🔗 기존 결과와 병합: 총 {len(matched_df)}개")
                 
                 # 성공 통계
                 if 'status' in matched_df.columns:
@@ -243,7 +274,7 @@ if __name__ == "__main__":
             print("\n2️⃣ 아이허브 매칭 테스트 (처음 3개만)")
             test_df = crawled_df.head(3)
             # 매칭 결과를 임시 경로가 아닌 고정된 경로로 저장해 이어서 실행 가능하도록 테스트
-            matched_df = updater.match_iherb_products(test_df, output_path="test_matched_results.csv")
+            matched_df = updater.match_iherb_products(test_df, output_path="test_matched_results.csv", brand_name="thorne")
             print(f"매칭 결과: {len(matched_df)}개")
 
         print("\n✅ 테스트 완료")

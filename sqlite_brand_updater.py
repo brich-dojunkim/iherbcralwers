@@ -36,8 +36,10 @@ import sys
 from config import DatabaseConfig, PathConfig
 from improved_updater import run_pipeline
 
+# 통일된 데이터 디렉토리 내에 데이터베이스 저장
 os.makedirs(PathConfig.DATA_ROOT, exist_ok=True)
 DB_PATH = os.path.join(PathConfig.DATA_ROOT, DatabaseConfig.DATABASE_NAME)
+
 
 def init_db() -> sqlite3.Connection:
     """SQLite 데이터베이스를 초기화하고 테이블을 생성합니다."""
@@ -150,7 +152,7 @@ def main() -> int:
 
     # 파이프라인 실행
     try:
-        result_csv = run_pipeline(coupang_url, base_csv)
+        result_csv = run_pipeline(coupang_url, base_csv, brand_name)
         if result_csv:
             # 마지막 업데이트 일자 갱신
             today = datetime.date.today().isoformat()
