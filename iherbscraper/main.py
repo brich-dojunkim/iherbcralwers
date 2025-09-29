@@ -484,7 +484,7 @@ if __name__ == "__main__":
             max_products_to_compare=4
         )
         
-        input_csv = "/Users/brich/Desktop/iherb_price/coupang/coupang_csv/coupang_products_v2_20250918_141436_translated.csv"
+        input_csv = "/Users/brich/Desktop/iherb_price/data/outputs/coupang_products_20250926_181517_translated.csv"
         # 브랜드명을 추출하거나 기본값 사용
         brand_name = "thorne"  # 또는 입력 파일명에서 추출
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
