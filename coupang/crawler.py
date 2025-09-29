@@ -1,110 +1,258 @@
+"""
+쿠팡 크롤러 - DB 버전
+CSV 저장 대신 SQLite DB에 직접 저장
+"""
+
+import sys
+import os
+
+# 경로 설정
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from coupang_manager import BrowserManager
 from scraper import ProductScraper
 from image_downloader import ImageDownloader
 from page_navigator import PageNavigator
-from data_saver import DataSaver
 from datetime import datetime
+from db import Database
+from config import PathConfig
 
-class CoupangCrawlerMacOS:
-    def __init__(self, headless=False, delay_range=(2, 5), download_images=True, image_dir=None):
+
+class CoupangCrawlerDB:
+    """DB 연동 쿠팡 크롤러"""
+    
+    def __init__(self, db: Database, brand_name: str, 
+                 headless: bool = False, 
+                 delay_range: tuple = (2, 5),
+                 download_images: bool = True):
         """
-        macOS 최적화 쿠팡 크롤러 - 단순화된 이미지 관리
-        
         Args:
-            headless: 헤드리스 모드 여부
+            db: Database 인스턴스
+            brand_name: 브랜드명
+            headless: 헤드리스 모드
             delay_range: 딜레이 범위
-            download_images: 이미지 다운로드 여부 (Gemini 이미지 매칭용)
-            image_dir: 이미지 저장 디렉토리 (None이면 coupang/coupang_images 자동 사용)
+            download_images: 이미지 다운로드 여부
         """
+        self.db = db
+        self.brand_name = brand_name
         self.headless = headless
         self.delay_range = delay_range
         self.download_images = download_images
         
-        # 모듈 초기화
+        # 기존 모듈 초기화
         self.browser = BrowserManager(headless)
         self.scraper = ProductScraper()
-        
-        # 이미지 다운로더 초기화 (None이면 자동으로 coupang/coupang_images 사용)
-        self.image_downloader = ImageDownloader(image_dir) if download_images else None
-        
+        self.image_downloader = ImageDownloader() if download_images else None
         self.navigator = PageNavigator(self.browser, self.scraper, self.image_downloader)
-        self.data_saver = DataSaver()
         
-        self.products = []
+        self.crawled_count = 0
+        self.new_products = 0
+        self.updated_products = 0
     
     def start_driver(self):
         """Chrome 드라이버 시작"""
         return self.browser.start_driver()
     
-    def crawl_all_pages(self, start_url, max_pages=None):
-        """모든 페이지 크롤링"""
-        if not self.start_driver():
-            print("드라이버 시작 실패")
-            return []
+    def crawl_and_save(self, search_url: str, max_pages: int = None) -> dict:
+        """
+        크롤링 및 DB 저장
         
-        self.products = self.navigator.crawl_all_pages(start_url, max_pages, self.delay_range)
-        return self.products
+        Args:
+            search_url: 쿠팡 검색 URL
+            max_pages: 최대 페이지 수
+            
+        Returns:
+            통계 딕셔너리
+        """
+        print(f"\n{'='*80}")
+        print(f"🎯 DB 연동 쿠팡 크롤링 시작")
+        print(f"{'='*80}")
+        print(f"브랜드: {self.brand_name}")
+        print(f"이미지: {'활성화' if self.download_images else '비활성화'}")
+        print(f"{'='*80}\n")
+        
+        # 드라이버 시작
+        if not self.start_driver():
+            print("❌ 드라이버 시작 실패")
+            return self._get_stats()
+        
+        try:
+            # 기존 상품 수 확인
+            initial_stats = self.db.get_brand_stats(self.brand_name)
+            initial_count = initial_stats.get('total_products', 0)
+            
+            print(f"📊 기존 상품: {initial_count}개\n")
+            
+            # 크롤링 실행
+            products = self.navigator.crawl_all_pages(
+                search_url, 
+                max_pages, 
+                self.delay_range
+            )
+            
+            if not products:
+                print("⚠️ 크롤링된 상품이 없습니다")
+                return self._get_stats()
+            
+            print(f"\n{'='*80}")
+            print(f"💾 DB 저장 시작: {len(products)}개")
+            print(f"{'='*80}")
+            
+            # DB 저장
+            for idx, product_data in enumerate(products, 1):
+                try:
+                    self._save_product(product_data, idx, len(products))
+                except Exception as e:
+                    print(f"  ❌ 상품 {idx} 저장 실패: {e}")
+                    continue
+            
+            # 브랜드 크롤링 시간 업데이트
+            self.db.update_brand_crawled(self.brand_name)
+            
+            # 최종 통계
+            self._print_summary(initial_count)
+            
+            # 사라진 상품 감지
+            self._detect_missing_products()
+            
+            return self._get_stats()
+            
+        except KeyboardInterrupt:
+            print("\n⚠️ 사용자 중단")
+            self.db.update_brand_crawled(self.brand_name)
+            return self._get_stats()
+            
+        except Exception as e:
+            print(f"\n❌ 크롤링 오류: {e}")
+            import traceback
+            traceback.print_exc()
+            return self._get_stats()
+            
+        finally:
+            self.close()
     
-    def save_to_csv(self, filename=None):
-        """CSV 저장"""
-        return self.data_saver.save_to_csv(self.products, filename)
+    def _save_product(self, product_data: dict, idx: int, total: int):
+        """단일 상품 DB 저장"""
+        # product_id 추출
+        product_id = self.db.insert_crawled_product(
+            self.brand_name, 
+            product_data
+        )
+        
+        self.crawled_count += 1
+        
+        # 신규 vs 업데이트 판단 (간단한 방법)
+        # 실제로는 product_id가 새로 생성되었는지 확인해야 하지만,
+        # insert_crawled_product()가 항상 id를 반환하므로
+        # 여기서는 카운트만 증가
+        
+        # 진행률 표시 (10개마다)
+        if idx % 10 == 0 or idx == total:
+            print(f"  💾 저장 중: {idx}/{total} ({idx/total*100:.1f}%)")
     
-    def print_summary(self):
-        """결과 요약"""
-        self.data_saver.print_summary(self.products, self.image_downloader)
+    def _print_summary(self, initial_count: int):
+        """크롤링 결과 요약"""
+        print(f"\n{'='*80}")
+        print(f"📊 크롤링 완료 요약")
+        print(f"{'='*80}")
+        
+        final_stats = self.db.get_brand_stats(self.brand_name)
+        final_count = final_stats.get('total_products', 0)
+        
+        print(f"총 크롤링: {self.crawled_count}개")
+        print(f"DB 상품 수: {initial_count}개 → {final_count}개")
+        
+        # 파이프라인 단계별
+        by_stage = final_stats.get('by_stage', {})
+        print(f"\n파이프라인 단계:")
+        for stage, count in by_stage.items():
+            emoji = {
+                'crawled': '🆕',
+                'translated': '📝',
+                'matched': '✅',
+                'failed': '❌'
+            }.get(stage, '❓')
+            print(f"  {emoji} {stage}: {count}개")
+        
+        # 이미지 통계
+        if self.image_downloader:
+            stats = self.image_downloader.image_download_stats
+            print(f"\n이미지 수집:")
+            print(f"  📸 성공: {stats['successful_downloads']}개")
+            print(f"  ⏭️ 기존: {stats['skipped_existing']}개")
+            print(f"  ❌ 실패: {stats['failed_downloads']}개")
+    
+    def _detect_missing_products(self):
+        """사라진 상품 감지"""
+        print(f"\n{'='*80}")
+        print(f"🔍 사라진 상품 감지")
+        print(f"{'='*80}")
+        
+        missing = self.db.get_missing_products(self.brand_name)
+        
+        if missing:
+            print(f"⚠️ 발견: {len(missing)}개 상품이 최신 크롤링에서 제외됨")
+            print(f"\n상품 예시:")
+            for product in missing[:5]:
+                print(f"  - {product['coupang_product_name'][:50]}...")
+            
+            if len(missing) > 5:
+                print(f"  ... 외 {len(missing) - 5}개")
+        else:
+            print(f"✓ 모든 상품이 크롤링에 포함됨")
+    
+    def _get_stats(self) -> dict:
+        """통계 반환"""
+        return {
+            'crawled_count': self.crawled_count,
+            'new_products': self.new_products,
+            'updated_products': self.updated_products
+        }
     
     def close(self):
         """브라우저 종료"""
         self.browser.close()
 
 
-# 실행 부분 (독립 실행 시에만)
-if __name__ == "__main__":
-    print("🎯 macOS용 쿠팡 크롤러 시작...")
-    print("🔧 주요 특징:")
-    print("  - 새로운 Tailwind CSS 구조 완전 대응")
-    print("  - 자동 이미지 저장 (coupang/coupang_images)")
-    print("  - Gemini 이미지 매칭 지원")
-    print("  - 단순화된 구조 (매니페스트 제거)")
+def main():
+    """테스트 실행"""
+    print("🧪 DB 연동 쿠팡 크롤러 테스트\n")
     
-    # 크롤러 생성
-    crawler = CoupangCrawlerMacOS(
-        headless=False,
-        delay_range=(3, 6),
-        download_images=True,  # 이미지 다운로드 활성화
-        image_dir=None  # 기본 경로 사용 (coupang/coupang_images)
-    )
+    # DB 초기화
+    db_path = os.path.join(PathConfig.DATA_ROOT, "products.db")
+    db = Database(db_path)
     
-    # 검색 URL (예시)
+    # 브랜드 등록
+    brand_name = "thorne"
     search_url = "https://www.coupang.com/np/search?listSize=36&filterType=coupang_global&rating=0&isPriceRange=false&minPrice=&maxPrice=&component=&sorter=scoreDesc&brand=14420&offerCondition=&filter=194176%23attr_7652%2431823%40DEFAULT&fromComponent=N&channel=user&selectedPlpKeepFilter=&q=thorne"
     
+    db.upsert_brand(brand_name, search_url)
+    
+    # 크롤러 실행
+    crawler = CoupangCrawlerDB(
+        db=db,
+        brand_name=brand_name,
+        headless=False,
+        delay_range=(3, 6),
+        download_images=True
+    )
+    
     try:
-        # 크롤링 실행
-        products = crawler.crawl_all_pages(search_url, max_pages=None)
+        stats = crawler.crawl_and_save(
+            search_url=search_url,
+            max_pages=2  # 테스트용 2페이지만
+        )
         
-        # 결과 저장
-        if products:
-            csv_filename = crawler.save_to_csv()
-            crawler.print_summary()
-            
-            print(f"\n🎉 크롤링 완료!")
-            print(f"CSV 파일: {csv_filename}")
-            print(f"이미지 저장: {crawler.image_downloader.image_dir if crawler.image_downloader else 'None'}")
-            
-            print(f"\n✅ 단순화된 구조 적용:")
-            print(f"  - 불필요한 매니페스트 제거")
-            print(f"  - 핵심 기능만 유지")
-            print(f"  - Gemini 매칭 준비 완료")
-        else:
-            print("❌ 크롤링된 상품이 없습니다.")
-    
+        print(f"\n{'='*80}")
+        print(f"🎉 테스트 완료!")
+        print(f"{'='*80}")
+        print(f"크롤링: {stats['crawled_count']}개")
+        
     except KeyboardInterrupt:
-        print("\n👋 크롤링을 중단했습니다.")
-        if crawler.products:
-            crawler.save_to_csv()
-            print("지금까지 수집한 데이터를 저장했습니다.")
-    
+        print("\n⚠️ 테스트 중단")
     finally:
         crawler.close()
-    
-    print("🎉 단순화된 쿠팡 크롤러 완료!")
+
+
+if __name__ == "__main__":
+    main()
