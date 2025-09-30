@@ -2,7 +2,7 @@
 iHerb 스크래퍼 패키지 초기화
 """
 
-from .main import EnglishIHerbScraper
+from .main import IHerbScraperDB
 from .iherb_config import IHerbConfig
 from .iherb_manager import BrowserManager
 from .iherb_client import IHerbClient
@@ -13,7 +13,7 @@ __version__ = "1.0.0"
 __author__ = "iHerb Scraper Team"
 
 __all__ = [
-    'EnglishIHerbScraper',
+    'IHerbScraperDB',
     'IHerbConfig',
     'BrowserManager',
     'IHerbClient',

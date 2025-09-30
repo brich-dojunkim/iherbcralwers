@@ -155,7 +155,7 @@ class IHerbScraperDB:
                     # URL은 찾았으나 코드 추출 실패
                     self.db.update_matching_result(product_id, {
                         'product_url': product_url,
-                        'status': 'code_not_found'
+                        'status': 'not_found'
                     })
                     self.not_found_count += 1
                     print(f"  ⚠️ 상품코드 추출 실패")

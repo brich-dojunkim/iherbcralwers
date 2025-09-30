@@ -224,7 +224,11 @@ class Database:
     def update_matching_result(self, product_id: int, iherb_data: Dict[str, Any]) -> None:
         """아이허브 매칭 결과 업데이트"""
         now = datetime.now().isoformat()
-        
+                
+        status = iherb_data.get('status', 'success')
+        if status not in {'pending', 'success', 'not_found', 'error'}:
+            status = 'error'  # 알 수 없는 값은 error로
+            
         with self.get_connection() as conn:
             conn.execute("""
                 UPDATE products SET
