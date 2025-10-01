@@ -13,7 +13,7 @@ class APIConfig:
     """API 관련 전역 설정 - 여러 모듈에서 공통 사용"""
     
     # Gemini API Key (환경변수 우선, 기본값 제공)
-    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "AIzaSyA6XyWFJou4QZpRM4C_3p0JuzRjpQWSKp4")
+    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "AIzaSyDNB7zwp36ICInpj3SRV9GiX7ovBxyFHHE")
     
     # Gemini 모델 (iherbscraper, coupang/translator 공통)
     GEMINI_TEXT_MODEL = "models/gemini-2.0-flash"

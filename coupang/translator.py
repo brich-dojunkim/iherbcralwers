@@ -18,7 +18,7 @@ from coupang_config import CoupangConfig
 class TranslatorDB:
     """DB 연동 번역기"""
     
-    def __init__(self, db: Database, api_key: str = None):
+    def __init__(self, db: Database):
         """
         Args:
             db: Database 인스턴스

@@ -1,222 +1,434 @@
 """
-파이프라인 통합 실행기
-쿠팡 크롤링 → 번역 → 아이허브 매칭을 한 번에 실행
+파이프라인 Orchestrator
+DB 상태 기반 자동 실행
+
+로직:
+1. 상품 없음 → NEW (처음부터)
+2. 정상 미완료(crawled/translated) 있음 → RESUME (남은 것만)
+3. 완료됨 → UPDATE (크롤링부터)
+
+Failed 처리:
+- UPDATE 시 failed → crawled로 리셋 (새 사이클 시도)
+- 무한 RESUME 방지
 """
 
 import sys
 import os
+import argparse
 from datetime import datetime
+from typing import Tuple, Dict, Any
 
-# 경로 설정
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'coupang'))
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'iherbscraper'))
 
-from db import Database
-from config import PathConfig
+from db.database import Database
+
+# Coupang 모듈
 from coupang.crawler import CoupangCrawlerDB
 from coupang.translator import TranslatorDB
+
+# IHerb 모듈
 from iherbscraper.main import IHerbScraperDB
 
 
-class Pipeline:
-    """전체 파이프라인 통합 실행"""
+class PipelineOrchestrator:
+    """파이프라인 자동 실행 관리"""
     
-    def __init__(self, db_path=None):
-        """
-        Args:
-            db_path: DB 경로 (기본값: products.db)
-        """
-        if db_path is None:
-            db_path = os.path.join(PathConfig.DATA_ROOT, "products.db")
-        
+    def __init__(self, db_path='products.db', headless=False, max_iherb_products=5):
         self.db = Database(db_path)
-        self.start_time = None
-    
-    def run_brand(self, brand_name: str, search_url: str = None, 
-                max_pages: int = None, headless: bool = False) -> dict:
+        self.headless = headless
+        self.max_iherb_products = max_iherb_products
+        
+    def analyze_state(self, brand_name: str) -> Tuple[str, Dict[str, int]]:
         """
-        브랜드 전체 파이프라인 실행
+        브랜드 상태 분석 및 실행 모드 결정
         
-        Args:
-            brand_name: 브랜드명
-            search_url: 쿠팡 검색 URL (신규 브랜드만 필수)
-            max_pages: 최대 페이지 수
-            headless: 헤드리스 모드
+        Returns:
+            (mode, stats)
+            - mode: 'NEW' | 'RESUME' | 'UPDATE'
+            - stats: {'total', 'crawled', 'translated', 'matched', 'failed'}
         """
-        self.start_time = datetime.now()
+        stats = {
+            'total': 0,
+            'crawled': 0,
+            'translated': 0,
+            'matched': 0,
+            'failed': 0
+        }
         
-        # 브랜드 확인 및 URL 결정
-        brand = self.db.get_brand(brand_name)
-        
-        if brand:
-            # 기존 브랜드 → DB의 URL 사용
-            actual_url = brand['coupang_search_url']
-            print(f"\n📋 기존 브랜드: {brand_name}")
-            print(f"마지막 크롤링: {brand['last_crawled_at'] or '없음'}")
-        elif search_url:
-            # 신규 브랜드 → URL 등록
-            self.db.upsert_brand(brand_name, search_url)
-            actual_url = search_url
-            print(f"\n🆕 신규 브랜드 등록: {brand_name}")
-        else:
-            raise ValueError(
-                f"브랜드 '{brand_name}'가 DB에 없습니다. "
-                f"신규 브랜드는 --url 옵션이 필수입니다."
-            )
-        
-        self.start_time = datetime.now()
-        
-        print(f"\n{'='*80}")
-        print(f"🚀 파이프라인 시작: {brand_name}")
-        print(f"{'='*80}")
-        print(f"시작 시간: {self.start_time.strftime('%Y-%m-%d %H:%M:%S')}")
-        print(f"{'='*80}\n")
-        
-        stats = {}
-        
-        try:
-            # 브랜드 등록
-            self.db.upsert_brand(brand_name, search_url)
+        # 각 단계별 상품 수 조회
+        with self.db.get_connection() as conn:
+            # 전체 상품 수
+            result = conn.execute("""
+                SELECT COUNT(*) as cnt FROM products WHERE brand_name = ?
+            """, (brand_name,)).fetchone()
+            stats['total'] = result['cnt']
             
-            # 1단계: 쿠팡 크롤링
-            print(f"\n{'='*80}")
-            print(f"1️⃣ 쿠팡 크롤링")
-            print(f"{'='*80}")
+            # 단계별 카운트
+            for stage in ['crawled', 'translated', 'matched', 'failed']:
+                result = conn.execute("""
+                    SELECT COUNT(*) as cnt FROM products 
+                    WHERE brand_name = ? AND pipeline_stage = ?
+                """, (brand_name, stage)).fetchone()
+                stats[stage] = result['cnt']
+        
+        # 판단 로직
+        if stats['total'] == 0:
+            mode = 'NEW'
+        elif stats['crawled'] + stats['translated'] > 0:
+            # 정상 미완료 작업 있음 (failed 제외)
+            mode = 'RESUME'
+        else:
+            # 모두 완료 (matched만 있거나 failed만 있음)
+            mode = 'UPDATE'
+        
+        return mode, stats
+    
+    def run(self, brand_name: str) -> Dict[str, Any]:
+        """
+        브랜드 파이프라인 자동 실행
+        
+        Returns:
+            실행 결과 통계
+        """
+        print(f"\n{'='*80}")
+        print(f"🔍 브랜드 상태 분석: {brand_name}")
+        print(f"{'='*80}")
+        
+        # 1. 상태 분석
+        mode, stats = self.analyze_state(brand_name)
+        
+        print(f"\n📊 현재 상태:")
+        print(f"   전체 상품: {stats['total']}개")
+        if stats['total'] > 0:
+            print(f"   - crawled: {stats['crawled']}개")
+            print(f"   - translated: {stats['translated']}개")
+            print(f"   - matched: {stats['matched']}개")
+            print(f"   - failed: {stats['failed']}개")
+        
+        print(f"\n🎯 결정된 실행 모드: {mode}")
+        
+        if mode == 'NEW':
+            print(f"   이유: 상품 데이터 없음")
+            return self._run_new(brand_name)
+        elif mode == 'RESUME':
+            print(f"   이유: 미완료 작업 {stats['crawled'] + stats['translated']}개 발견")
+            return self._run_resume(brand_name, stats)
+        else:  # UPDATE
+            print(f"   이유: 전체 {stats['matched'] + stats['failed']}개 완료됨, 업데이트 필요")
+            return self._run_update(brand_name)
+    
+    def _run_new(self, brand_name: str) -> Dict[str, Any]:
+        """NEW 모드: 처음부터 전체 실행"""
+        print(f"\n{'='*80}")
+        print(f"🆕 NEW 모드: 전체 파이프라인 실행")
+        print(f"{'='*80}")
+        
+        result = {
+            'mode': 'NEW',
+            'crawled': 0,
+            'translated': 0,
+            'matched': 0,
+            'failed': 0
+        }
+        
+        # 브랜드 정보 확인
+        brand_info = self.db.get_brand(brand_name)
+        if not brand_info or not brand_info['coupang_search_url']:
+            raise ValueError(f"브랜드 '{brand_name}'이 등록되지 않았거나 URL이 없습니다.")
+        
+        # 1. 크롤링
+        print(f"\n[1/3] 크롤링 시작...")
+        crawler = CoupangCrawlerDB(
+            db=self.db,
+            brand_name=brand_name,
+            headless=self.headless
+        )
+        crawler.start_driver()
+        crawler_stats = crawler.crawl_and_save(brand_info['coupang_search_url'])
+        crawler.close()
+        result['crawled'] = crawler_stats.get('crawled_count', 0)
+        print(f"✓ {result['crawled']}개 크롤링 완료")
+        
+        # 2. 번역
+        print(f"\n[2/3] 번역 시작...")
+        translator = TranslatorDB(db=self.db)
+        trans_stats = translator.translate_brand(brand_name)
+        result['translated'] = trans_stats.get('translated', 0)
+        print(f"✓ {result['translated']}개 번역 완료")
+        
+        # 3. 매칭
+        print(f"\n[3/3] 매칭 시작...")
+        scraper = IHerbScraperDB(
+            db=self.db,
+            brand_name=brand_name,
+            headless=self.headless,
+            max_products=self.max_iherb_products
+        )
+        match_result = scraper.match_all_products()
+        scraper.close()
+        result['matched'] = match_result.get('matched', 0)
+        result['failed'] = match_result.get('error', 0)
+        print(f"✓ {result['matched']}개 매칭 성공, {result['failed']}개 실패")
+        
+        return result
+    
+    def _run_resume(self, brand_name: str, stats: Dict[str, int]) -> Dict[str, Any]:
+        """RESUME 모드: 중단된 작업 이어하기"""
+        print(f"\n{'='*80}")
+        print(f"▶️ RESUME 모드: 미완료 작업 재개")
+        print(f"{'='*80}")
+        
+        result = {
+            'mode': 'RESUME',
+            'crawled': 0,
+            'translated': 0,
+            'matched': 0,
+            'failed': 0
+        }
+        
+        # 1. 크롤링 (crawled 상품이 있으면)
+        if stats['crawled'] > 0:
+            print(f"\n⚠️ crawled 단계 상품 {stats['crawled']}개 발견")
+            print(f"   → 크롤링 중단으로 판단, 크롤링부터 재시작")
+            
+            brand_info = self.db.get_brand(brand_name)
+            if not brand_info or not brand_info['coupang_search_url']:
+                raise ValueError(f"브랜드 '{brand_name}'의 URL 정보 없음")
             
             crawler = CoupangCrawlerDB(
                 db=self.db,
                 brand_name=brand_name,
-                headless=headless,
-                download_images=True
+                headless=self.headless
             )
-            
-            crawl_stats = crawler.crawl_and_save(search_url, max_pages)
-            stats['crawl'] = crawl_stats
-            
-            if crawl_stats['crawled_count'] == 0:
-                print("\n⚠️ 크롤링 결과 없음 - 파이프라인 중단")
-                return stats
-            
-            # 2단계: 번역
-            print(f"\n{'='*80}")
-            print(f"2️⃣ 번역")
-            print(f"{'='*80}")
-            
-            translator = TranslatorDB(self.db)
-            translate_stats = translator.translate_brand(brand_name, batch_size=10)
-            stats['translate'] = translate_stats
-            
-            if translate_stats['translated'] == 0:
-                print("\n⚠️ 번역 결과 없음 - 파이프라인 중단")
-                return stats
-            
-            # 3단계: 아이허브 매칭
-            print(f"\n{'='*80}")
-            print(f"3️⃣ 아이허브 매칭")
-            print(f"{'='*80}")
-            
+            crawler.start_driver()
+            crawler_stats = crawler.crawl_and_save(brand_info['coupang_search_url'])
+            crawler.close()
+            result['crawled'] = crawler_stats.get('crawled_count', 0)
+            print(f"✓ {result['crawled']}개 크롤링 완료")
+        else:
+            print(f"\n[크롤링] 건너뜀 (crawled 단계 없음)")
+        
+        # 2. 번역 (crawled 대기 중인 상품만)
+        to_translate = len(self.db.get_products_by_stage(brand_name, 'crawled'))
+        if to_translate > 0:
+            print(f"\n[번역] {to_translate}개 시작...")
+            translator = TranslatorDB(db=self.db)
+            trans_stats = translator.translate_brand(brand_name)
+            result['translated'] = trans_stats.get('translated', 0)
+            print(f"✓ {result['translated']}개 번역 완료")
+        else:
+            print(f"\n[번역] 건너뜀 (crawled 단계 없음)")
+        
+        # 3. 매칭 (translated 대기 중인 상품만)
+        to_match = len(self.db.get_products_by_stage(brand_name, 'translated'))
+        if to_match > 0:
+            print(f"\n[매칭] {to_match}개 시작...")
             scraper = IHerbScraperDB(
                 db=self.db,
                 brand_name=brand_name,
-                headless=headless,
-                max_products=4
+                headless=self.headless,
+                max_products=self.max_iherb_products
             )
-            
-            match_stats = scraper.match_all_products(resume=True)
-            stats['match'] = match_stats
-            
-            # 최종 요약
-            self._print_summary(brand_name, stats)
-            
-            return stats
-            
-        except KeyboardInterrupt:
-            print(f"\n⚠️ 사용자 중단")
-            self._print_summary(brand_name, stats)
-            return stats
-            
-        except Exception as e:
-            print(f"\n❌ 파이프라인 오류: {e}")
-            import traceback
-            traceback.print_exc()
-            return stats
-            
-        finally:
-            # 리소스 정리
-            if 'scraper' in locals():
-                scraper.close()
+            match_result = scraper.match_all_products()
+            scraper.close()
+            result['matched'] = match_result.get('matched', 0)
+            result['failed'] = match_result.get('error', 0)
+            print(f"✓ {result['matched']}개 매칭 성공, {result['failed']}개 실패")
+        else:
+            print(f"\n[매칭] 건너뜀 (translated 단계 없음)")
+        
+        return result
     
-    def _print_summary(self, brand_name: str, stats: dict):
-        """최종 통계 요약"""
-        end_time = datetime.now()
-        duration = end_time - self.start_time
-        
+    def _run_update(self, brand_name: str) -> Dict[str, Any]:
+        """UPDATE 모드: 새 크롤링 후 신규 상품만 처리"""
         print(f"\n{'='*80}")
-        print(f"📊 파이프라인 완료 요약")
+        print(f"🔄 UPDATE 모드: 새 크롤링 시작")
         print(f"{'='*80}")
-        print(f"브랜드: {brand_name}")
-        print(f"실행 시간: {duration.total_seconds()/60:.1f}분")
         
-        if 'crawl' in stats:
-            print(f"\n1️⃣ 크롤링: {stats['crawl']['crawled_count']}개")
+        result = {
+            'mode': 'UPDATE',
+            'crawled': 0,
+            'translated': 0,
+            'matched': 0,
+            'failed': 0
+        }
         
-        if 'translate' in stats:
-            print(f"2️⃣ 번역: {stats['translate']['translated']}개")
+        # 1. 크롤링 (전체)
+        print(f"\n[크롤링] 최신 데이터 수집 중...")
+        brand_info = self.db.get_brand(brand_name)
+        if not brand_info or not brand_info['coupang_search_url']:
+            raise ValueError(f"브랜드 '{brand_name}'의 URL 정보 없음")
         
-        if 'match' in stats:
-            match = stats['match']
-            total = match['matched'] + match['not_found'] + match['error']
-            success_rate = (match['matched'] / total * 100) if total > 0 else 0
-            print(f"3️⃣ 매칭: {match['matched']}/{total}개 ({success_rate:.1f}%)")
+        crawler = CoupangCrawlerDB(
+            db=self.db,
+            brand_name=brand_name,
+            headless=self.headless
+        )
+        crawler.start_driver()
+        crawler_stats = crawler.crawl_and_save(brand_info['coupang_search_url'])
+        crawler.close()
+        result['crawled'] = crawler_stats.get('crawled_count', 0)
+        print(f"✓ {result['crawled']}개 크롤링 완료")
         
-        # DB 최종 상태
-        brand_stats = self.db.get_brand_stats(brand_name)
-        print(f"\n📈 최종 상태:")
-        for stage, count in brand_stats['by_stage'].items():
-            emoji = {
-                'crawled': '🆕',
-                'translated': '📝',
-                'matched': '✅',
-                'failed': '❌'
-            }.get(stage, '❓')
-            print(f"  {emoji} {stage}: {count}개")
+        # 크롤링 후 상태 재확인
+        print(f"\n[상태 확인] 크롤링 후 분류...")
+        with self.db.get_connection() as conn:
+            # failed였던 상품이 crawled로 리셋되었는지 확인
+            new_crawled = conn.execute("""
+                SELECT COUNT(*) as cnt FROM products
+                WHERE brand_name = ? AND pipeline_stage = 'crawled'
+            """, (brand_name,)).fetchone()['cnt']
+            
+            matched_count = conn.execute("""
+                SELECT COUNT(*) as cnt FROM products
+                WHERE brand_name = ? AND pipeline_stage = 'matched'
+            """, (brand_name,)).fetchone()['cnt']
         
-        print(f"{'='*80}\n")
+        print(f"   - 신규/리셋 상품: {new_crawled}개 (crawled)")
+        print(f"   - 기존 완료 상품: {matched_count}개 (matched)")
+        
+        # 신규 상품이 있으면 자동으로 RESUME
+        if new_crawled > 0:
+            print(f"\n🔄 자동 전환: RESUME 모드 (신규 {new_crawled}개 처리)")
+            
+            # 2. 번역
+            print(f"\n[번역] {new_crawled}개 시작...")
+            translator = TranslatorDB(db=self.db)
+            trans_stats = translator.translate_brand(brand_name)
+            result['translated'] = trans_stats.get('translated', 0)
+            print(f"✓ {result['translated']}개 번역 완료")
+            
+            # 3. 매칭
+            to_match = len(self.db.get_products_by_stage(brand_name, 'translated'))
+            print(f"\n[매칭] {to_match}개 시작...")
+            scraper = IHerbScraperDB(
+                db=self.db,
+                brand_name=brand_name,
+                headless=self.headless,
+                max_products=self.max_iherb_products
+            )
+            match_result = scraper.match_all_products()
+            scraper.close()
+            result['matched'] = match_result.get('matched', 0)
+            result['failed'] = match_result.get('error', 0)
+            print(f"✓ {result['matched']}개 매칭 성공, {result['failed']}개 실패")
+        else:
+            print(f"\n✓ 신규 상품 없음, 가격 업데이트만 완료")
+        
+        return result
+    
+    def register_brand(self, brand_name: str, coupang_url: str) -> None:
+        """브랜드 등록"""
+        self.db.upsert_brand(brand_name, coupang_url)
+        print(f"✓ 브랜드 '{brand_name}' 등록 완료")
+    
+    def list_brands(self) -> None:
+        """등록된 브랜드 목록 출력"""
+        with self.db.get_connection() as conn:
+            brands = conn.execute("""
+                SELECT 
+                    b.brand_name,
+                    b.coupang_search_url,
+                    b.last_crawled_at,
+                    b.last_matched_at,
+                    COUNT(p.id) as product_count,
+                    SUM(CASE WHEN p.pipeline_stage = 'matched' THEN 1 ELSE 0 END) as matched_count
+                FROM brands b
+                LEFT JOIN products p ON b.brand_name = p.brand_name
+                GROUP BY b.brand_name
+                ORDER BY b.brand_name
+            """).fetchall()
+            
+            if not brands:
+                print("등록된 브랜드가 없습니다.")
+                return
+            
+            print(f"\n{'='*80}")
+            print(f"등록된 브랜드 목록")
+            print(f"{'='*80}")
+            
+            for brand in brands:
+                print(f"\n브랜드: {brand['brand_name']}")
+                print(f"  URL: {brand['coupang_search_url']}")
+                print(f"  상품 수: {brand['product_count']}개")
+                print(f"  매칭 완료: {brand['matched_count']}개")
+                print(f"  마지막 크롤링: {brand['last_crawled_at'] or '없음'}")
+                print(f"  마지막 매칭: {brand['last_matched_at'] or '없음'}")
 
 
 def main():
-    """CLI 실행"""
-    import argparse
+    parser = argparse.ArgumentParser(
+        description='쿠팡-아이허브 가격 비교 파이프라인',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+사용 예시:
+  # 브랜드 등록
+  python orchestrator.py --register --brand thorne --url "https://coupang.com/..."
+  
+  # 실행 (자동 모드 판단)
+  python orchestrator.py --brand thorne
+  
+  # 브랜드 목록
+  python orchestrator.py --list
+        """
+    )
     
-    parser = argparse.ArgumentParser(description='파이프라인 통합 실행')
-    parser.add_argument('--brand', required=True, help='브랜드명')
-    parser.add_argument('--url', help='쿠팡 검색 URL (신규 브랜드만 필수)')
-    parser.add_argument('--max-pages', type=int, help='최대 페이지 수')
-    parser.add_argument('--headless', action='store_true', help='헤드리스 모드')
-    parser.add_argument('--list', action='store_true', help='브랜드 목록 보기')
+    # 명령어 그룹
+    parser.add_argument('--brand', type=str, help='처리할 브랜드명')
+    parser.add_argument('--register', action='store_true', help='새 브랜드 등록')
+    parser.add_argument('--list', action='store_true', help='브랜드 목록 출력')
+    
+    # 등록 시 필요
+    parser.add_argument('--url', type=str, help='쿠팡 검색 URL (등록 시)')
+    
+    # 옵션
+    parser.add_argument('--db', type=str, default='products.db', help='DB 파일 경로')
+    parser.add_argument('--headless', action='store_true', help='헤드리스 모드 (기본: 브라우저 표시)')
+    parser.add_argument('--max-products', type=int, default=5, 
+                       help='아이허브 비교 상품 수 (기본: 5)')
     
     args = parser.parse_args()
     
-    pipeline = Pipeline()
+    # Orchestrator 생성
+    orchestrator = PipelineOrchestrator(
+        db_path=args.db,
+        headless=args.headless,
+        max_iherb_products=args.max_products
+    )
     
-    # 브랜드 목록
-    if args.list:
-        pipeline.list_brands()
-        return 0
-    
-    # 실행
     try:
-        stats = pipeline.run_brand(
-            brand_name=args.brand,
-            search_url=args.url,  # None 가능
-            max_pages=args.max_pages,
-            headless=args.headless
-        )
-        return 0 if stats else 1
-    except ValueError as e:
-        print(f"❌ {e}")
-        return 1
+        # 명령 실행
+        if args.list:
+            orchestrator.list_brands()
+        
+        elif args.register:
+            if not args.brand or not args.url:
+                parser.error("--register는 --brand와 --url이 필요합니다")
+            orchestrator.register_brand(args.brand, args.url)
+        
+        elif args.brand:
+            # 자동 실행
+            result = orchestrator.run(args.brand)
+            
+            # 결과 출력
+            print(f"\n{'='*80}")
+            print(f"✅ 실행 완료")
+            print(f"{'='*80}")
+            print(f"모드: {result['mode']}")
+            print(f"크롤링: {result['crawled']}개")
+            print(f"번역: {result['translated']}개")
+            print(f"매칭 성공: {result['matched']}개")
+            print(f"매칭 실패: {result['failed']}개")
+        
+        else:
+            parser.print_help()
+    
+    except Exception as e:
+        print(f"\n❌ 오류 발생: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
+
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()
