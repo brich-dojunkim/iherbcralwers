@@ -33,7 +33,7 @@ class InfiniteScrollCrawler:
         self.global_new_ids = global_new_ids  # 전체 신규 수집 ID
         self.products = []
     
-    def infinite_scroll_crawl(self, url, target_count=300):
+    def infinite_scroll_crawl(self, url, target_count=40):
         """무한 스크롤로 신규 상품만 수집"""
         try:
             print(f"\n{'='*80}")
@@ -521,12 +521,22 @@ class CoupangIHerbAdd900Crawler:
             print(f"⚠️ 캐시 저장 실패: {e}\n")
     
     def match_iherb_products(self):
-        """아이허브 매칭 (신규 900개만)"""
+        """아이허브 매칭 (미처리 상품만)"""
         print("\n" + "="*80)
         print(f"📦 2단계: 아이허브 매칭")
         print(f"   전체 {len(self.all_products)}개 중")
-        print(f"   신규 {len(self.new_products)}개만 매칭")
+        print(f"   매칭 완료: {len(self.matched_product_ids)}개")
         print("="*80 + "\n")
+        
+        # 🔍 디버깅: matched_product_ids 샘플 출력
+        if self.matched_product_ids:
+            sample_matched = list(self.matched_product_ids)[:3]
+            print(f"📋 매칭 완료 ID 샘플: {sample_matched}")
+        
+        # 🔍 디버깅: all_products ID 샘플 출력
+        if self.all_products:
+            sample_products = [p.get('상품ID', '') for p in self.all_products[:3]]
+            print(f"📋 전체 상품 ID 샘플: {sample_products}\n")
         
         # 아이허브 브라우저 시작
         print("🚀 아이허브 브라우저 시작")
@@ -538,25 +548,34 @@ class CoupangIHerbAdd900Crawler:
         # 매칭 시작
         start_time = time.time()
         completed = 0
-        restart_counter = 0  # 브라우저 재시작 카운터
+        restart_counter = 0
+        skipped = 0
         
         for idx, product_data in enumerate(self.all_products, 1):
             product_id = product_data.get('상품ID', '')
             
-            # 이미 매칭 완료된 상품 스킵
+            # ✅ 수정된 로직: CSV에 이미 존재하는지 체크
+            # CSV에서 로드한 matched_product_ids는 URL에서 추출한 ID
+            # all_products의 product_id는 캐시의 '상품ID' 컬럼
+            
+            # 1. matched_product_ids에 있으면 스킵
             if product_id in self.matched_product_ids:
-                print(f"[{idx}/{len(self.all_products)}] ⏭️ 스킵 (이미 매칭 완료)")
+                if skipped < 5:  # 처음 5개만 로그
+                    print(f"[{idx}/{len(self.all_products)}] ⏭️ 스킵 (매칭 완료): ID {product_id}")
+                elif skipped == 5:
+                    print(f"[{idx}/{len(self.all_products)}] ... (이후 스킵 로그 생략)")
+                skipped += 1
                 continue
             
-            # 신규 상품이 아니면 스킵 (안전장치)
-            if product_id in self.existing_product_ids and product_id not in self.global_new_ids:
-                continue
+            # 2. 기존 블랙리스트(원본 774개)는 스킵하지 않음!
+            # → 이미 매칭된 것만 스킵하고, 나머지는 모두 매칭 시도
             
             # 예상 잔여 시간 계산
             if completed > 0:
                 elapsed = time.time() - start_time
                 avg_time = elapsed / completed
-                remaining = (len(self.new_products) - completed) * avg_time
+                remaining_count = len(self.all_products) - idx + 1
+                remaining = remaining_count * avg_time
                 hours = int(remaining // 3600)
                 minutes = int((remaining % 3600) // 60)
                 
@@ -588,18 +607,15 @@ class CoupangIHerbAdd900Crawler:
                     print("🔄 브라우저 재시작 (메모리 관리 & 차단 방지)")
                     print("="*80)
                     
-                    # 기존 브라우저 종료
                     try:
                         self.iherb_browser.close()
                         print("  ✅ 기존 브라우저 종료")
                     except:
                         pass
                     
-                    # 대기
                     print("  ⏳ 3초 대기 중...")
                     time.sleep(3)
                     
-                    # 새 브라우저 시작
                     print("  🚀 새 브라우저 시작 중...")
                     self.iherb_browser = IHerbBrowser(headless=False)
                     self.iherb_client = IHerbClient(self.iherb_browser)
@@ -615,12 +631,17 @@ class CoupangIHerbAdd900Crawler:
                 
                 print(f"\n{'='*80}")
                 print(f"⚠️  작업 중단!")
-                print(f"📊 처리 완료: {completed}개 / {len(self.new_products)}개")
+                print(f"{'='*80}")
+                print(f"📊 처리 통계:")
+                print(f"   - 신규 처리: {completed}개")
+                print(f"   - 스킵: {skipped}개")
+                print(f"   - 총 진행: {completed + skipped}개")
                 print(f"⏱️  소요 시간: {hours}시간 {minutes}분")
-                print(f"💾 진행사항 저장됨: {self.output_file}")
+                print(f"💾 진행사항 저장: {self.output_file}")
                 print(f"🔄 다시 실행하면 이어서 진행됩니다.")
                 print(f"{'='*80}")
-                raise
+                # ✅ run() 메서드의 중복 출력 방지
+                return
         
         # 완료
         self.iherb_browser.close()
@@ -631,12 +652,16 @@ class CoupangIHerbAdd900Crawler:
         
         print(f"\n{'='*80}")
         print(f"🎉 매칭 완료!")
-        print(f"📊 신규 매칭: {completed}개")
+        print(f"{'='*80}")
+        print(f"📊 처리 통계:")
+        print(f"   - 신규 처리: {completed}개")
+        print(f"   - 스킵: {skipped}개")
+        print(f"   - 총 진행: {completed + skipped}개")
         print(f"⏱️  소요 시간: {hours}시간 {minutes}분")
         print(f"{'='*80}")
-    
+
     def _match_and_save(self, idx, category, product_url, product_name, price, product_id):
-        """아이허브 매칭 및 저장"""
+        """아이허브 매칭 및 저장 - 수정된 버전"""
         print(f"\n[{idx}/{len(self.all_products)}] 🔍 {product_name[:50]}...")
         
         upc = ""
@@ -644,22 +669,37 @@ class CoupangIHerbAdd900Crawler:
         
         try:
             # 아이허브 검색 및 매칭
-            result = self.product_matcher.search_product_enhanced(product_name)
+            # ✅ search_product_enhanced는 tuple (product_url, similarity_score, match_details) 반환
+            search_result = self.product_matcher.search_product_enhanced(product_name, product_id)
             
-            if result and result.get('matched_url'):
-                matched_url = result['matched_url']
-                print(f"  ✅ 매칭 성공: {matched_url}")
-                
-                # 상품 정보 추출
-                info = self.iherb_client.extract_product_info_with_price(matched_url)
-                if info:
-                    part_number = info.get('product_id', '')
-                    upc = self._extract_upc_from_page()
-                    print(f"  📦 파트넘버: {part_number}")
-                    if upc:
-                        print(f"  🔢 UPC: {upc}")
+            if not search_result or len(search_result) != 3:
+                print(f"  ❌ 검색 결과 형식 오류")
+                upc = ""
+                part_number = ""
             else:
-                print(f"  ❌ 매칭 실패")
+                # ✅ Tuple unpacking
+                matched_url, similarity_score, match_details = search_result
+                
+                if matched_url:
+                    print(f"  ✅ 매칭 성공: {matched_url}")
+                    
+                    # 상품 정보 추출 (코드, 이름, 가격)
+                    product_code, iherb_name, price_info = \
+                        self.iherb_client.extract_product_info_with_price(matched_url)
+                    
+                    if product_code:
+                        part_number = product_code
+                        print(f"  📦 파트넘버: {part_number}")
+                        
+                        # UPC 추출
+                        upc = self._extract_upc_from_page()
+                        if upc:
+                            print(f"  🔢 UPC: {upc}")
+                    else:
+                        print(f"  ⚠️ 파트넘버 추출 실패")
+                else:
+                    reason = match_details.get('reason', 'unknown') if isinstance(match_details, dict) else 'unknown'
+                    print(f"  ❌ 매칭 실패: {reason}")
         
         except Exception as e:
             error_msg = str(e)
@@ -668,7 +708,7 @@ class CoupangIHerbAdd900Crawler:
             if "quota" in error_msg.lower() or "limit" in error_msg.lower():
                 print(f"\n{'='*80}")
                 print("⚠️  Gemini API 할당량 초과!")
-                print(f"📊 처리 완료: {idx - len(self.existing_product_ids)}개 / {len(self.new_products)}개")
+                print(f"📊 신규 매칭: {idx - len(self.matched_product_ids)}개")
                 print(f"💾 진행사항 저장됨: {self.output_file}")
                 print(f"🔄 다시 실행하면 이어서 진행됩니다.")
                 print(f"{'='*80}")
@@ -688,8 +728,15 @@ class CoupangIHerbAdd900Crawler:
             '수집시간': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         }
         
-        self.csv_writer.writerow(row)
-        self.csv_file.flush()
+        try:
+            self.csv_writer.writerow(row)
+            self.csv_file.flush()  # 버퍼 비우기
+            os.fsync(self.csv_file.fileno())  # 강제로 디스크에 쓰기
+            
+            print(f"  💾 CSV 저장 완료 (행 {idx})")
+            
+        except Exception as e:
+            print(f"  ⚠️ CSV 저장 실패: {e}")
         
         # 처리 완료 ID에 추가
         self.matched_product_ids.add(product_id)
@@ -752,8 +799,27 @@ class CoupangIHerbAdd900Crawler:
         ]
         
         try:
-            # 1단계: 신규 쿠팡 크롤링 (900개)
-            self.crawl_new_coupang_products(categories)
+            # ✅ 크롤링 완료 여부 체크 (목표: 원본 + 900개)
+            # 캐시에 이미 충분한 상품이 있으면 크롤링 스킵
+            target_total = 774 + 900  # 1674개
+            current_total = len(self.all_products)  # 현재 캐시 상품 수
+            
+            need_crawling = current_total < target_total
+            
+            if need_crawling:
+                print("\n" + "="*80)
+                print("📦 1단계: 신규 쿠팡 크롤링 필요")
+                print(f"   현재: {current_total}개 / 목표: {target_total}개")
+                print(f"   부족: {target_total - current_total}개")
+                print("="*80)
+                self.crawl_new_coupang_products(categories)
+            else:
+                print("\n" + "="*80)
+                print("✅ 1단계 스킵: 크롤링 이미 완료됨")
+                print(f"   캐시 상품: {current_total}개 (목표: {target_total}개)")
+                print(f"   매칭 완료: {len(self.matched_product_ids)}개")
+                print(f"   매칭 대기: {current_total - len(self.matched_product_ids)}개")
+                print("="*80)
             
             # 2단계: 신규 상품만 아이허브 매칭
             self.match_iherb_products()
@@ -764,7 +830,7 @@ class CoupangIHerbAdd900Crawler:
             print(f"\n❌ 오류 발생: {e}")
         finally:
             self.cleanup()
-    
+        
     def cleanup(self):
         """리소스 정리"""
         print("\n🧹 정리 중...")
