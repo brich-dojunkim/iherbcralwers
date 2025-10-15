@@ -17,9 +17,9 @@
 
 예:
   python3 smartstore_collect.py \
-    --start-url "https://search.shopping.naver.com/search/all?adQuery=%ED%8F%AC%ED%84%B0&origQuery=%ED%8F%AC%ED%84%B0&pagingIndex=1&pagingSize=40&productSet=total&query=%ED%8F%AC%ED%84%B0&sort=rel&timestamp=&viewType=list" \
+    --start-url "https://search.shopping.naver.com/search/all?query=%EC%B2%9C%EC%A7%80%EC%96%91%20%ED%99%8D%EC%82%BC%EC%8A%A4%ED%8B%B1%2010ml%2030%ED%8F%AC&vertical=search" \
     --pages 10 \
-    --out stores_porter.txt
+    --out keyword3.txt
 """
 
 import os, re, time, html, argparse, json
