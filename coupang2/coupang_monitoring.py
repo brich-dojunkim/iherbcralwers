@@ -130,8 +130,6 @@ class CategoryMonitoringDatabase:
         
         conn.commit()
         conn.close()
-        
-        print(f"데이터베이스 초기화 완료: {self.db_path}")
     
     def register_category(self, name, url):
         """카테고리 등록"""
@@ -302,55 +300,76 @@ class InfiniteScrollExtractor:
     
     def __init__(self, browser_manager):
         self.browser = browser_manager
-        self.driver = browser_manager.driver
+    
+    @property
+    def driver(self):
+        """브라우저 드라이버 접근"""
+        return self.browser.driver if self.browser else None
     
     def extract_all_products_with_scroll(self, page_url):
         """무한 스크롤로 모든 상품 추출"""
-        print(f"무한 스크롤 크롤링 시작: {page_url}")
+        if not self.driver:
+            print("❌ 브라우저 드라이버가 초기화되지 않았습니다")
+            return []
         
-        self.driver.get(page_url)
-        time.sleep(random.uniform(3, 5))
-        
-        # 판매량순 필터 적용
-        self._click_sales_filter()
-        
-        all_products = []
-        seen_product_ids = set()
-        scroll_count = 0
-        max_scrolls = 100
-        no_new_products_count = 0
-        max_no_new_attempts = 10
-        
-        print("📜 무한 스크롤로 모든 상품 수집 중...")
-        
-        while scroll_count < max_scrolls:
-            scroll_count += 1
+        try:
+            print(f"무한 스크롤 크롤링 시작: {page_url}")
+            self.driver.get(page_url)
+            time.sleep(random.uniform(3, 5))
             
-            # 현재 페이지에서 상품 추출
-            new_products = self._extract_products_from_current_page(seen_product_ids)
+            # 판매량순 필터 적용
+            self._click_sales_filter()
             
-            if new_products:
-                all_products.extend(new_products)
-                no_new_products_count = 0
-                print(f"  [스크롤 {scroll_count}] 신규: {len(new_products)}개, 총: {len(all_products)}개")
-            else:
-                no_new_products_count += 1
-                print(f"  [스크롤 {scroll_count}] 신규: 0개 (연속 {no_new_products_count}회)")
+            all_products = []
+            seen_product_ids = set()
+            scroll_count = 0
+            max_scrolls = 200
+            no_new_products_count = 0
+            max_no_new_attempts = 15
+            consecutive_no_height_change = 0
             
-            # 더 이상 신규 상품이 없으면 종료
-            if no_new_products_count >= max_no_new_attempts:
-                print(f"🏁 더 이상 신규 상품이 없습니다 (연속 {max_no_new_attempts}회)")
-                break
+            print("📜 무한 스크롤로 모든 상품 수집 중...")
             
-            # 스크롤 다운
-            if not self._scroll_down_and_wait():
-                print("🏁 페이지 끝에 도달했습니다")
-                break
+            while scroll_count < max_scrolls:
+                scroll_count += 1
+                
+                # 현재 페이지에서 상품 추출
+                new_products = self._extract_products_from_current_page(seen_product_ids)
+                
+                if new_products:
+                    all_products.extend(new_products)
+                    no_new_products_count = 0
+                    consecutive_no_height_change = 0
+                    print(f"  [스크롤 {scroll_count}] 신규: {len(new_products)}개, 총: {len(all_products)}개")
+                else:
+                    no_new_products_count += 1
+                
+                # 스크롤
+                height_changed = self._scroll_to_bottom()
+                
+                if not height_changed:
+                    consecutive_no_height_change += 1
+                    
+                    # 5회 연속 높이 변화 없으면서 신규도 없으면 종료
+                    if consecutive_no_height_change >= 5 and no_new_products_count >= 5:
+                        print(f"🏁 더 이상 신규 상품이 없습니다")
+                        break
+                else:
+                    consecutive_no_height_change = 0
+                
+                # 오래 신규 없으면 종료
+                if no_new_products_count >= max_no_new_attempts:
+                    print(f"🏁 {max_no_new_attempts}회 연속 신규 없음, 크롤링 종료")
+                    break
+                
+                time.sleep(random.uniform(1, 2))
             
-            time.sleep(random.uniform(1, 2))
-        
-        print(f"✅ 무한 스크롤 완료: 총 {len(all_products)}개 상품 수집")
-        return all_products
+            print(f"✅ 무한 스크롤 완료: 총 {len(all_products)}개 상품 수집")
+            return all_products
+            
+        except Exception as e:
+            print(f"❌ 크롤링 오류: {e}")
+            return []
     
     def _click_sales_filter(self):
         """판매량순 필터 클릭"""
@@ -361,11 +380,14 @@ class InfiniteScrollExtractor:
             filter_buttons = self.driver.find_elements(By.CSS_SELECTOR, 'li.sortkey')
             
             for button in filter_buttons:
-                if '판매량순' in button.text:
-                    button.click()
-                    print("✅ 판매량순 필터 적용 완료")
-                    time.sleep(3)
-                    return
+                try:
+                    if '판매량순' in button.text:
+                        button.click()
+                        print("✅ 판매량순 필터 적용 완료")
+                        time.sleep(3)
+                        return
+                except:
+                    continue
             
             print("⚠️ 판매량순 필터 없음 (기본 정렬 사용)")
         except Exception as e:
@@ -383,6 +405,9 @@ class InfiniteScrollExtractor:
                     link_elem = element.find_element(By.CSS_SELECTOR, 'a.product-wrapper')
                     product_url = link_elem.get_attribute('href')
                     
+                    if not product_url:
+                        continue
+                    
                     match = re.search(r'itemId=(\d+)', product_url)
                     if not match:
                         continue
@@ -396,16 +421,15 @@ class InfiniteScrollExtractor:
                     
                     # 상품 데이터 파싱
                     product_data = self._parse_product_data(element, product_id, product_url)
-                    if product_data:
+                    if product_data and product_data.get('product_name'):
                         new_products.append(product_data)
                 
-                except Exception as e:
+                except:
                     continue
             
             return new_products
             
-        except Exception as e:
-            print(f"상품 추출 오류: {e}")
+        except:
             return []
     
     def _parse_product_data(self, element, product_id, product_url):
@@ -414,30 +438,63 @@ class InfiniteScrollExtractor:
             html = element.get_attribute('outerHTML')
             soup = BeautifulSoup(html, 'html.parser')
             
-            # 상품명
-            name_elem = soup.select_one('div.product-name')
-            product_name = name_elem.get_text(strip=True) if name_elem else ''
+            # 상품명 (필수)
+            name_elem = soup.select_one('div.name, div.product-name, div[class*="name"]')
+            if not name_elem:
+                return None
+            
+            product_name = name_elem.get_text(strip=True)
+            if not product_name:
+                return None
             
             # 가격
-            price_elem = soup.select_one('span.price-value')
             current_price = 0
-            if price_elem:
-                price_text = price_elem.get_text(strip=True)
-                current_price = int(re.sub(r'[^\d]', '', price_text)) if price_text else 0
+            price_selectors = ['strong.price-value', 'span.price-value', 'em.sale', 'span[class*="price"]']
+            
+            for selector in price_selectors:
+                price_elem = soup.select_one(selector)
+                if price_elem:
+                    price_text = price_elem.get_text(strip=True)
+                    price_text = re.sub(r'[^\d]', '', price_text)
+                    if price_text:
+                        current_price = int(price_text)
+                        break
             
             # 할인율
-            discount_elem = soup.select_one('span.discount-percentage')
             discount_rate = 0
-            if discount_elem:
-                discount_text = discount_elem.get_text(strip=True)
-                discount_rate = int(re.sub(r'[^\d]', '', discount_text)) if discount_text else 0
+            discount_selectors = ['span.discount-percentage', 'em.discount-rate', 'span[class*="discount"]']
+            
+            for selector in discount_selectors:
+                discount_elem = soup.select_one(selector)
+                if discount_elem:
+                    discount_text = discount_elem.get_text(strip=True)
+                    discount_text = re.sub(r'[^\d]', '', discount_text)
+                    if discount_text:
+                        discount_rate = int(discount_text)
+                        break
             
             # 리뷰 수
-            review_elem = soup.select_one('span.rating-total-count')
             review_count = 0
-            if review_elem:
-                review_text = review_elem.get_text(strip=True)
-                review_count = int(re.sub(r'[^\d]', '', review_text)) if review_text else 0
+            review_selectors = ['span.rating-total-count', 'span[class*="review"]', 'em.rating-count']
+            
+            for selector in review_selectors:
+                review_elem = soup.select_one(selector)
+                if review_elem:
+                    review_text = review_elem.get_text(strip=True)
+                    review_text = re.sub(r'[^\d]', '', review_text)
+                    if review_text:
+                        review_count = int(review_text)
+                        break
+            
+            # 평점
+            rating_score = 0.0
+            rating_elem = soup.select_one('em.rating, span[class*="rating"]')
+            if rating_elem:
+                try:
+                    rating_text = rating_elem.get_text(strip=True)
+                    rating_score = float(re.sub(r'[^\d.]', '', rating_text))
+                except:
+                    pass
             
             return {
                 'product_id': product_id,
@@ -446,25 +503,38 @@ class InfiniteScrollExtractor:
                 'current_price': current_price,
                 'discount_rate': discount_rate,
                 'review_count': review_count,
-                'rank': 0  # 순위는 나중에 설정
+                'rating_score': rating_score,
+                'rank': 0
             }
             
-        except Exception as e:
+        except:
             return None
     
-    def _scroll_down_and_wait(self):
-        """스크롤 다운 및 대기"""
+    def _scroll_to_bottom(self):
+        """스크롤 & 새 콘텐츠 확인"""
         try:
             last_height = self.driver.execute_script("return document.body.scrollHeight")
             
+            # 천천히 단계적으로 스크롤
+            scroll_steps = random.randint(3, 5)
+            for i in range(scroll_steps):
+                scroll_amount = (last_height / scroll_steps) * (i + 1)
+                self.driver.execute_script(f"window.scrollTo(0, {scroll_amount});")
+                time.sleep(0.3)
+            
+            # 완전히 끝까지
             self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-            time.sleep(random.uniform(1.5, 2.5))
             
-            new_height = self.driver.execute_script("return document.body.scrollHeight")
+            # 새 콘텐츠 로딩 대기 (최대 5초)
+            for _ in range(5):
+                time.sleep(1)
+                new_height = self.driver.execute_script("return document.body.scrollHeight")
+                if new_height > last_height:
+                    return True
             
-            return new_height > last_height
+            return False
             
-        except Exception as e:
+        except:
             return False
 
 
@@ -533,7 +603,7 @@ class CategoryPageMonitor:
         self.category_config = category_config
         self.db = CategoryMonitoringDatabase(db_path)
         self.browser = BrowserManager(headless=headless)
-        self.extractor = InfiniteScrollExtractor(self.browser)
+        self.extractor = None
         self.change_detector = CategoryChangeDetector()
         
         # 카테고리 등록
@@ -547,14 +617,15 @@ class CategoryPageMonitor:
             self.db.load_csv_baseline(csv_baseline_path)
         
         print(f"카테고리 '{category_config['name']}' 모니터링 시스템 초기화 완료")
-        print(f"대상 URL: {category_config['url']}")
     
     def start_driver(self):
         """브라우저 드라이버 시작"""
         print("Chrome 드라이버 시작 중...")
         if self.browser.start_driver():
             print("Chrome 드라이버 시작 완료")
+            self.extractor = InfiniteScrollExtractor(self.browser)
             return True
+        print("❌ Chrome 드라이버 시작 실패")
         return False
     
     def run_monitoring_cycle(self):
@@ -569,8 +640,18 @@ class CategoryPageMonitor:
         start_time = time.time()
         
         try:
-            # 1. 페이지 크롤링 (무한 스크롤)
+            if not self.extractor:
+                print(f"❌ Extractor 초기화 안됨")
+                return None
+            
+            # 1. 페이지 크롤링
             current_products = self.extractor.extract_all_products_with_scroll(page_url)
+            
+            if not current_products:
+                print(f"❌ 상품 수집 실패: 상품이 없습니다")
+                return None
+            
+            print(f"✅ {len(current_products)}개 상품 수집 완료")
             
             # 2. 이전 데이터와 비교
             previous_products = self.db.get_latest_snapshot_data(category_name)
@@ -590,29 +671,32 @@ class CategoryPageMonitor:
             return changes
             
         except Exception as e:
-            print(f"[{category_name}] 모니터링 오류: {e}")
+            print(f"❌ [{category_name}] 모니터링 오류: {e}")
+            import traceback
+            traceback.print_exc()
             return None
     
     def report_changes(self, category_name, changes):
         """카테고리별 변화 보고"""
-        print(f"\n[{category_name}] 변화 감지 결과:")
-        print(f"  신규 상품: {len(changes['new_products'])}개")
-        print(f"  제거된 상품: {len(changes['removed_products'])}개")
+        print(f"\n[{category_name}] 변화 감지:")
+        print(f"  신규: {len(changes['new_products'])}개")
+        print(f"  제거: {len(changes['removed_products'])}개")
         print(f"  순위 변화: {len(changes['rank_changes'])}개")
         print(f"  가격 변화: {len(changes['price_changes'])}개")
         
-        # 주요 변화 상세 출력
+        # 주요 순위 변화
         if changes['rank_changes']:
-            print(f"\n[{category_name}] 주요 순위 변화:")
+            print(f"\n주요 순위 변화:")
             for change in changes['rank_changes'][:5]:
-                direction = "상승" if change['rank_change'] > 0 else "하락"
-                print(f"  {change['product_name'][:30]}...: {change['old_rank']}위 → {change['new_rank']}위 ({abs(change['rank_change'])}단계 {direction})")
+                direction = "↑" if change['rank_change'] > 0 else "↓"
+                print(f"  {change['product_name'][:30]}: {change['old_rank']}위 → {change['new_rank']}위 {direction}")
         
+        # 주요 가격 변화
         if changes['price_changes']:
-            print(f"\n[{category_name}] 주요 가격 변화:")
+            print(f"\n주요 가격 변화:")
             for change in changes['price_changes'][:5]:
-                direction = "인상" if change['price_change'] > 0 else "인하"
-                print(f"  {change['product_name'][:30]}...: {change['old_price']:,}원 → {change['new_price']:,}원 ({abs(change['price_change']):,}원 {direction})")
+                direction = "↑" if change['price_change'] > 0 else "↓"
+                print(f"  {change['product_name'][:30]}: {change['old_price']:,}원 → {change['new_price']:,}원 {direction}")
     
     def log_changes(self, category_name, changes):
         """카테고리별 변화 이벤트 로깅"""
@@ -637,7 +721,7 @@ class CategoryPageMonitor:
             self.db.log_change_event(
                 product['product_id'], category_name, 'new_product',
                 None, product['product_name'],
-                f"신규 상품 등장"
+                f"신규 상품"
             )
     
     def close(self):
@@ -657,8 +741,6 @@ class MultiCategoryMonitoringSystem:
         
         print(f"다중 카테고리 모니터링 시스템 초기화")
         print(f"대상 카테고리: {len(categories_config)}개")
-        for cat in categories_config:
-            print(f"  - {cat['name']}")
     
     def run_full_monitoring_cycle(self, cycles=1):
         """전체 카테고리 모니터링 사이클 실행"""

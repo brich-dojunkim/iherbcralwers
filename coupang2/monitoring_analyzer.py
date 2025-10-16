@@ -2,498 +2,1665 @@
 # -*- coding: utf-8 -*-
 
 """
-모니터링 데이터 종합 분석 모듈
-coupang_monitoring.py에서 수집한 데이터를 분석하고 리포트 생성
+순수 모니터링 시스템 - 실시간 데이터 수집 및 변화 감지
+쿠팡 페이지의 모든 상품을 카테고리별로 수집하여 변화 추적
 """
 
-import sqlite3
-import pandas as pd
-import json
-from datetime import datetime
+import sys
 import os
+import time
+import re
+import sqlite3
+import random
+from datetime import datetime
+from bs4 import BeautifulSoup
+
+# 기존 모듈 임포트
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+sys.path.insert(0, parent_dir)
+sys.path.insert(0, os.path.join(parent_dir, 'coupang'))
+
+from coupang.coupang_manager import BrowserManager
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 
 
-class MonitoringAnalyzer:
-    """모니터링 데이터 종합 분석기"""
+class CategoryMonitoringDatabase:
+    """카테고리별 모니터링 전용 데이터베이스"""
     
     def __init__(self, db_path="page_monitoring.db"):
         self.db_path = db_path
-        if not os.path.exists(db_path):
-            raise FileNotFoundError(f"DB 파일을 찾을 수 없습니다: {db_path}")
+        self.init_database()
     
-    # ========== 기본 통계 ==========
-    
-    def get_db_statistics(self):
-        """DB 통계 정보 조회"""
+    def init_database(self):
+        """데이터베이스 테이블 초기화 - 순수 모니터링용"""
         conn = sqlite3.connect(self.db_path)
         
-        stats = {}
-        tables = ['categories', 'matching_reference', 'page_snapshots', 
-                  'product_states', 'change_events']
-        
-        for table in tables:
-            try:
-                count = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
-                stats[table] = count
-            except sqlite3.OperationalError:
-                stats[table] = 0
-        
-        # 매칭 통계
-        try:
-            matched_count = conn.execute("""
-                SELECT COUNT(*) FROM matching_reference 
-                WHERE iherb_upc IS NOT NULL
-            """).fetchone()[0]
-            stats['matched_products'] = matched_count
-            stats['unmatched_products'] = stats.get('matching_reference', 0) - matched_count
-        except:
-            stats['matched_products'] = 0
-            stats['unmatched_products'] = 0
-        
-        # 최신 스냅샷 정보
-        try:
-            latest = conn.execute("""
-                SELECT snapshot_time, total_products 
-                FROM page_snapshots 
-                ORDER BY id DESC LIMIT 1
-            """).fetchone()
-            if latest:
-                stats['latest_snapshot_time'] = latest[0]
-                stats['latest_total_products'] = latest[1]
-        except:
-            pass
-        
-        conn.close()
-        return stats
-    
-    def print_db_statistics(self):
-        """DB 통계 출력"""
-        stats = self.get_db_statistics()
-        
-        print(f"\n{'='*70}")
-        print(f"📊 모니터링 DB 통계")
-        print(f"{'='*70}")
-        print(f"DB 파일: {self.db_path}")
-        print(f"\n[테이블별 데이터]")
-        print(f"  카테고리: {stats.get('categories', 0)}개")
-        print(f"  매칭 참조: {stats.get('matching_reference', 0)}개 상품")
-        print(f"    - 매칭 완료: {stats.get('matched_products', 0)}개")
-        print(f"    - 미매칭: {stats.get('unmatched_products', 0)}개")
-        print(f"  페이지 스냅샷: {stats.get('page_snapshots', 0)}회 수집")
-        print(f"  상품 상태: {stats.get('product_states', 0)}개 레코드")
-        print(f"  변화 이벤트: {stats.get('change_events', 0)}개")
-        
-        if stats.get('latest_snapshot_time'):
-            print(f"\n[최근 수집]")
-            print(f"  시간: {stats['latest_snapshot_time']}")
-            print(f"  상품 수: {stats.get('latest_total_products', 0)}개")
-        
-        return stats
-    
-    # ========== 변화 분석 ==========
-    
-    def analyze_changes(self, days=7, top_n=10):
-        """최근 변화 분석"""
-        print(f"\n{'='*70}")
-        print(f"📈 최근 {days}일 변화 분석")
-        print(f"{'='*70}")
-        
-        conn = sqlite3.connect(self.db_path)
-        
-        # 변화 유형별 통계
-        query = """
-        SELECT 
-            event_type,
-            category_name,
-            COUNT(*) as count
-        FROM change_events
-        WHERE event_time >= datetime('now', '-{} days')
-        GROUP BY event_type, category_name
-        ORDER BY count DESC
-        """.format(days)
-        
-        change_stats = pd.read_sql_query(query, conn)
-        
-        if not change_stats.empty:
-            print(f"\n[카테고리별 변화 통계]")
-            for _, row in change_stats.iterrows():
-                event_type_korean = {
-                    'rank_change': '순위 변화',
-                    'price_change': '가격 변화',
-                    'new_product': '신규 상품'
-                }.get(row['event_type'], row['event_type'])
-                print(f"  [{row['category_name']}] {event_type_korean}: {row['count']}건")
-        
-        # 주요 순위 상승
-        rank_up_query = """
-        SELECT 
-            ce.coupang_product_id,
-            (SELECT product_name FROM product_states 
-             WHERE coupang_product_id = ce.coupang_product_id 
-             ORDER BY id DESC LIMIT 1) as product_name,
-            ce.category_name,
-            ce.old_value as old_rank,
-            ce.new_value as new_rank,
-            CAST(ce.old_value AS INTEGER) - CAST(ce.new_value AS INTEGER) as rank_improvement
-        FROM change_events ce
-        WHERE ce.event_type = 'rank_change'
-        AND ce.event_time >= datetime('now', '-{} days')
-        AND CAST(ce.old_value AS INTEGER) > CAST(ce.new_value AS INTEGER)
-        ORDER BY rank_improvement DESC
-        LIMIT ?
-        """.format(days)
-        
-        rank_ups = pd.read_sql_query(rank_up_query, conn, params=[top_n])
-        
-        if not rank_ups.empty:
-            print(f"\n[주요 순위 상승 TOP {top_n}]")
-            for idx, row in rank_ups.iterrows():
-                print(f"  {row['product_name'][:40]}...")
-                print(f"    [{row['category_name']}] {row['old_rank']}위 → {row['new_rank']}위 (↑{row['rank_improvement']})")
-        
-        # 주요 가격 인하
-        price_down_query = """
-        SELECT 
-            ce.coupang_product_id,
-            (SELECT product_name FROM product_states 
-             WHERE coupang_product_id = ce.coupang_product_id 
-             ORDER BY id DESC LIMIT 1) as product_name,
-            ce.category_name,
-            ce.old_value as old_price,
-            ce.new_value as new_price,
-            CAST(ce.old_value AS INTEGER) - CAST(ce.new_value AS INTEGER) as price_drop
-        FROM change_events ce
-        WHERE ce.event_type = 'price_change'
-        AND ce.event_time >= datetime('now', '-{} days')
-        AND CAST(ce.old_value AS INTEGER) > CAST(ce.new_value AS INTEGER)
-        ORDER BY price_drop DESC
-        LIMIT ?
-        """.format(days)
-        
-        price_downs = pd.read_sql_query(price_down_query, conn, params=[top_n])
-        
-        if not price_downs.empty:
-            print(f"\n[주요 가격 인하 TOP {top_n}]")
-            for idx, row in price_downs.iterrows():
-                print(f"  {row['product_name'][:40]}...")
-                print(f"    [{row['category_name']}] {int(row['old_price']):,}원 → {int(row['new_price']):,}원 (↓{int(row['price_drop']):,}원)")
-        
-        conn.close()
-    
-    # ========== 카테고리별 분석 ==========
-    
-    def analyze_by_category(self):
-        """카테고리별 통계 분석"""
-        print(f"\n{'='*70}")
-        print(f"📂 카테고리별 분석")
-        print(f"{'='*70}")
-        
-        conn = sqlite3.connect(self.db_path)
-        
-        query = """
-        SELECT 
-            snap.category_name,
-            COUNT(DISTINCT ps.coupang_product_id) as total_products,
-            AVG(ps.current_price) as avg_price,
-            AVG(ps.discount_rate) as avg_discount,
-            AVG(ps.review_count) as avg_reviews,
-            MAX(snap.snapshot_time) as last_updated
-        FROM product_states ps
-        JOIN page_snapshots snap ON ps.snapshot_id = snap.id
-        WHERE snap.id IN (
-            SELECT MAX(id) FROM page_snapshots GROUP BY category_name
-        )
-        GROUP BY snap.category_name
-        ORDER BY total_products DESC
-        """
-        
-        df = pd.read_sql_query(query, conn)
-        conn.close()
-        
-        if df.empty:
-            print("카테고리 데이터가 없습니다.")
-            return None
-        
-        print(f"\n총 {len(df)}개 카테고리\n")
-        
-        for idx, row in df.iterrows():
-            print(f"{idx+1}. {row['category_name']}")
-            print(f"   상품 수: {row['total_products']}개")
-            print(f"   평균 가격: {row['avg_price']:,.0f}원")
-            print(f"   평균 할인율: {row['avg_discount']:.1f}%")
-            print(f"   평균 리뷰수: {row['avg_reviews']:.0f}개")
-            print(f"   최근 업데이트: {row['last_updated']}")
-            print()
-        
-        return df
-    
-    # ========== 중복 상품 분석 ==========
-    
-    def analyze_cross_category_products(self, top_n=20):
-        """여러 카테고리에 동시 등장하는 상품 분석"""
-        print(f"\n{'='*70}")
-        print(f"🔍 중복 상품 분석 (여러 카테고리 동시 등장)")
-        print(f"{'='*70}")
-        
-        conn = sqlite3.connect(self.db_path)
-        
-        # 여러 카테고리에 나타나는 상품 찾기
-        query = """
-        WITH latest_snapshots AS (
-            SELECT category_name, MAX(id) as snapshot_id
-            FROM page_snapshots
-            GROUP BY category_name
-        ),
-        product_categories AS (
-            SELECT 
-                ps.coupang_product_id,
-                ps.product_name,
-                snap.category_name,
-                ps.category_rank,
-                ps.current_price
-            FROM product_states ps
-            JOIN page_snapshots snap ON ps.snapshot_id = snap.id
-            JOIN latest_snapshots ls ON snap.id = ls.snapshot_id
-        )
-        SELECT 
-            coupang_product_id,
-            product_name,
-            COUNT(DISTINCT category_name) as category_count,
-            GROUP_CONCAT(category_name, ', ') as categories
-        FROM product_categories
-        GROUP BY coupang_product_id, product_name
-        HAVING category_count > 1
-        ORDER BY category_count DESC, product_name
-        LIMIT ?
-        """
-        
-        duplicate_products = pd.read_sql_query(query, conn, params=[top_n])
-        
-        if duplicate_products.empty:
-            print("중복 상품이 발견되지 않았습니다.")
-            conn.close()
-            return None
-        
-        print(f"\n총 {len(duplicate_products)}개 중복 상품 발견")
-        print(f"상위 {min(top_n, len(duplicate_products))}개 상품:\n")
-        
-        for idx, row in duplicate_products.iterrows():
-            print(f"{idx+1}. {row['product_name'][:45]}...")
-            print(f"   등장 카테고리: {row['categories']} ({row['category_count']}개)")
-            
-            # 카테고리별 순위 조회
-            rank_query = """
-            WITH latest_snapshots AS (
-                SELECT category_name, MAX(id) as snapshot_id
-                FROM page_snapshots
-                GROUP BY category_name
+        # 1. 카테고리 테이블
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS categories (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT UNIQUE NOT NULL,
+                url TEXT NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )
-            SELECT 
-                snap.category_name,
-                ps.category_rank,
-                ps.current_price
-            FROM product_states ps
-            JOIN page_snapshots snap ON ps.snapshot_id = snap.id
-            JOIN latest_snapshots ls ON snap.id = ls.snapshot_id
-            WHERE ps.coupang_product_id = ?
-            ORDER BY ps.category_rank
-            """
+        """)
+        
+        # 2. 매칭 참조 테이블 (CSV에서 로드)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS matching_reference (
+                coupang_product_id TEXT PRIMARY KEY,
+                coupang_product_name TEXT,
+                coupang_product_url TEXT,
+                original_category TEXT,
+                iherb_upc TEXT,
+                iherb_part_number TEXT,
+                created_from_csv BOOLEAN DEFAULT TRUE,
+                created_time DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # 3. 페이지 스냅샷 테이블 (카테고리별)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS page_snapshots (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                category_id INTEGER NOT NULL,
+                category_name TEXT NOT NULL,
+                page_url TEXT NOT NULL,
+                snapshot_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+                total_products INTEGER,
+                crawl_duration_seconds REAL,
+                status TEXT DEFAULT 'completed',
+                FOREIGN KEY (category_id) REFERENCES categories (id)
+            )
+        """)
+        
+        # 4. 상품 상태 테이블 (카테고리별 순위)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS product_states (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                snapshot_id INTEGER NOT NULL,
+                coupang_product_id TEXT NOT NULL,
+                category_rank INTEGER NOT NULL,
+                
+                -- 쿠팡 실시간 정보
+                product_name TEXT,
+                product_url TEXT,
+                current_price INTEGER,
+                original_price INTEGER,
+                discount_rate INTEGER,
+                review_count INTEGER,
+                rating_score REAL,
+                is_rocket_delivery BOOLEAN,
+                is_free_shipping BOOLEAN,
+                cashback_amount INTEGER,
+                delivery_info TEXT,
+                
+                -- 아이허브 매칭 정보
+                iherb_upc TEXT,
+                iherb_part_number TEXT,
+                matching_status TEXT DEFAULT 'unknown',
+                
+                FOREIGN KEY (snapshot_id) REFERENCES page_snapshots (id)
+            )
+        """)
+        
+        # 5. 변화 이벤트 로그 테이블 (카테고리 정보 포함)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS change_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                coupang_product_id TEXT NOT NULL,
+                category_name TEXT NOT NULL,
+                event_type TEXT NOT NULL,
+                old_value TEXT,
+                new_value TEXT,
+                description TEXT,
+                event_time DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # 인덱스 생성
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_product_states_snapshot ON product_states(snapshot_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_product_states_product ON product_states(coupang_product_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_product_states_category_rank ON product_states(snapshot_id, category_rank)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_change_events_product ON change_events(coupang_product_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_change_events_category ON change_events(category_name)")
+        
+        conn.commit()
+        conn.close()
+    
+    def register_category(self, name, url):
+        """카테고리 등록"""
+        conn = sqlite3.connect(self.db_path)
+        try:
+            conn.execute("""
+                INSERT OR REPLACE INTO categories (name, url)
+                VALUES (?, ?)
+            """, (name, url))
+            conn.commit()
             
-            ranks = pd.read_sql_query(rank_query, conn, params=[row['coupang_product_id']])
+            category_id = conn.execute("""
+                SELECT id FROM categories WHERE name = ?
+            """, (name,)).fetchone()[0]
             
-            if not ranks.empty:
-                rank_strs = []
-                for _, rank_info in ranks.iterrows():
-                    rank_strs.append(f"{rank_info['category_name']}: {rank_info['category_rank']}위")
-                print(f"   순위: {', '.join(rank_strs)}")
-            print()
+            return category_id
+        finally:
+            conn.close()
+    
+    def load_csv_baseline(self, csv_path):
+        """CSV 베이스라인 로드 (매칭 참조용)"""
+        import pandas as pd
         
+        try:
+            df = pd.read_csv(csv_path, encoding='utf-8-sig')
+            
+            conn = sqlite3.connect(self.db_path)
+            
+            for _, row in df.iterrows():
+                product_id = str(row.get('coupang_product_id', ''))
+                if not product_id:
+                    continue
+                
+                conn.execute("""
+                    INSERT OR REPLACE INTO matching_reference 
+                    (coupang_product_id, coupang_product_name, coupang_product_url,
+                     original_category, iherb_upc, iherb_part_number)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (
+                    product_id,
+                    str(row.get('coupang_product_name', '')),
+                    str(row.get('coupang_product_url', '')),
+                    str(row.get('category', '')),
+                    str(row.get('iherb_upc', '')),
+                    str(row.get('iherb_part_number', ''))
+                ))
+            
+            conn.commit()
+            conn.close()
+            
+            print(f"CSV 베이스라인 로드 완료: {len(df)}개 상품")
+            
+        except Exception as e:
+            print(f"CSV 로드 실패: {e}")
+    
+    def save_snapshot(self, category_name, page_url, products, crawl_duration):
+        """스냅샷 저장"""
+        conn = sqlite3.connect(self.db_path)
+        
+        # 카테고리 ID 조회
+        category_id = conn.execute("""
+            SELECT id FROM categories WHERE name = ?
+        """, (category_name,)).fetchone()[0]
+        
+        # 스냅샷 생성
+        cursor = conn.execute("""
+            INSERT INTO page_snapshots 
+            (category_id, category_name, page_url, total_products, crawl_duration_seconds)
+            VALUES (?, ?, ?, ?, ?)
+        """, (category_id, category_name, page_url, len(products), crawl_duration))
+        
+        snapshot_id = cursor.lastrowid
+        
+        # 상품 상태 저장
+        for product in products:
+            # 매칭 정보 조회
+            matching_info = conn.execute("""
+                SELECT iherb_upc, iherb_part_number 
+                FROM matching_reference 
+                WHERE coupang_product_id = ?
+            """, (product['product_id'],)).fetchone()
+            
+            iherb_upc = matching_info[0] if matching_info else None
+            iherb_part_number = matching_info[1] if matching_info else None
+            matching_status = 'matched' if iherb_upc else 'unmatched'
+            
+            conn.execute("""
+                INSERT INTO product_states 
+                (snapshot_id, coupang_product_id, category_rank,
+                 product_name, product_url, current_price, original_price,
+                 discount_rate, review_count, rating_score,
+                 is_rocket_delivery, is_free_shipping, cashback_amount, delivery_info,
+                 iherb_upc, iherb_part_number, matching_status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                snapshot_id, product['product_id'], product['rank'],
+                product['product_name'], product['product_url'],
+                product.get('current_price', 0), product.get('original_price', 0),
+                product.get('discount_rate', 0), product.get('review_count', 0),
+                product.get('rating_score', 0.0),
+                product.get('is_rocket_delivery', False),
+                product.get('is_free_shipping', False),
+                product.get('cashback_amount', 0),
+                product.get('delivery_info', ''),
+                iherb_upc, iherb_part_number, matching_status
+            ))
+        
+        conn.commit()
         conn.close()
-        return duplicate_products
-    
-    # ========== CSV 출력 ==========
-    
-    def export_latest_snapshot(self, output_path=None):
-        """최신 스냅샷을 CSV로 출력"""
-        if not output_path:
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            output_path = f"latest_snapshot_{timestamp}.csv"
         
+        return snapshot_id
+    
+    def get_latest_snapshot_data(self, category_name):
+        """최신 스냅샷 데이터 조회"""
         conn = sqlite3.connect(self.db_path)
         
         query = """
         SELECT 
-            ps.category_rank as '순위',
-            snap.category_name as '카테고리',
-            ps.coupang_product_id as '쿠팡_상품ID',
-            ps.product_name as '쿠팡_상품명',
-            ps.product_url as '쿠팡_상품URL',
-            ps.current_price as '현재가격',
-            ps.original_price as '정가',
-            ps.discount_rate as '할인율(%)',
-            ps.review_count as '리뷰수',
-            ps.rating_score as '평점',
-            CASE WHEN ps.is_rocket_delivery THEN '로켓배송' ELSE '일반배송' END as '배송타입',
-            ps.cashback_amount as '적립금',
-            ps.iherb_upc as '아이허브_UPC',
-            ps.iherb_part_number as '아이허브_파트넘버',
-            ps.matching_status as '매칭상태',
-            snap.snapshot_time as '수집시간'
-        FROM product_states ps
-        JOIN page_snapshots snap ON ps.snapshot_id = snap.id
-        WHERE snap.id IN (
-            SELECT MAX(id) FROM page_snapshots GROUP BY category_name
-        )
-        ORDER BY snap.category_name, ps.category_rank
-        """
-        
-        df = pd.read_sql_query(query, conn)
-        conn.close()
-        
-        if df.empty:
-            print("출력할 데이터가 없습니다.")
-            return None
-        
-        df.to_csv(output_path, index=False, encoding='utf-8-sig')
-        print(f"✅ 최신 스냅샷 CSV 출력: {output_path} ({len(df)}개 상품)")
-        return output_path
-    
-    def export_change_summary(self, days=7, output_path=None):
-        """최근 변화 요약 CSV 출력"""
-        if not output_path:
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            output_path = f"change_summary_{days}days_{timestamp}.csv"
-        
-        conn = sqlite3.connect(self.db_path)
-        
-        query = """
-        SELECT 
-            ce.coupang_product_id as '쿠팡_상품ID',
-            (SELECT product_name FROM product_states 
-             WHERE coupang_product_id = ce.coupang_product_id 
-             ORDER BY id DESC LIMIT 1) as '상품명',
-            ce.category_name as '카테고리',
-            ce.event_type as '변화유형',
-            ce.old_value as '이전값',
-            ce.new_value as '현재값',
-            ce.description as '설명',
-            ce.event_time as '변화시간'
-        FROM change_events ce
-        WHERE ce.event_time >= datetime('now', '-{} days')
-        ORDER BY ce.event_time DESC
-        """.format(days)
-        
-        df = pd.read_sql_query(query, conn)
-        conn.close()
-        
-        if df.empty:
-            print("출력할 변화 데이터가 없습니다.")
-            return None
-        
-        df.to_csv(output_path, index=False, encoding='utf-8-sig')
-        print(f"✅ 변화 요약 CSV 출력: {output_path} ({len(df)}개 이벤트)")
-        return output_path
-    
-    def export_category_ranking(self, category_name, top_n=50, output_path=None):
-        """특정 카테고리의 최신 순위 CSV 출력"""
-        if not output_path:
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            safe_category = category_name.replace('/', '_')
-            output_path = f"ranking_{safe_category}_top{top_n}_{timestamp}.csv"
-        
-        conn = sqlite3.connect(self.db_path)
-        
-        query = """
-        SELECT 
-            ps.category_rank as '순위',
-            ps.product_name as '상품명',
-            ps.product_url as '상품URL',
-            ps.current_price as '현재가격',
-            ps.original_price as '정가',
-            ps.discount_rate as '할인율(%)',
-            ps.review_count as '리뷰수',
-            ps.rating_score as '평점',
-            ps.iherb_upc as '아이허브_UPC',
-            ps.iherb_part_number as '아이허브_파트넘버'
+            ps.coupang_product_id as product_id,
+            ps.category_rank as rank,
+            ps.product_name,
+            ps.product_url,
+            ps.current_price,
+            ps.original_price,
+            ps.discount_rate,
+            ps.review_count
         FROM product_states ps
         JOIN page_snapshots snap ON ps.snapshot_id = snap.id
         WHERE snap.category_name = ?
         AND snap.id = (
             SELECT MAX(id) FROM page_snapshots WHERE category_name = ?
         )
-        AND ps.category_rank <= ?
         ORDER BY ps.category_rank
         """
         
-        df = pd.read_sql_query(query, conn, params=[category_name, category_name, top_n])
+        cursor = conn.execute(query, (category_name, category_name))
+        products = []
+        
+        for row in cursor:
+            products.append({
+                'product_id': row[0],
+                'rank': row[1],
+                'product_name': row[2],
+                'product_url': row[3],
+                'current_price': row[4],
+                'original_price': row[5],
+                'discount_rate': row[6],
+                'review_count': row[7]
+            })
+        
         conn.close()
+        return products
+    
+    def log_change_event(self, product_id, category_name, event_type, old_value, new_value, description):
+        """변화 이벤트 로깅"""
+        conn = sqlite3.connect(self.db_path)
+        conn.execute("""
+            INSERT INTO change_events 
+            (coupang_product_id, category_name, event_type, old_value, new_value, description)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (product_id, category_name, event_type, str(old_value), str(new_value), description))
+        conn.commit()
+        conn.close()
+
+
+class InfiniteScrollExtractor:
+    """무한 스크롤 상품 추출기"""
+    
+    def __init__(self, browser_manager):
+        self.browser = browser_manager
+    
+    @property
+    def driver(self):
+        """브라우저 드라이버 접근"""
+        return self.browser.driver if self.browser else None
+    
+    def extract_all_products_with_scroll(self, page_url):
+        """무한 스크롤로 모든 상품 추출"""
+        if not self.driver:
+            print("❌ 브라우저 드라이버가 초기화되지 않았습니다")
+            return []
         
-        if df.empty:
-            print(f"카테고리 '{category_name}'의 데이터가 없습니다.")
+        try:
+            self.driver.get(page_url)
+            time.sleep(random.uniform(3, 5))
+            
+            # 판매량순 필터 적용
+            self._click_sales_filter()
+            
+            all_products = []
+            seen_product_ids = set()
+            scroll_count = 0
+            max_scrolls = 200
+            no_new_products_count = 0
+            max_no_new_attempts = 15
+            consecutive_no_height_change = 0
+            
+            while scroll_count < max_scrolls:
+                scroll_count += 1
+                
+                # 현재 페이지에서 상품 추출
+                new_products = self._extract_products_from_current_page(seen_product_ids)
+                
+                if new_products:
+                    all_products.extend(new_products)
+                    no_new_products_count = 0
+                    consecutive_no_height_change = 0
+                else:
+                    no_new_products_count += 1
+                
+                # 스크롤
+                height_changed = self._scroll_to_bottom()
+                
+                if not height_changed:
+                    consecutive_no_height_change += 1
+                    
+                    # 5회 연속 높이 변화 없으면서 신규도 없으면 종료
+                    if consecutive_no_height_change >= 5 and no_new_products_count >= 5:
+                        break
+                else:
+                    consecutive_no_height_change = 0
+                
+                # 오래 신규 없으면 종료
+                if no_new_products_count >= max_no_new_attempts:
+                    break
+                
+                time.sleep(random.uniform(1, 2))
+            
+            return all_products
+            
+        except Exception as e:
+            print(f"크롤링 오류: {e}")
+            return []
+    
+    def _click_sales_filter(self):
+        """판매량순 필터 클릭"""
+        try:
+            time.sleep(2)
+            
+            filter_buttons = self.driver.find_elements(By.CSS_SELECTOR, 'li.sortkey')
+            
+            for button in filter_buttons:
+                try:
+                    if '판매량순' in button.text:
+                        button.click()
+                        time.sleep(3)
+                        return
+                except:
+                    continue
+        except:
+            pass
+    
+    def _extract_products_from_current_page(self, seen_product_ids):
+        """현재 페이지에서 신규 상품만 추출"""
+        try:
+            new_products = []
+            
+            product_elements = self.driver.find_elements(By.CSS_SELECTOR, 'li.product-wrap')
+            
+            for element in product_elements:
+                try:
+                    link_elem = element.find_element(By.CSS_SELECTOR, 'a.product-wrapper')
+                    product_url = link_elem.get_attribute('href')
+                    
+                    if not product_url:
+                        continue
+                    
+                    match = re.search(r'itemId=(\d+)', product_url)
+                    if not match:
+                        continue
+                    
+                    product_id = match.group(1)
+                    
+                    if product_id in seen_product_ids:
+                        continue
+                    
+                    seen_product_ids.add(product_id)
+                    
+                    # 상품 데이터 파싱
+                    product_data = self._parse_product_data(element, product_id, product_url)
+                    if product_data and product_data.get('product_name'):
+                        new_products.append(product_data)
+                
+                except:
+                    continue
+            
+            return new_products
+            
+        except:
+            return []
+    
+    def _parse_product_data(self, element, product_id, product_url):
+        """상품 데이터 파싱"""
+        try:
+            html = element.get_attribute('outerHTML')
+            soup = BeautifulSoup(html, 'html.parser')
+            
+            # 상품명 (필수)
+            name_elem = soup.select_one('div.name, div.product-name, div[class*="name"]')
+            if not name_elem:
+                return None
+            
+            product_name = name_elem.get_text(strip=True)
+            if not product_name:
+                return None
+            
+            # 가격
+            current_price = 0
+            price_selectors = ['strong.price-value', 'span.price-value', 'em.sale', 'span[class*="price"]']
+            
+            for selector in price_selectors:
+                price_elem = soup.select_one(selector)
+                if price_elem:
+                    price_text = price_elem.get_text(strip=True)
+                    price_text = re.sub(r'[^\d]', '', price_text)
+                    if price_text:
+                        current_price = int(price_text)
+                        break
+            
+            # 할인율
+            discount_rate = 0
+            discount_selectors = ['span.discount-percentage', 'em.discount-rate', 'span[class*="discount"]']
+            
+            for selector in discount_selectors:
+                discount_elem = soup.select_one(selector)
+                if discount_elem:
+                    discount_text = discount_elem.get_text(strip=True)
+                    discount_text = re.sub(r'[^\d]', '', discount_text)
+                    if discount_text:
+                        discount_rate = int(discount_text)
+                        break
+            
+            # 리뷰 수
+            review_count = 0
+            review_selectors = ['span.rating-total-count', 'span[class*="review"]', 'em.rating-count']
+            
+            for selector in review_selectors:
+                review_elem = soup.select_one(selector)
+                if review_elem:
+                    review_text = review_elem.get_text(strip=True)
+                    review_text = re.sub(r'[^\d]', '', review_text)
+                    if review_text:
+                        review_count = int(review_text)
+                        break
+            
+            # 평점
+            rating_score = 0.0
+            rating_elem = soup.select_one('em.rating, span[class*="rating"]')
+            if rating_elem:
+                try:
+                    rating_text = rating_elem.get_text(strip=True)
+                    rating_score = float(re.sub(r'[^\d.]', '', rating_text))
+                except:
+                    pass
+            
+            return {
+                'product_id': product_id,
+                'product_name': product_name,
+                'product_url': product_url,
+                'current_price': current_price,
+                'discount_rate': discount_rate,
+                'review_count': review_count,
+                'rating_score': rating_score,
+                'rank': 0
+            }
+            
+        except:
             return None
-        
-        df.to_csv(output_path, index=False, encoding='utf-8-sig')
-        print(f"✅ {category_name} 순위 CSV 출력: {output_path} ({len(df)}개 상품)")
-        return output_path
     
-    # ========== 종합 리포트 ==========
+    def _scroll_to_bottom(self):
+        """스크롤 & 새 콘텐츠 확인"""
+        try:
+            last_height = self.driver.execute_script("return document.body.scrollHeight")
+            
+            # 천천히 단계적으로 스크롤
+            scroll_steps = random.randint(3, 5)
+            for i in range(scroll_steps):
+                scroll_amount = (last_height / scroll_steps) * (i + 1)
+                self.driver.execute_script(f"window.scrollTo(0, {scroll_amount});")
+                time.sleep(0.3)
+            
+            # 완전히 끝까지
+            self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+            
+            # 새 콘텐츠 로딩 대기 (최대 5초)
+            for _ in range(5):
+                time.sleep(1)
+                new_height = self.driver.execute_script("return document.body.scrollHeight")
+                if new_height > last_height:
+                    return True
+            
+            return False
+            
+        except:
+            return False
+
+
+class CategoryChangeDetector:
+    """카테고리 변화 감지기"""
     
-    def generate_full_report(self, days=7):
-        """종합 분석 리포트 생성"""
-        print(f"\n{'='*70}")
-        print(f"📊 모니터링 데이터 종합 분석 리포트")
-        print(f"{'='*70}")
-        print(f"생성 시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    def detect_changes(self, previous_products, current_products):
+        """이전 데이터와 현재 데이터 비교"""
+        changes = {
+            'new_products': [],
+            'removed_products': [],
+            'rank_changes': [],
+            'price_changes': []
+        }
         
-        # 1. DB 통계
-        self.print_db_statistics()
+        # 순위 할당
+        for idx, product in enumerate(current_products, 1):
+            product['rank'] = idx
         
-        # 2. 카테고리별 분석
-        self.analyze_by_category()
+        # 이전 상품 ID 세트
+        prev_ids = {p['product_id']: p for p in previous_products}
+        curr_ids = {p['product_id']: p for p in current_products}
         
-        # 3. 최근 변화 분석
-        self.analyze_changes(days=days)
+        # 신규 상품
+        for pid in curr_ids:
+            if pid not in prev_ids:
+                changes['new_products'].append(curr_ids[pid])
         
-        # 4. 중복 상품 분석
-        self.analyze_cross_category_products(top_n=10)
+        # 제거된 상품
+        for pid in prev_ids:
+            if pid not in curr_ids:
+                changes['removed_products'].append(prev_ids[pid])
         
-        print(f"\n{'='*70}")
-        print(f"✅ 리포트 생성 완료")
-        print(f"{'='*70}")
+        # 순위 및 가격 변화
+        for pid in set(prev_ids.keys()) & set(curr_ids.keys()):
+            old_product = prev_ids[pid]
+            new_product = curr_ids[pid]
+            
+            # 순위 변화
+            if old_product['rank'] != new_product['rank']:
+                changes['rank_changes'].append({
+                    'product_id': pid,
+                    'product_name': new_product['product_name'],
+                    'old_rank': old_product['rank'],
+                    'new_rank': new_product['rank'],
+                    'rank_change': old_product['rank'] - new_product['rank']
+                })
+            
+            # 가격 변화
+            if old_product['current_price'] != new_product['current_price']:
+                changes['price_changes'].append({
+                    'product_id': pid,
+                    'product_name': new_product['product_name'],
+                    'old_price': old_product['current_price'],
+                    'new_price': new_product['current_price'],
+                    'price_change': new_product['current_price'] - old_product['current_price']
+                })
+        
+        return changes
+
+
+class CategoryPageMonitor:
+    """카테고리별 페이지 모니터링 메인 클래스"""
+    
+    def __init__(self, category_config, csv_baseline_path=None, db_path="page_monitoring.db", headless=True):
+        self.category_config = category_config
+        self.db = CategoryMonitoringDatabase(db_path)
+        self.browser = BrowserManager(headless=headless)
+        self.extractor = None
+        self.change_detector = CategoryChangeDetector()
+        
+        # 카테고리 등록
+        self.category_id = self.db.register_category(
+            category_config['name'], 
+            category_config['url']
+        )
+        
+        # CSV 베이스라인 로드 (초기 1회만)
+        if csv_baseline_path:
+            self.db.load_csv_baseline(csv_baseline_path)
+        
+        print(f"카테고리 '{category_config['name']}' 모니터링 시스템 초기화 완료")
+    
+    def start_driver(self):
+        """브라우저 드라이버 시작"""
+        if self.browser.start_driver():
+            self.extractor = InfiniteScrollExtractor(self.browser)
+            return True
+        return False
+    
+    def run_monitoring_cycle(self):
+        """카테고리별 모니터링 사이클 실행"""
+        category_name = self.category_config['name']
+        page_url = self.category_config['url']
+        
+        print(f"\n{'='*60}")
+        print(f"[{category_name}] 모니터링 시작: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"{'='*60}")
+        
+        start_time = time.time()
+        
+        try:
+            if not self.extractor:
+                return None
+            
+            # 1. 페이지 크롤링
+            current_products = self.extractor.extract_all_products_with_scroll(page_url)
+            
+            if not current_products:
+                print(f"상품 수집 실패")
+                return None
+            
+            # 2. 이전 데이터와 비교
+            previous_products = self.db.get_latest_snapshot_data(category_name)
+            changes = self.change_detector.detect_changes(previous_products, current_products)
+            
+            # 3. 변화 보고
+            self.report_changes(category_name, changes)
+            
+            # 4. 변화 이벤트 로깅
+            self.log_changes(category_name, changes)
+            
+            # 5. 스냅샷 저장
+            crawl_duration = time.time() - start_time
+            snapshot_id = self.db.save_snapshot(category_name, page_url, current_products, crawl_duration)
+            
+            print(f"스냅샷 저장 완료: {len(current_products)}개 상품")
+            return changes
+            
+        except Exception as e:
+            print(f"모니터링 오류: {e}")
+            return None
+    
+    def report_changes(self, category_name, changes):
+        """카테고리별 변화 보고"""
+        print(f"\n[{category_name}] 변화 감지:")
+        print(f"  신규: {len(changes['new_products'])}개")
+        print(f"  제거: {len(changes['removed_products'])}개")
+        print(f"  순위 변화: {len(changes['rank_changes'])}개")
+        print(f"  가격 변화: {len(changes['price_changes'])}개")
+        
+        # 주요 순위 변화
+        if changes['rank_changes']:
+            print(f"\n주요 순위 변화:")
+            for change in changes['rank_changes'][:5]:
+                direction = "↑" if change['rank_change'] > 0 else "↓"
+                print(f"  {change['product_name'][:30]}: {change['old_rank']}위 → {change['new_rank']}위 {direction}")
+        
+        # 주요 가격 변화
+        if changes['price_changes']:
+            print(f"\n주요 가격 변화:")
+            for change in changes['price_changes'][:5]:
+                direction = "↑" if change['price_change'] > 0 else "↓"
+                print(f"  {change['product_name'][:30]}: {change['old_price']:,}원 → {change['new_price']:,}원 {direction}")
+    
+    def log_changes(self, category_name, changes):
+        """카테고리별 변화 이벤트 로깅"""
+        # 순위 변화 로깅
+        for change in changes['rank_changes']:
+            self.db.log_change_event(
+                change['product_id'], category_name, 'rank_change',
+                change['old_rank'], change['new_rank'],
+                f"순위 {abs(change['rank_change'])}단계 {'상승' if change['rank_change'] > 0 else '하락'}"
+            )
+        
+        # 가격 변화 로깅
+        for change in changes['price_changes']:
+            self.db.log_change_event(
+                change['product_id'], category_name, 'price_change',
+                change['old_price'], change['new_price'],
+                f"가격 {abs(change['price_change']):,}원 {'인상' if change['price_change'] > 0 else '인하'}"
+            )
+        
+        # 신규 상품 로깅
+        for product in changes['new_products']:
+            self.db.log_change_event(
+                product['product_id'], category_name, 'new_product',
+                None, product['product_name'],
+                f"신규 상품"
+            )
+    
+    def close(self):
+        """리소스 정리"""
+        if self.browser:
+            self.browser.close()
+
+
+class MultiCategoryMonitoringSystem:
+    """다중 카테고리 모니터링 시스템"""
+    
+    def __init__(self, categories_config, csv_baseline_path=None, db_path="page_monitoring.db", headless=True):
+        self.categories_config = categories_config
+        self.csv_baseline_path = csv_baseline_path
+        self.db_path = db_path
+        self.headless = headless
+        
+        print(f"다중 카테고리 모니터링 시스템 초기화")
+        print(f"대상 카테고리: {len(categories_config)}개")
+    
+    def run_full_monitoring_cycle(self, cycles=1):
+        """전체 카테고리 모니터링 사이클 실행"""
+        print(f"\n🎯 모니터링 시작 ({cycles}회 반복)")
+        print("="*80)
+        
+        for cycle in range(cycles):
+            if cycles > 1:
+                print(f"\n[사이클 {cycle + 1}/{cycles}]")
+            
+            # 각 카테고리별 모니터링
+            for i, category_config in enumerate(self.categories_config, 1):
+                print(f"\n[{i}/{len(self.categories_config)}] {category_config['name']}")
+                
+                monitor = CategoryPageMonitor(
+                    category_config=category_config,
+                    csv_baseline_path=self.csv_baseline_path,
+                    db_path=self.db_path,
+                    headless=self.headless
+                )
+                
+                try:
+                    if not monitor.start_driver():
+                        print(f"브라우저 시작 실패")
+                        continue
+                    
+                    changes = monitor.run_monitoring_cycle()
+                    
+                    if changes:
+                        print(f"✅ 모니터링 완료")
+                    else:
+                        print(f"모니터링 실패")
+                
+                except KeyboardInterrupt:
+                    print(f"\n⚠️ 중단")
+                    monitor.close()
+                    return
+                except Exception as e:
+                    print(f"오류: {e}")
+                finally:
+                    monitor.close()
+                
+                # 카테고리 간 대기 (봇 탐지 방지)
+                if i < len(self.categories_config):
+                    wait_time = 30 if cycle == 0 else 60
+                    print(f"다음 카테고리까지 {wait_time}초 대기...")
+                    time.sleep(wait_time)
+            
+            # 사이클 간 대기
+            if cycle < cycles - 1:
+                print(f"\n다음 사이클까지 10분 대기...")
+                time.sleep(600)
+        
+        print(f"\n🎉 모든 모니터링 완료!")
 
 
 def main():
-    """메인 함수 - 분석 실행"""
+    """메인 함수 - 다중 카테고리 모니터링"""
+    
+    categories = [
+        {
+            'name': '헬스/건강식품',
+            'url': 'https://shop.coupang.com/coupangus/74511?category=305433&platform=p&brandId=0'
+        },
+        {
+            'name': '출산유아동',
+            'url': 'https://shop.coupang.com/coupangus/74511?category=219079&platform=p&brandId=0'
+        },
+        {
+            'name': '스포츠레저',
+            'url': 'https://shop.coupang.com/coupangus/74511?category=317675&platform=p&brandId=0'
+        }
+    ]
+    
+    csv_baseline = "coupang_iherb_products.csv"
+    
+    monitoring_system = MultiCategoryMonitoringSystem(
+        categories_config=categories,
+        csv_baseline_path=csv_baseline,
+        headless=False
+    )
     
     try:
-        analyzer = MonitoringAnalyzer(db_path="page_monitoring.db")
+        monitoring_system.run_full_monitoring_cycle(cycles=2)
         
-        # 종합 리포트 생성
-        analyzer.generate_full_report(days=7)
-        
-        print(f"\n{'='*70}")
-        print(f"📄 CSV 파일 출력")
-        print(f"{'='*70}")
-        
-        # CSV 출력
-        analyzer.export_latest_snapshot()
-        analyzer.export_change_summary(days=7)
-        
-        # 카테고리별 순위 출력 (예시)
-        categories = ['헬스/건강식품', '출산유아동', '스포츠레저']
-        for category in categories:
-            try:
-                analyzer.export_category_ranking(category, top_n=30)
-            except:
-                print(f"⚠️ {category} 카테고리 데이터 없음")
-        
-        print(f"\n✅ 모든 분석 및 출력 완료!")
-        
-    except FileNotFoundError as e:
-        print(f"❌ 오류: {e}")
-        print("먼저 coupang_monitoring.py를 실행하여 DB를 생성하세요.")
+    except KeyboardInterrupt:
+        print("\n⚠️ 모니터링 중단됨")
     except Exception as e:
-        print(f"❌ 분석 중 오류 발생: {e}")
+        print(f"❌ 시스템 오류: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+if __name__ == "__main__":
+    main()#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+"""
+순수 모니터링 시스템 - 실시간 데이터 수집 및 변화 감지
+쿠팡 페이지의 모든 상품을 카테고리별로 수집하여 변화 추적
+"""
+
+import sys
+import os
+import time
+import re
+import sqlite3
+import random
+from datetime import datetime
+from bs4 import BeautifulSoup
+
+# 기존 모듈 임포트
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+sys.path.insert(0, parent_dir)
+sys.path.insert(0, os.path.join(parent_dir, 'coupang'))
+
+from coupang.coupang_manager import BrowserManager
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+
+
+class CategoryMonitoringDatabase:
+    """카테고리별 모니터링 전용 데이터베이스"""
+    
+    def __init__(self, db_path="page_monitoring.db"):
+        self.db_path = db_path
+        self.init_database()
+    
+    def init_database(self):
+        """데이터베이스 테이블 초기화 - 순수 모니터링용"""
+        conn = sqlite3.connect(self.db_path)
+        
+        # 1. 카테고리 테이블
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS categories (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT UNIQUE NOT NULL,
+                url TEXT NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # 2. 매칭 참조 테이블 (CSV에서 로드)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS matching_reference (
+                coupang_product_id TEXT PRIMARY KEY,
+                coupang_product_name TEXT,
+                coupang_product_url TEXT,
+                original_category TEXT,
+                iherb_upc TEXT,
+                iherb_part_number TEXT,
+                created_from_csv BOOLEAN DEFAULT TRUE,
+                created_time DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # 3. 페이지 스냅샷 테이블 (카테고리별)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS page_snapshots (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                category_id INTEGER NOT NULL,
+                category_name TEXT NOT NULL,
+                page_url TEXT NOT NULL,
+                snapshot_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+                total_products INTEGER,
+                crawl_duration_seconds REAL,
+                status TEXT DEFAULT 'completed',
+                FOREIGN KEY (category_id) REFERENCES categories (id)
+            )
+        """)
+        
+        # 4. 상품 상태 테이블 (카테고리별 순위)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS product_states (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                snapshot_id INTEGER NOT NULL,
+                coupang_product_id TEXT NOT NULL,
+                category_rank INTEGER NOT NULL,
+                
+                -- 쿠팡 실시간 정보
+                product_name TEXT,
+                product_url TEXT,
+                current_price INTEGER,
+                original_price INTEGER,
+                discount_rate INTEGER,
+                review_count INTEGER,
+                rating_score REAL,
+                is_rocket_delivery BOOLEAN,
+                is_free_shipping BOOLEAN,
+                cashback_amount INTEGER,
+                delivery_info TEXT,
+                
+                -- 아이허브 매칭 정보
+                iherb_upc TEXT,
+                iherb_part_number TEXT,
+                matching_status TEXT DEFAULT 'unknown',
+                
+                FOREIGN KEY (snapshot_id) REFERENCES page_snapshots (id)
+            )
+        """)
+        
+        # 5. 변화 이벤트 로그 테이블 (카테고리 정보 포함)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS change_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                coupang_product_id TEXT NOT NULL,
+                category_name TEXT NOT NULL,
+                event_type TEXT NOT NULL,
+                old_value TEXT,
+                new_value TEXT,
+                description TEXT,
+                event_time DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # 인덱스 생성
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_product_states_snapshot ON product_states(snapshot_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_product_states_product ON product_states(coupang_product_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_product_states_category_rank ON product_states(snapshot_id, category_rank)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_change_events_product ON change_events(coupang_product_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_change_events_category ON change_events(category_name)")
+        
+        conn.commit()
+        conn.close()
+        
+        print(f"데이터베이스 초기화 완료: {self.db_path}")
+    
+    def register_category(self, name, url):
+        """카테고리 등록"""
+        conn = sqlite3.connect(self.db_path)
+        try:
+            conn.execute("""
+                INSERT OR REPLACE INTO categories (name, url)
+                VALUES (?, ?)
+            """, (name, url))
+            conn.commit()
+            
+            category_id = conn.execute("""
+                SELECT id FROM categories WHERE name = ?
+            """, (name,)).fetchone()[0]
+            
+            return category_id
+        finally:
+            conn.close()
+    
+    def load_csv_baseline(self, csv_path):
+        """CSV 베이스라인 로드 (매칭 참조용)"""
+        import pandas as pd
+        
+        try:
+            df = pd.read_csv(csv_path, encoding='utf-8-sig')
+            
+            conn = sqlite3.connect(self.db_path)
+            
+            for _, row in df.iterrows():
+                product_id = str(row.get('coupang_product_id', ''))
+                if not product_id:
+                    continue
+                
+                conn.execute("""
+                    INSERT OR REPLACE INTO matching_reference 
+                    (coupang_product_id, coupang_product_name, coupang_product_url,
+                     original_category, iherb_upc, iherb_part_number)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (
+                    product_id,
+                    str(row.get('coupang_product_name', '')),
+                    str(row.get('coupang_product_url', '')),
+                    str(row.get('category', '')),
+                    str(row.get('iherb_upc', '')),
+                    str(row.get('iherb_part_number', ''))
+                ))
+            
+            conn.commit()
+            conn.close()
+            
+            print(f"CSV 베이스라인 로드 완료: {len(df)}개 상품")
+            
+        except Exception as e:
+            print(f"CSV 로드 실패: {e}")
+    
+    def save_snapshot(self, category_name, page_url, products, crawl_duration):
+        """스냅샷 저장"""
+        conn = sqlite3.connect(self.db_path)
+        
+        # 카테고리 ID 조회
+        category_id = conn.execute("""
+            SELECT id FROM categories WHERE name = ?
+        """, (category_name,)).fetchone()[0]
+        
+        # 스냅샷 생성
+        cursor = conn.execute("""
+            INSERT INTO page_snapshots 
+            (category_id, category_name, page_url, total_products, crawl_duration_seconds)
+            VALUES (?, ?, ?, ?, ?)
+        """, (category_id, category_name, page_url, len(products), crawl_duration))
+        
+        snapshot_id = cursor.lastrowid
+        
+        # 상품 상태 저장
+        for product in products:
+            # 매칭 정보 조회
+            matching_info = conn.execute("""
+                SELECT iherb_upc, iherb_part_number 
+                FROM matching_reference 
+                WHERE coupang_product_id = ?
+            """, (product['product_id'],)).fetchone()
+            
+            iherb_upc = matching_info[0] if matching_info else None
+            iherb_part_number = matching_info[1] if matching_info else None
+            matching_status = 'matched' if iherb_upc else 'unmatched'
+            
+            conn.execute("""
+                INSERT INTO product_states 
+                (snapshot_id, coupang_product_id, category_rank,
+                 product_name, product_url, current_price, original_price,
+                 discount_rate, review_count, rating_score,
+                 is_rocket_delivery, is_free_shipping, cashback_amount, delivery_info,
+                 iherb_upc, iherb_part_number, matching_status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                snapshot_id, product['product_id'], product['rank'],
+                product['product_name'], product['product_url'],
+                product.get('current_price', 0), product.get('original_price', 0),
+                product.get('discount_rate', 0), product.get('review_count', 0),
+                product.get('rating_score', 0.0),
+                product.get('is_rocket_delivery', False),
+                product.get('is_free_shipping', False),
+                product.get('cashback_amount', 0),
+                product.get('delivery_info', ''),
+                iherb_upc, iherb_part_number, matching_status
+            ))
+        
+        conn.commit()
+        conn.close()
+        
+        return snapshot_id
+    
+    def get_latest_snapshot_data(self, category_name):
+        """최신 스냅샷 데이터 조회"""
+        conn = sqlite3.connect(self.db_path)
+        
+        query = """
+        SELECT 
+            ps.coupang_product_id as product_id,
+            ps.category_rank as rank,
+            ps.product_name,
+            ps.product_url,
+            ps.current_price,
+            ps.original_price,
+            ps.discount_rate,
+            ps.review_count
+        FROM product_states ps
+        JOIN page_snapshots snap ON ps.snapshot_id = snap.id
+        WHERE snap.category_name = ?
+        AND snap.id = (
+            SELECT MAX(id) FROM page_snapshots WHERE category_name = ?
+        )
+        ORDER BY ps.category_rank
+        """
+        
+        cursor = conn.execute(query, (category_name, category_name))
+        products = []
+        
+        for row in cursor:
+            products.append({
+                'product_id': row[0],
+                'rank': row[1],
+                'product_name': row[2],
+                'product_url': row[3],
+                'current_price': row[4],
+                'original_price': row[5],
+                'discount_rate': row[6],
+                'review_count': row[7]
+            })
+        
+        conn.close()
+        return products
+    
+    def log_change_event(self, product_id, category_name, event_type, old_value, new_value, description):
+        """변화 이벤트 로깅"""
+        conn = sqlite3.connect(self.db_path)
+        conn.execute("""
+            INSERT INTO change_events 
+            (coupang_product_id, category_name, event_type, old_value, new_value, description)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (product_id, category_name, event_type, str(old_value), str(new_value), description))
+        conn.commit()
+        conn.close()
+
+
+class InfiniteScrollExtractor:
+    """무한 스크롤 상품 추출기"""
+    
+    def __init__(self, browser_manager):
+        self.browser = browser_manager
+        # driver는 browser_manager.driver를 통해 접근
+    
+    @property
+    def driver(self):
+        """브라우저 드라이버 접근"""
+        return self.browser.driver if self.browser else None
+    
+    def extract_all_products_with_scroll(self, page_url):
+        """무한 스크롤로 모든 상품 추출"""
+        print(f"무한 스크롤 크롤링 시작: {page_url}")
+        
+        try:
+            if not self.driver:
+                print("❌ 브라우저 드라이버가 초기화되지 않았습니다")
+                return []
+            
+            self.driver.get(page_url)
+            print("페이지 로딩 중...")
+            time.sleep(random.uniform(3, 5))
+            
+            # 판매량순 필터 적용
+            self._click_sales_filter()
+            
+            all_products = []
+            seen_product_ids = set()
+            scroll_count = 0
+            max_scrolls = 100
+            no_new_products_count = 0
+            max_no_new_attempts = 10
+            
+            print("📜 무한 스크롤로 모든 상품 수집 중...")
+            
+            while scroll_count < max_scrolls:
+                scroll_count += 1
+                
+                # 현재 페이지에서 상품 추출
+                new_products = self._extract_products_from_current_page(seen_product_ids)
+                
+                if new_products:
+                    all_products.extend(new_products)
+                    no_new_products_count = 0
+                    print(f"  [스크롤 {scroll_count}] 신규: {len(new_products)}개, 총: {len(all_products)}개")
+                else:
+                    no_new_products_count += 1
+                    print(f"  [스크롤 {scroll_count}] 신규: 0개 (연속 {no_new_products_count}회)")
+                
+                # 더 이상 신규 상품이 없으면 종료
+                if no_new_products_count >= max_no_new_attempts:
+                    print(f"🏁 더 이상 신규 상품이 없습니다 (연속 {max_no_new_attempts}회)")
+                    break
+                
+                # 스크롤 다운
+                if not self._scroll_down_and_wait():
+                    print("🏁 페이지 끝에 도달했습니다")
+                    break
+                
+                time.sleep(random.uniform(1, 2))
+            
+            print(f"✅ 무한 스크롤 완료: 총 {len(all_products)}개 상품 수집")
+            return all_products
+            
+        except Exception as e:
+            print(f"❌ 크롤링 오류: {e}")
+            import traceback
+            traceback.print_exc()
+            return []
+    
+    def _click_sales_filter(self):
+        """판매량순 필터 클릭"""
+        try:
+            print("🔍 판매량순 필터 적용 중...")
+            time.sleep(2)
+            
+            filter_buttons = self.driver.find_elements(By.CSS_SELECTOR, 'li.sortkey')
+            
+            for button in filter_buttons:
+                try:
+                    if '판매량순' in button.text:
+                        button.click()
+                        print("✅ 판매량순 필터 적용 완료")
+                        time.sleep(3)
+                        return
+                except:
+                    continue
+            
+            print("⚠️ 판매량순 필터 없음 (기본 정렬 사용)")
+        except Exception as e:
+            print(f"⚠️ 필터 적용 오류: {e}")
+            print("기본 정렬로 진행합니다.")
+    
+    def _extract_products_from_current_page(self, seen_product_ids):
+        """현재 페이지에서 신규 상품만 추출"""
+        try:
+            new_products = []
+            
+            product_elements = self.driver.find_elements(By.CSS_SELECTOR, 'li.product-wrap')
+            
+            for element in product_elements:
+                try:
+                    link_elem = element.find_element(By.CSS_SELECTOR, 'a.product-wrapper')
+                    product_url = link_elem.get_attribute('href')
+                    
+                    if not product_url:
+                        continue
+                    
+                    match = re.search(r'itemId=(\d+)', product_url)
+                    if not match:
+                        continue
+                    
+                    product_id = match.group(1)
+                    
+                    if product_id in seen_product_ids:
+                        continue
+                    
+                    seen_product_ids.add(product_id)
+                    
+                    # 상품 데이터 파싱
+                    product_data = self._parse_product_data(element, product_id, product_url)
+                    if product_data and product_data.get('product_name'):  # 상품명 필수
+                        new_products.append(product_data)
+                
+                except Exception as e:
+                    continue
+            
+            return new_products
+            
+        except Exception as e:
+            print(f"상품 추출 오류: {e}")
+            return []
+    
+    def _parse_product_data(self, element, product_id, product_url):
+        """상품 데이터 파싱"""
+        try:
+            html = element.get_attribute('outerHTML')
+            soup = BeautifulSoup(html, 'html.parser')
+            
+            # 상품명 (필수)
+            name_elem = soup.select_one('div.product-name, div.name, div[class*="name"]')
+            if not name_elem:
+                return None
+            
+            product_name = name_elem.get_text(strip=True)
+            if not product_name:
+                return None
+            
+            # 가격 (여러 선택자 시도)
+            current_price = 0
+            price_selectors = [
+                'span.price-value',
+                'strong.price-value',
+                'em.sale',
+                'span[class*="price"]'
+            ]
+            
+            for selector in price_selectors:
+                price_elem = soup.select_one(selector)
+                if price_elem:
+                    price_text = price_elem.get_text(strip=True)
+                    price_text = re.sub(r'[^\d]', '', price_text)
+                    if price_text:
+                        current_price = int(price_text)
+                        break
+            
+            # 할인율
+            discount_rate = 0
+            discount_selectors = [
+                'span.discount-percentage',
+                'em.discount-rate',
+                'span[class*="discount"]'
+            ]
+            
+            for selector in discount_selectors:
+                discount_elem = soup.select_one(selector)
+                if discount_elem:
+                    discount_text = discount_elem.get_text(strip=True)
+                    discount_text = re.sub(r'[^\d]', '', discount_text)
+                    if discount_text:
+                        discount_rate = int(discount_text)
+                        break
+            
+            # 리뷰 수
+            review_count = 0
+            review_selectors = [
+                'span.rating-total-count',
+                'span[class*="review"]',
+                'em.rating-count'
+            ]
+            
+            for selector in review_selectors:
+                review_elem = soup.select_one(selector)
+                if review_elem:
+                    review_text = review_elem.get_text(strip=True)
+                    review_text = re.sub(r'[^\d]', '', review_text)
+                    if review_text:
+                        review_count = int(review_text)
+                        break
+            
+            # 평점
+            rating_score = 0.0
+            rating_elem = soup.select_one('em.rating, span[class*="rating"]')
+            if rating_elem:
+                try:
+                    rating_text = rating_elem.get_text(strip=True)
+                    rating_score = float(re.sub(r'[^\d.]', '', rating_text))
+                except:
+                    pass
+            
+            return {
+                'product_id': product_id,
+                'product_name': product_name,
+                'product_url': product_url,
+                'current_price': current_price,
+                'discount_rate': discount_rate,
+                'review_count': review_count,
+                'rating_score': rating_score,
+                'rank': 0  # 순위는 나중에 설정
+            }
+            
+        except Exception as e:
+            print(f"상품 파싱 오류 (ID: {product_id}): {e}")
+            return None
+    
+    def _scroll_down_and_wait(self):
+        """스크롤 다운 및 대기"""
+        try:
+            last_height = self.driver.execute_script("return document.body.scrollHeight")
+            
+            self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+            time.sleep(random.uniform(1.5, 2.5))
+            
+            new_height = self.driver.execute_script("return document.body.scrollHeight")
+            
+            return new_height > last_height
+            
+        except Exception as e:
+            return False
+
+
+class CategoryChangeDetector:
+    """카테고리 변화 감지기"""
+    
+    def detect_changes(self, previous_products, current_products):
+        """이전 데이터와 현재 데이터 비교"""
+        changes = {
+            'new_products': [],
+            'removed_products': [],
+            'rank_changes': [],
+            'price_changes': []
+        }
+        
+        # 순위 할당
+        for idx, product in enumerate(current_products, 1):
+            product['rank'] = idx
+        
+        # 이전 상품 ID 세트
+        prev_ids = {p['product_id']: p for p in previous_products}
+        curr_ids = {p['product_id']: p for p in current_products}
+        
+        # 신규 상품
+        for pid in curr_ids:
+            if pid not in prev_ids:
+                changes['new_products'].append(curr_ids[pid])
+        
+        # 제거된 상품
+        for pid in prev_ids:
+            if pid not in curr_ids:
+                changes['removed_products'].append(prev_ids[pid])
+        
+        # 순위 및 가격 변화
+        for pid in set(prev_ids.keys()) & set(curr_ids.keys()):
+            old_product = prev_ids[pid]
+            new_product = curr_ids[pid]
+            
+            # 순위 변화
+            if old_product['rank'] != new_product['rank']:
+                changes['rank_changes'].append({
+                    'product_id': pid,
+                    'product_name': new_product['product_name'],
+                    'old_rank': old_product['rank'],
+                    'new_rank': new_product['rank'],
+                    'rank_change': old_product['rank'] - new_product['rank']
+                })
+            
+            # 가격 변화
+            if old_product['current_price'] != new_product['current_price']:
+                changes['price_changes'].append({
+                    'product_id': pid,
+                    'product_name': new_product['product_name'],
+                    'old_price': old_product['current_price'],
+                    'new_price': new_product['current_price'],
+                    'price_change': new_product['current_price'] - old_product['current_price']
+                })
+        
+        return changes
+
+
+class CategoryPageMonitor:
+    """카테고리별 페이지 모니터링 메인 클래스"""
+    
+    def __init__(self, category_config, csv_baseline_path=None, db_path="page_monitoring.db", headless=True):
+        self.category_config = category_config
+        self.db = CategoryMonitoringDatabase(db_path)
+        self.browser = BrowserManager(headless=headless)
+        self.extractor = None  # 브라우저 시작 후 생성
+        self.change_detector = CategoryChangeDetector()
+        
+        # 카테고리 등록
+        self.category_id = self.db.register_category(
+            category_config['name'], 
+            category_config['url']
+        )
+        
+        # CSV 베이스라인 로드 (초기 1회만)
+        if csv_baseline_path:
+            self.db.load_csv_baseline(csv_baseline_path)
+        
+        print(f"카테고리 '{category_config['name']}' 모니터링 시스템 초기화 완료")
+        print(f"대상 URL: {category_config['url']}")
+    
+    def start_driver(self):
+        """브라우저 드라이버 시작"""
+        print("Chrome 드라이버 시작 중...")
+        if self.browser.start_driver():
+            print("Chrome 드라이버 시작 완료")
+            # 드라이버 시작 후 extractor 생성
+            self.extractor = InfiniteScrollExtractor(self.browser)
+            return True
+        return False
+    
+    def run_monitoring_cycle(self):
+        """카테고리별 모니터링 사이클 실행"""
+        category_name = self.category_config['name']
+        page_url = self.category_config['url']
+        
+        print(f"\n{'='*60}")
+        print(f"[{category_name}] 모니터링 시작: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"{'='*60}")
+        
+        start_time = time.time()
+        
+        try:
+            if not self.extractor:
+                print(f"❌ Extractor가 초기화되지 않았습니다")
+                return None
+            
+            # 1. 페이지 크롤링 (무한 스크롤)
+            print(f"[1/5] 페이지 크롤링 중...")
+            current_products = self.extractor.extract_all_products_with_scroll(page_url)
+            
+            if not current_products:
+                print(f"❌ 상품 수집 실패: 상품이 없습니다")
+                return None
+            
+            print(f"✅ {len(current_products)}개 상품 수집 완료")
+            
+            # 2. 이전 데이터와 비교
+            print(f"[2/5] 이전 데이터 조회 중...")
+            previous_products = self.db.get_latest_snapshot_data(category_name)
+            print(f"✅ 이전 데이터: {len(previous_products)}개")
+            
+            # 3. 변화 감지
+            print(f"[3/5] 변화 감지 중...")
+            changes = self.change_detector.detect_changes(previous_products, current_products)
+            print(f"✅ 변화 감지 완료")
+            
+            # 4. 변화 보고
+            print(f"[4/5] 변화 보고 중...")
+            self.report_changes(category_name, changes)
+            
+            # 5. 변화 이벤트 로깅
+            print(f"[5/5] DB 저장 중...")
+            self.log_changes(category_name, changes)
+            
+            # 6. 스냅샷 저장
+            crawl_duration = time.time() - start_time
+            snapshot_id = self.db.save_snapshot(category_name, page_url, current_products, crawl_duration)
+            
+            print(f"✅ 스냅샷 저장 완료: ID {snapshot_id}, {len(current_products)}개 상품")
+            return changes
+            
+        except Exception as e:
+            print(f"❌ [{category_name}] 모니터링 오류: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
+    
+    def report_changes(self, category_name, changes):
+        """카테고리별 변화 보고"""
+        print(f"\n[{category_name}] 변화 감지 결과:")
+        print(f"  신규 상품: {len(changes['new_products'])}개")
+        print(f"  제거된 상품: {len(changes['removed_products'])}개")
+        print(f"  순위 변화: {len(changes['rank_changes'])}개")
+        print(f"  가격 변화: {len(changes['price_changes'])}개")
+        
+        # 주요 변화 상세 출력
+        if changes['rank_changes']:
+            print(f"\n[{category_name}] 주요 순위 변화:")
+            for change in changes['rank_changes'][:5]:
+                direction = "상승" if change['rank_change'] > 0 else "하락"
+                print(f"  {change['product_name'][:30]}...: {change['old_rank']}위 → {change['new_rank']}위 ({abs(change['rank_change'])}단계 {direction})")
+        
+        if changes['price_changes']:
+            print(f"\n[{category_name}] 주요 가격 변화:")
+            for change in changes['price_changes'][:5]:
+                direction = "인상" if change['price_change'] > 0 else "인하"
+                print(f"  {change['product_name'][:30]}...: {change['old_price']:,}원 → {change['new_price']:,}원 ({abs(change['price_change']):,}원 {direction})")
+    
+    def log_changes(self, category_name, changes):
+        """카테고리별 변화 이벤트 로깅"""
+        # 순위 변화 로깅
+        for change in changes['rank_changes']:
+            self.db.log_change_event(
+                change['product_id'], category_name, 'rank_change',
+                change['old_rank'], change['new_rank'],
+                f"순위 {abs(change['rank_change'])}단계 {'상승' if change['rank_change'] > 0 else '하락'}"
+            )
+        
+        # 가격 변화 로깅
+        for change in changes['price_changes']:
+            self.db.log_change_event(
+                change['product_id'], category_name, 'price_change',
+                change['old_price'], change['new_price'],
+                f"가격 {abs(change['price_change']):,}원 {'인상' if change['price_change'] > 0 else '인하'}"
+            )
+        
+        # 신규 상품 로깅
+        for product in changes['new_products']:
+            self.db.log_change_event(
+                product['product_id'], category_name, 'new_product',
+                None, product['product_name'],
+                f"신규 상품 등장"
+            )
+    
+    def close(self):
+        """리소스 정리"""
+        if self.browser:
+            self.browser.close()
+
+
+class MultiCategoryMonitoringSystem:
+    """다중 카테고리 모니터링 시스템"""
+    
+    def __init__(self, categories_config, csv_baseline_path=None, db_path="page_monitoring.db", headless=True):
+        self.categories_config = categories_config
+        self.csv_baseline_path = csv_baseline_path
+        self.db_path = db_path
+        self.headless = headless
+        
+        print(f"다중 카테고리 모니터링 시스템 초기화")
+        print(f"대상 카테고리: {len(categories_config)}개")
+        for cat in categories_config:
+            print(f"  - {cat['name']}")
+    
+    def run_full_monitoring_cycle(self, cycles=1):
+        """전체 카테고리 모니터링 사이클 실행"""
+        print(f"\n🎯 다중 카테고리 모니터링 시작 ({cycles}회 반복)")
+        print("="*80)
+        
+        for cycle in range(cycles):
+            if cycles > 1:
+                print(f"\n[사이클 {cycle + 1}/{cycles}]")
+            
+            # 각 카테고리별 모니터링
+            for i, category_config in enumerate(self.categories_config, 1):
+                print(f"\n[{i}/{len(self.categories_config)}] 📂 {category_config['name']} 모니터링")
+                
+                monitor = CategoryPageMonitor(
+                    category_config=category_config,
+                    csv_baseline_path=self.csv_baseline_path,
+                    db_path=self.db_path,
+                    headless=self.headless
+                )
+                
+                try:
+                    if not monitor.start_driver():
+                        print(f"❌ {category_config['name']} 브라우저 시작 실패")
+                        continue
+                    
+                    changes = monitor.run_monitoring_cycle()
+                    
+                    if changes:
+                        print(f"✅ {category_config['name']} 모니터링 완료!")
+                    else:
+                        print(f"❌ {category_config['name']} 모니터링 실패")
+                
+                except KeyboardInterrupt:
+                    print(f"\n⚠️ {category_config['name']} 모니터링 중단")
+                    monitor.close()
+                    return
+                except Exception as e:
+                    print(f"❌ {category_config['name']} 오류 발생: {e}")
+                finally:
+                    monitor.close()
+                
+                # 카테고리 간 대기 (봇 탐지 방지)
+                if i < len(self.categories_config):
+                    wait_time = 30 if cycle == 0 else 60
+                    print(f"다음 카테고리까지 {wait_time}초 대기...")
+                    time.sleep(wait_time)
+            
+            # 사이클 간 대기
+            if cycle < cycles - 1:
+                print(f"\n다음 사이클까지 10분 대기...")
+                time.sleep(600)
+        
+        print(f"\n🎉 모든 모니터링 사이클 완료!")
+
+
+def main():
+    """메인 함수 - 다중 카테고리 모니터링"""
+    
+    categories = [
+        {
+            'name': '헬스/건강식품',
+            'url': 'https://shop.coupang.com/coupangus/74511?category=305433&platform=p&brandId=0'
+        },
+        {
+            'name': '출산유아동',
+            'url': 'https://shop.coupang.com/coupangus/74511?category=219079&platform=p&brandId=0'
+        },
+        {
+            'name': '스포츠레저',
+            'url': 'https://shop.coupang.com/coupangus/74511?category=317675&platform=p&brandId=0'
+        }
+    ]
+    
+    csv_baseline = "coupang_iherb_products.csv"
+    
+    monitoring_system = MultiCategoryMonitoringSystem(
+        categories_config=categories,
+        csv_baseline_path=csv_baseline,
+        headless=False
+    )
+    
+    try:
+        monitoring_system.run_full_monitoring_cycle(cycles=2)
+        
+    except KeyboardInterrupt:
+        print("\n⚠️ 모니터링 중단됨")
+    except Exception as e:
+        print(f"❌ 시스템 오류: {e}")
         import traceback
         traceback.print_exc()
 
