@@ -28,7 +28,7 @@ PRODUCT_ITEM_SELECTOR = 'li.Hz4XxKbt9h'  # 상품 아이템 컨테이너
 PAGE_WAIT = 15
 
 # Gemini API 설정
-GEMINI_API_KEY = "AIzaSyA6XyWFJou4QZpRM4C_3p0JuzRjpQWSKp4"  # 여기에 실제 API 키 입력
+GEMINI_API_KEY = "AIzaSyD-GIKFbdwJO2BW5l-w3nCv_DQGFHA4VOU"  # 여기에 실제 API 키 입력
 GEMINI_MODEL = "gemini-2.5-flash"
 
 class ProductInfo:
