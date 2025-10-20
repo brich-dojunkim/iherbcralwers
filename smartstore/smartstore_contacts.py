@@ -82,7 +82,7 @@ def make_driver(headless=False):
     opt.add_argument("--disable-features=SameSiteByDefaultCookies,CookiesWithoutSameSiteMustBeSecure")
     if headless:
         opt.add_argument("--headless=new")
-    d = uc.Chrome(options=opt, version_main=140)
+    d = uc.Chrome(options=opt)
     d.set_page_load_timeout(45)
     return d
 
