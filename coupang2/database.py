@@ -141,12 +141,29 @@ class MonitoringDatabase:
         
         print(f"✅ 개선된 데이터베이스 초기화 완료: {self.db_path}")
     
+    # database.py의 register_category() 수정
     def register_category(self, name: str, url: str) -> int:
-        """카테고리 등록"""
+        """카테고리 등록 또는 기존 ID 반환"""
         conn = sqlite3.connect(self.db_path)
-        try:
+        
+        # 1. 기존 카테고리 확인
+        existing = conn.execute("""
+            SELECT id FROM categories WHERE name = ?
+        """, (name,)).fetchone()
+        
+        if existing:
+            # 기존 카테고리가 있으면 ID만 반환
+            category_id = existing[0]
+            
+            # URL만 업데이트 (변경되었을 수 있음)
             conn.execute("""
-                INSERT OR REPLACE INTO categories (name, url)
+                UPDATE categories SET url = ? WHERE id = ?
+            """, (url, category_id))
+            conn.commit()
+        else:
+            # 새 카테고리 생성
+            conn.execute("""
+                INSERT INTO categories (name, url)
                 VALUES (?, ?)
             """, (name, url))
             conn.commit()
@@ -154,10 +171,9 @@ class MonitoringDatabase:
             category_id = conn.execute("""
                 SELECT id FROM categories WHERE name = ?
             """, (name,)).fetchone()[0]
-            
-            return category_id
-        finally:
-            conn.close()
+        
+        conn.close()
+        return category_id
     
     def load_csv_baseline(self, csv_path: str) -> int:
         """CSV 베이스라인 로드 (매칭 참조용) - 개선된 버전"""

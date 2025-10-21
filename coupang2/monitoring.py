@@ -4,8 +4,8 @@
 """
 개선된 모니터링 시스템
 - 순위 할당 로직 개선
+- 하이브리드 매칭 (ID + 상품명)
 - 데이터 무결성 보장
-- 효율적인 변화 감지
 """
 
 import sys
@@ -304,10 +304,48 @@ class ImprovedScrollExtractor:
 
 
 class ImprovedChangeDetector:
-    """개선된 변화 감지기 - change_magnitude 계산"""
+    """개선된 변화 감지기 - 하이브리드 매칭 (ID + 상품명)"""
+    
+    def _normalize_product_name(self, name: str) -> str:
+        """상품명 정규화 (매칭용)"""
+        if not name:
+            return ""
+        
+        # 1. 소문자 변환
+        name = name.lower()
+        
+        # 2. 공백 정리
+        name = re.sub(r'\s+', ' ', name)
+        
+        # 3. 특수문자 제거 (괄호, 쉼표 등)
+        name = re.sub(r'[^\w\s가-힣]', '', name)
+        
+        # 4. 앞뒤 공백 제거
+        return name.strip()
+    
+    def _create_product_index(self, products: list) -> dict:
+        """
+        상품 인덱스 생성: 
+        - 1차 키: product_id
+        - 2차 키: normalized_name
+        """
+        by_id = {}
+        by_name = {}
+        
+        for p in products:
+            # ID 기반 인덱스
+            if p.get('product_id'):
+                by_id[p['product_id']] = p
+            
+            # 이름 기반 인덱스
+            normalized = self._normalize_product_name(p['product_name'])
+            if normalized:
+                by_name[normalized] = p
+        
+        return {'by_id': by_id, 'by_name': by_name}
     
     def detect_changes(self, previous_products: list, current_products: list) -> dict:
-        """이전 데이터와 현재 데이터 비교"""
+        """이전 데이터와 현재 데이터 비교 - 하이브리드 매칭"""
         changes = {
             'new_products': [],
             'removed_products': [],
@@ -316,59 +354,84 @@ class ImprovedChangeDetector:
             'review_surges': []
         }
         
-        # 이전 상품 ID 맵
-        prev_ids = {p['product_id']: p for p in previous_products}
-        curr_ids = {p['product_id']: p for p in current_products}
+        # 인덱스 생성
+        prev_idx = self._create_product_index(previous_products)
+        curr_idx = self._create_product_index(current_products)
         
-        # 신규 상품
-        for pid in curr_ids:
-            if pid not in prev_ids:
-                changes['new_products'].append(curr_ids[pid])
+        # 매칭된 상품 추적 (중복 방지)
+        matched_prev = set()
+        matched_curr = set()
         
-        # 제거된 상품
-        for pid in prev_ids:
-            if pid not in curr_ids:
-                changes['removed_products'].append(prev_ids[pid])
+        # 1단계: product_id로 매칭 (우선순위)
+        for product_id in set(prev_idx['by_id'].keys()) & set(curr_idx['by_id'].keys()):
+            old_product = prev_idx['by_id'][product_id]
+            new_product = curr_idx['by_id'][product_id]
+            
+            self._detect_product_changes(old_product, new_product, changes)
+            
+            # 매칭 표시
+            matched_prev.add(self._normalize_product_name(old_product['product_name']))
+            matched_curr.add(self._normalize_product_name(new_product['product_name']))
         
-        # 순위 및 가격 변화
-        for pid in set(prev_ids.keys()) & set(curr_ids.keys()):
-            old_product = prev_ids[pid]
-            new_product = curr_ids[pid]
+        # 2단계: 상품명으로 매칭 (ID 매칭 실패한 것들)
+        for name in set(prev_idx['by_name'].keys()) & set(curr_idx['by_name'].keys()):
+            if name in matched_prev or name in matched_curr:
+                continue  # 이미 ID로 매칭됨
             
-            # 순위 변화
-            if old_product['rank'] != new_product['rank']:
-                rank_improvement = old_product['rank'] - new_product['rank']  # 양수면 상승
-                changes['rank_changes'].append({
-                    'product_id': pid,
-                    'product_name': new_product['product_name'],
-                    'old_rank': old_product['rank'],
-                    'new_rank': new_product['rank'],
-                    'change_magnitude': rank_improvement
-                })
+            old_product = prev_idx['by_name'][name]
+            new_product = curr_idx['by_name'][name]
             
-            # 가격 변화
-            if old_product['current_price'] != new_product['current_price']:
-                price_change = new_product['current_price'] - old_product['current_price']
-                changes['price_changes'].append({
-                    'product_id': pid,
-                    'product_name': new_product['product_name'],
-                    'old_price': old_product['current_price'],
-                    'new_price': new_product['current_price'],
-                    'change_magnitude': price_change
-                })
+            self._detect_product_changes(old_product, new_product, changes)
             
-            # 리뷰 급증 (50개 이상 증가)
-            review_increase = new_product['review_count'] - old_product['review_count']
-            if review_increase >= 50:
-                changes['review_surges'].append({
-                    'product_id': pid,
-                    'product_name': new_product['product_name'],
-                    'old_count': old_product['review_count'],
-                    'new_count': new_product['review_count'],
-                    'change_magnitude': review_increase
-                })
+            matched_prev.add(name)
+            matched_curr.add(name)
+        
+        # 3단계: 신규 상품 (ID도 없고 이름도 없음)
+        for name, product in curr_idx['by_name'].items():
+            if name not in matched_curr:
+                changes['new_products'].append(product)
+        
+        # 4단계: 제거된 상품
+        for name, product in prev_idx['by_name'].items():
+            if name not in matched_prev:
+                changes['removed_products'].append(product)
         
         return changes
+    
+    def _detect_product_changes(self, old_product: dict, new_product: dict, changes: dict):
+        """개별 상품의 변화 감지"""
+        # 순위 변화
+        if old_product['rank'] != new_product['rank']:
+            rank_improvement = old_product['rank'] - new_product['rank']
+            changes['rank_changes'].append({
+                'product_id': new_product['product_id'],
+                'product_name': new_product['product_name'],
+                'old_rank': old_product['rank'],
+                'new_rank': new_product['rank'],
+                'change_magnitude': rank_improvement
+            })
+        
+        # 가격 변화
+        if old_product['current_price'] != new_product['current_price']:
+            price_change = new_product['current_price'] - old_product['current_price']
+            changes['price_changes'].append({
+                'product_id': new_product['product_id'],
+                'product_name': new_product['product_name'],
+                'old_price': old_product['current_price'],
+                'new_price': new_product['current_price'],
+                'change_magnitude': price_change
+            })
+        
+        # 리뷰 급증 (50개 이상 증가)
+        review_increase = new_product['review_count'] - old_product['review_count']
+        if review_increase >= 50:
+            changes['review_surges'].append({
+                'product_id': new_product['product_id'],
+                'product_name': new_product['product_name'],
+                'old_count': old_product['review_count'],
+                'new_count': new_product['review_count'],
+                'change_magnitude': review_increase
+            })
 
 
 class ImprovedCategoryMonitor:
@@ -435,8 +498,8 @@ class ImprovedCategoryMonitor:
             previous_products = self.db.get_latest_snapshot_data(self.category_id)
             print(f"✅ 이전 데이터: {len(previous_products)}개")
             
-            # 3. 변화 감지
-            print(f"\n[3/5] 🔄 변화 감지 중...")
+            # 3. 변화 감지 (하이브리드 매칭)
+            print(f"\n[3/5] 🔄 변화 감지 중 (하이브리드 매칭: ID + 상품명)...")
             changes = self.change_detector.detect_changes(previous_products, current_products)
             print(f"✅ 변화 감지 완료")
             
