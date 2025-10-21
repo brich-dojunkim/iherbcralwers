@@ -655,7 +655,7 @@ def main():
     ]
     
     # CSV 베이스라인 경로
-    csv_baseline = "coupang_iherb_products.csv"
+    csv_baseline = "coupang_iherb_products_updated_upc.csv"
     
     # 모니터링 시스템 생성
     monitoring_system = MultiCategoryMonitoringSystem(
