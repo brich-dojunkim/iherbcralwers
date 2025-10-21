@@ -231,7 +231,7 @@ class CleanupVerifier:
                                 previous_snapshot_id: int, 
                                 current_snapshot_id: int,
                                 prev_time: str, curr_time: str):
-        """개별 카테고리 추적 테스트"""
+        """개별 카테고리 추적 테스트 - 하이브리드 매칭"""
         
         print(f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
         print(f"📂 카테고리: {category_name}")
@@ -240,42 +240,58 @@ class CleanupVerifier:
         print(f"현재 스냅샷: ID {current_snapshot_id} ({curr_time})")
         
         # 이전 스냅샷 상품들
-        prev_products = {}
+        prev_products_by_id = {}
+        prev_products_by_name = {}
         for row in self.conn.execute("""
             SELECT coupang_product_id, product_name, category_rank, current_price
             FROM product_states
             WHERE snapshot_id = ?
         """, (previous_snapshot_id,)):
-            prev_products[row[0]] = {
-                'name': row[1],
-                'rank': row[2],
-                'price': row[3]
+            product_id, name, rank, price = row
+            prev_products_by_id[product_id] = {
+                'name': name,
+                'rank': rank,
+                'price': price
+            }
+            prev_products_by_name[name] = {
+                'id': product_id,
+                'rank': rank,
+                'price': price
             }
         
         # 현재 스냅샷 상품들
-        curr_products = {}
+        curr_products_by_id = {}
+        curr_products_by_name = {}
         for row in self.conn.execute("""
             SELECT coupang_product_id, product_name, category_rank, current_price
             FROM product_states
             WHERE snapshot_id = ?
         """, (current_snapshot_id,)):
-            curr_products[row[0]] = {
-                'name': row[1],
-                'rank': row[2],
-                'price': row[3]
+            product_id, name, rank, price = row
+            curr_products_by_id[product_id] = {
+                'name': name,
+                'rank': rank,
+                'price': price
+            }
+            curr_products_by_name[name] = {
+                'id': product_id,
+                'rank': rank,
+                'price': price
             }
         
-        # 변화 감지
-        new_products = set(curr_products.keys()) - set(prev_products.keys())
-        removed_products = set(prev_products.keys()) - set(curr_products.keys())
-        common_products = set(prev_products.keys()) & set(curr_products.keys())
-        
+        # 하이브리드 매칭
+        matched_prev = set()
+        matched_curr = set()
         rank_changes = []
         price_changes = []
         
-        for product_id in common_products:
-            prev = prev_products[product_id]
-            curr = curr_products[product_id]
+        # 1단계: product_id로 매칭
+        for product_id in set(prev_products_by_id.keys()) & set(curr_products_by_id.keys()):
+            prev = prev_products_by_id[product_id]
+            curr = curr_products_by_id[product_id]
+            
+            matched_prev.add(product_id)
+            matched_curr.add(product_id)
             
             if prev['rank'] != curr['rank']:
                 rank_changes.append({
@@ -295,20 +311,68 @@ class CleanupVerifier:
                     'change': curr['price'] - prev['price']
                 })
         
+        # 2단계: 상품명으로 매칭 (ID로 매칭 안 된 것들)
+        for name in set(prev_products_by_name.keys()) & set(curr_products_by_name.keys()):
+            prev_id = prev_products_by_name[name]['id']
+            curr_id = curr_products_by_name[name]['id']
+            
+            # 이미 ID로 매칭됨
+            if prev_id in matched_prev and curr_id in matched_curr:
+                continue
+            
+            prev = prev_products_by_name[name]
+            curr = curr_products_by_name[name]
+            
+            matched_prev.add(prev_id)
+            matched_curr.add(curr_id)
+            
+            if prev['rank'] != curr['rank']:
+                rank_changes.append({
+                    'id': curr_id,
+                    'name': name,
+                    'old_rank': prev['rank'],
+                    'new_rank': curr['rank'],
+                    'change': prev['rank'] - curr['rank']
+                })
+            
+            if prev['price'] != curr['price']:
+                price_changes.append({
+                    'id': curr_id,
+                    'name': name,
+                    'old_price': prev['price'],
+                    'new_price': curr['price'],
+                    'change': curr['price'] - prev['price']
+                })
+        
+        # 신규/제거 계산
+        new_products = set(curr_products_by_id.keys()) - matched_curr
+        removed_products = set(prev_products_by_id.keys()) - matched_prev
+        
         # 결과 출력
+        total_prev = len(prev_products_by_id)
+        total_curr = len(curr_products_by_id)
+        
         print(f"\n변화 감지 결과:")
-        print(f"  이전 상품 수: {len(prev_products)}개")
-        print(f"  현재 상품 수: {len(curr_products)}개")
+        print(f"  이전 상품 수: {total_prev}개")
+        print(f"  현재 상품 수: {total_curr}개")
         print(f"  신규: {len(new_products)}개")
         print(f"  제거: {len(removed_products)}개")
         print(f"  순위 변화: {len(rank_changes)}개")
         print(f"  가격 변화: {len(price_changes)}개")
         
-        # 판단
-        total_products = len(prev_products)
-        new_rate = len(new_products) / total_products * 100 if total_products > 0 else 0
-        removed_rate = len(removed_products) / total_products * 100 if total_products > 0 else 0
-        tracked_rate = len(rank_changes) / total_products * 100 if total_products > 0 else 0
+        # 매칭 통계
+        id_matched = len(set(prev_products_by_id.keys()) & set(curr_products_by_id.keys()))
+        name_matched = len(matched_prev) - id_matched
+        
+        print(f"\n매칭 방식:")
+        print(f"  ID로 매칭: {id_matched}개")
+        print(f"  상품명으로 매칭: {name_matched}개")
+        print(f"  총 매칭: {len(matched_prev)}개")
+        
+        # 비율
+        new_rate = len(new_products) / total_prev * 100 if total_prev > 0 else 0
+        removed_rate = len(removed_products) / total_prev * 100 if total_prev > 0 else 0
+        tracked_rate = len(rank_changes) / total_prev * 100 if total_prev > 0 else 0
         
         print(f"\n비율:")
         print(f"  신규 비율: {new_rate:.1f}%")
@@ -323,15 +387,15 @@ class CleanupVerifier:
         else:
             print(f"\n⚠️ 주의: 순위 추적 비율이 낮습니다")
         
-        # 주요 순위 변화 샘플
+        # 주요 순위 변화
         if rank_changes:
             print(f"\n🔥 주요 순위 변화 (TOP 3):")
             sorted_changes = sorted(rank_changes, key=lambda x: abs(x['change']), reverse=True)
             for i, change in enumerate(sorted_changes[:3], 1):
                 direction = "📈 상승" if change['change'] > 0 else "📉 하락"
-                print(f"  {i}. {change['name'][:50]}...")
+                print(f"  {i}. {change['name'][:70]}...")
                 print(f"     {change['old_rank']}위 → {change['new_rank']}위 ({direction} {abs(change['change'])}단계)")
-    
+
     def verify_matching_reference_integrity(self):
         """매칭 정보 무결성 확인"""
         self.print_section("6. 매칭 정보 무결성")
