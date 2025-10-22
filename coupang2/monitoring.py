@@ -2,10 +2,10 @@
 # -*- coding: utf-8 -*-
 
 """
-개선된 모니터링 시스템
-- 순위 할당 로직 개선
-- 하이브리드 매칭 (ID + 상품명)
-- 데이터 무결성 보장
+간소화된 모니터링 시스템
+- product_id 기반 단순 매칭
+- 순위 할당 로직 유지
+- 복잡한 하이브리드 매칭 제거
 """
 
 import sys
@@ -25,23 +25,22 @@ sys.path.insert(0, os.path.join(parent_dir, 'coupang'))
 from coupang.coupang_manager import BrowserManager
 from selenium.webdriver.common.by import By
 
-# 개선된 DB 임포트
+# 간소화된 DB 임포트
 from database import MonitoringDatabase
 
 
-class ImprovedScrollExtractor:
-    """개선된 무한 스크롤 상품 추출기 - 순위 할당 개선"""
+class ScrollExtractor:
+    """무한 스크롤 상품 추출기"""
     
     def __init__(self, browser_manager):
         self.browser = browser_manager
     
     @property
     def driver(self):
-        """브라우저 드라이버 접근"""
         return self.browser.driver if self.browser else None
     
     def extract_all_products_with_scroll(self, page_url: str) -> list:
-        """무한 스크롤로 모든 상품 추출 - 순위 보장"""
+        """무한 스크롤로 모든 상품 추출"""
         if not self.driver:
             print("❌ 브라우저 드라이버가 초기화되지 않았습니다")
             return []
@@ -83,7 +82,6 @@ class ImprovedScrollExtractor:
                 
                 if not height_changed:
                     consecutive_no_height_change += 1
-                    
                     if consecutive_no_height_change >= 5 and no_new_products_count >= 5:
                         print(f"🏁 더 이상 신규 상품이 없습니다")
                         break
@@ -96,13 +94,13 @@ class ImprovedScrollExtractor:
                 
                 time.sleep(random.uniform(1, 2))
             
-            # ✨ 핵심 개선: 순위 할당 (DOM 순서 = 순위)
+            # 순위 할당 (DOM 순서 = 순위)
             ranked_products = []
             for rank, product in enumerate(all_products, 1):
                 product['rank'] = rank
                 ranked_products.append(product)
             
-            print(f"✅ 무한 스크롤 완료: 총 {len(ranked_products)}개 상품 수집 (순위 할당 완료)")
+            print(f"✅ 무한 스크롤 완료: 총 {len(ranked_products)}개 상품 수집")
             
             # 순위 검증
             self._verify_ranks(ranked_products)
@@ -122,11 +120,9 @@ class ImprovedScrollExtractor:
         
         ranks = [p['rank'] for p in products]
         
-        # 1. 순위가 1부터 시작하는지
         if min(ranks) != 1:
             raise ValueError(f"순위가 1부터 시작하지 않습니다: min={min(ranks)}")
         
-        # 2. 순위가 연속적인지
         expected_ranks = set(range(1, len(products) + 1))
         actual_ranks = set(ranks)
         
@@ -162,7 +158,6 @@ class ImprovedScrollExtractor:
         """현재 페이지에서 신규 상품만 추출"""
         try:
             new_products = []
-            
             product_elements = self.driver.find_elements(By.CSS_SELECTOR, 'li.product-wrap')
             
             for element in product_elements:
@@ -184,16 +179,14 @@ class ImprovedScrollExtractor:
                     
                     seen_product_ids.add(product_id)
                     
-                    # 상품 데이터 파싱 (rank는 나중에 할당)
+                    # 상품 데이터 파싱
                     product_data = self._parse_product_data(element, product_id, product_url)
                     if product_data and product_data.get('product_name'):
                         new_products.append(product_data)
-                
                 except:
                     continue
             
             return new_products
-            
         except:
             return []
     
@@ -215,7 +208,6 @@ class ImprovedScrollExtractor:
             # 가격
             current_price = 0
             price_selectors = ['strong.price-value', 'span.price-value', 'em.sale', 'span[class*="price"]']
-            
             for selector in price_selectors:
                 price_elem = soup.select_one(selector)
                 if price_elem:
@@ -228,7 +220,6 @@ class ImprovedScrollExtractor:
             # 할인율
             discount_rate = 0
             discount_selectors = ['span.discount-percentage', 'em.discount-rate', 'span[class*="discount"]']
-            
             for selector in discount_selectors:
                 discount_elem = soup.select_one(selector)
                 if discount_elem:
@@ -241,7 +232,6 @@ class ImprovedScrollExtractor:
             # 리뷰 수
             review_count = 0
             review_selectors = ['span.rating-total-count', 'span[class*="review"]', 'em.rating-count']
-            
             for selector in review_selectors:
                 review_elem = soup.select_one(selector)
                 if review_elem:
@@ -269,9 +259,7 @@ class ImprovedScrollExtractor:
                 'discount_rate': discount_rate,
                 'review_count': review_count,
                 'rating_score': rating_score
-                # rank는 extract_all_products_with_scroll에서 할당
             }
-            
         except:
             return None
     
@@ -298,54 +286,15 @@ class ImprovedScrollExtractor:
                     return True
             
             return False
-            
         except:
             return False
 
 
-class ImprovedChangeDetector:
-    """개선된 변화 감지기 - 하이브리드 매칭 (ID + 상품명)"""
-    
-    def _normalize_product_name(self, name: str) -> str:
-        """상품명 정규화 (매칭용)"""
-        if not name:
-            return ""
-        
-        # 1. 소문자 변환
-        name = name.lower()
-        
-        # 2. 공백 정리
-        name = re.sub(r'\s+', ' ', name)
-        
-        # 3. 특수문자 제거 (괄호, 쉼표 등)
-        name = re.sub(r'[^\w\s가-힣]', '', name)
-        
-        # 4. 앞뒤 공백 제거
-        return name.strip()
-    
-    def _create_product_index(self, products: list) -> dict:
-        """
-        상품 인덱스 생성: 
-        - 1차 키: product_id
-        - 2차 키: normalized_name
-        """
-        by_id = {}
-        by_name = {}
-        
-        for p in products:
-            # ID 기반 인덱스
-            if p.get('product_id'):
-                by_id[p['product_id']] = p
-            
-            # 이름 기반 인덱스
-            normalized = self._normalize_product_name(p['product_name'])
-            if normalized:
-                by_name[normalized] = p
-        
-        return {'by_id': by_id, 'by_name': by_name}
+class ChangeDetector:
+    """간소화된 변화 감지기 - product_id만 사용"""
     
     def detect_changes(self, previous_products: list, current_products: list) -> dict:
-        """이전 데이터와 현재 데이터 비교 - 하이브리드 매칭"""
+        """이전 데이터와 현재 데이터 비교 - product_id 기반"""
         changes = {
             'new_products': [],
             'removed_products': [],
@@ -354,88 +303,65 @@ class ImprovedChangeDetector:
             'review_surges': []
         }
         
-        # 인덱스 생성
-        prev_idx = self._create_product_index(previous_products)
-        curr_idx = self._create_product_index(current_products)
+        # product_id로 딕셔너리 생성
+        prev_dict = {p['product_id']: p for p in previous_products}
+        curr_dict = {p['product_id']: p for p in current_products}
         
-        # 매칭된 상품 추적 (중복 방지)
-        matched_prev = set()
-        matched_curr = set()
+        # 매칭된 상품 (ID가 같은 것)
+        common_ids = set(prev_dict.keys()) & set(curr_dict.keys())
         
-        # 1단계: product_id로 매칭 (우선순위)
-        for product_id in set(prev_idx['by_id'].keys()) & set(curr_idx['by_id'].keys()):
-            old_product = prev_idx['by_id'][product_id]
-            new_product = curr_idx['by_id'][product_id]
+        for product_id in common_ids:
+            old_product = prev_dict[product_id]
+            new_product = curr_dict[product_id]
             
-            self._detect_product_changes(old_product, new_product, changes)
+            # 순위 변화
+            if old_product['rank'] != new_product['rank']:
+                rank_improvement = old_product['rank'] - new_product['rank']
+                changes['rank_changes'].append({
+                    'product_id': product_id,
+                    'product_name': new_product['product_name'],
+                    'old_rank': old_product['rank'],
+                    'new_rank': new_product['rank'],
+                    'change_magnitude': rank_improvement
+                })
             
-            # 매칭 표시
-            matched_prev.add(self._normalize_product_name(old_product['product_name']))
-            matched_curr.add(self._normalize_product_name(new_product['product_name']))
+            # 가격 변화
+            if old_product['current_price'] != new_product['current_price']:
+                price_change = new_product['current_price'] - old_product['current_price']
+                changes['price_changes'].append({
+                    'product_id': product_id,
+                    'product_name': new_product['product_name'],
+                    'old_price': old_product['current_price'],
+                    'new_price': new_product['current_price'],
+                    'change_magnitude': price_change
+                })
+            
+            # 리뷰 급증 (50개 이상)
+            review_increase = new_product['review_count'] - old_product['review_count']
+            if review_increase >= 50:
+                changes['review_surges'].append({
+                    'product_id': product_id,
+                    'product_name': new_product['product_name'],
+                    'old_count': old_product['review_count'],
+                    'new_count': new_product['review_count'],
+                    'change_magnitude': review_increase
+                })
         
-        # 2단계: 상품명으로 매칭 (ID 매칭 실패한 것들)
-        for name in set(prev_idx['by_name'].keys()) & set(curr_idx['by_name'].keys()):
-            if name in matched_prev or name in matched_curr:
-                continue  # 이미 ID로 매칭됨
-            
-            old_product = prev_idx['by_name'][name]
-            new_product = curr_idx['by_name'][name]
-            
-            self._detect_product_changes(old_product, new_product, changes)
-            
-            matched_prev.add(name)
-            matched_curr.add(name)
+        # 신규 상품 (현재에만 있음)
+        new_ids = set(curr_dict.keys()) - set(prev_dict.keys())
+        for product_id in new_ids:
+            changes['new_products'].append(curr_dict[product_id])
         
-        # 3단계: 신규 상품 (ID도 없고 이름도 없음)
-        for name, product in curr_idx['by_name'].items():
-            if name not in matched_curr:
-                changes['new_products'].append(product)
-        
-        # 4단계: 제거된 상품
-        for name, product in prev_idx['by_name'].items():
-            if name not in matched_prev:
-                changes['removed_products'].append(product)
+        # 제거된 상품 (이전에만 있음)
+        removed_ids = set(prev_dict.keys()) - set(curr_dict.keys())
+        for product_id in removed_ids:
+            changes['removed_products'].append(prev_dict[product_id])
         
         return changes
-    
-    def _detect_product_changes(self, old_product: dict, new_product: dict, changes: dict):
-        """개별 상품의 변화 감지"""
-        # 순위 변화
-        if old_product['rank'] != new_product['rank']:
-            rank_improvement = old_product['rank'] - new_product['rank']
-            changes['rank_changes'].append({
-                'product_id': new_product['product_id'],
-                'product_name': new_product['product_name'],
-                'old_rank': old_product['rank'],
-                'new_rank': new_product['rank'],
-                'change_magnitude': rank_improvement
-            })
-        
-        # 가격 변화
-        if old_product['current_price'] != new_product['current_price']:
-            price_change = new_product['current_price'] - old_product['current_price']
-            changes['price_changes'].append({
-                'product_id': new_product['product_id'],
-                'product_name': new_product['product_name'],
-                'old_price': old_product['current_price'],
-                'new_price': new_product['current_price'],
-                'change_magnitude': price_change
-            })
-        
-        # 리뷰 급증 (50개 이상 증가)
-        review_increase = new_product['review_count'] - old_product['review_count']
-        if review_increase >= 50:
-            changes['review_surges'].append({
-                'product_id': new_product['product_id'],
-                'product_name': new_product['product_name'],
-                'old_count': old_product['review_count'],
-                'new_count': new_product['review_count'],
-                'change_magnitude': review_increase
-            })
 
 
-class ImprovedCategoryMonitor:
-    """개선된 카테고리 모니터"""
+class CategoryMonitor:
+    """간소화된 카테고리 모니터"""
     
     def __init__(self, category_config: dict, csv_baseline_path: str = None,
                  db_path: str = "improved_monitoring.db", headless: bool = True):
@@ -443,26 +369,26 @@ class ImprovedCategoryMonitor:
         self.db = MonitoringDatabase(db_path)
         self.browser = BrowserManager(headless=headless)
         self.extractor = None
-        self.change_detector = ImprovedChangeDetector()
+        self.change_detector = ChangeDetector()
         
-        # 카테고리 등록
+        # 카테고리 등록 (URL 기반!)
         self.category_id = self.db.register_category(
             category_config['name'], 
             category_config['url']
         )
         
-        # CSV 베이스라인 로드 (초기 1회)
+        # CSV 베이스라인 로드
         if csv_baseline_path and os.path.exists(csv_baseline_path):
             self.db.load_csv_baseline(csv_baseline_path)
         
-        print(f"✅ 카테고리 '{category_config['name']}' 모니터 초기화 완료")
+        print(f"✅ 카테고리 '{category_config['name']}' 모니터 초기화 완료 (ID: {self.category_id})")
     
     def start_driver(self) -> bool:
         """브라우저 드라이버 시작"""
         print("🚀 Chrome 드라이버 시작 중...")
         if self.browser.start_driver():
             print("✅ Chrome 드라이버 시작 완료")
-            self.extractor = ImprovedScrollExtractor(self.browser)
+            self.extractor = ScrollExtractor(self.browser)
             return True
         print("❌ Chrome 드라이버 시작 실패")
         return False
@@ -491,15 +417,15 @@ class ImprovedCategoryMonitor:
                 print(f"❌ 상품 수집 실패")
                 return None
             
-            print(f"✅ {len(current_products)}개 상품 수집 완료 (순위: 1~{len(current_products)})")
+            print(f"✅ {len(current_products)}개 상품 수집 완료")
             
             # 2. 이전 데이터 조회
             print(f"\n[2/5] 🔍 이전 데이터 조회 중...")
             previous_products = self.db.get_latest_snapshot_data(self.category_id)
             print(f"✅ 이전 데이터: {len(previous_products)}개")
             
-            # 3. 변화 감지 (하이브리드 매칭)
-            print(f"\n[3/5] 🔄 변화 감지 중 (하이브리드 매칭: ID + 상품명)...")
+            # 3. 변화 감지 (product_id만 사용)
+            print(f"\n[3/5] 🔄 변화 감지 중 (product_id 기반)...")
             changes = self.change_detector.detect_changes(previous_products, current_products)
             print(f"✅ 변화 감지 완료")
             
@@ -513,7 +439,7 @@ class ImprovedCategoryMonitor:
                 )
                 print(f"✅ 스냅샷 저장 완료: ID {snapshot_id}")
             except ValueError as e:
-                print(f"❌ 스냅샷 저장 실패 (순위 검증 오류): {e}")
+                print(f"❌ 스냅샷 저장 실패: {e}")
                 return None
             
             # 5. 변화 이벤트 로깅
@@ -590,29 +516,17 @@ class ImprovedCategoryMonitor:
         print(f"  • 가격 변화: {len(changes['price_changes'])}개")
         print(f"  • 리뷰 급증: {len(changes['review_surges'])}개")
         
-        # 주요 순위 변화 (상위 5개)
+        # 주요 순위 변화
         if changes['rank_changes']:
-            print(f"\n🔥 주요 순위 변화 (TOP 5):")
+            print(f"\n🔥 주요 순위 변화 (TOP 3):")
             sorted_changes = sorted(changes['rank_changes'], 
                                    key=lambda x: abs(x['change_magnitude']), 
                                    reverse=True)
-            for i, change in enumerate(sorted_changes[:5], 1):
+            for i, change in enumerate(sorted_changes[:3], 1):
                 direction = "📈 상승" if change['change_magnitude'] > 0 else "📉 하락"
                 print(f"  {i}. {change['product_name'][:40]}...")
                 print(f"     {change['old_rank']}위 → {change['new_rank']}위 "
                       f"({direction} {abs(change['change_magnitude'])}단계)")
-        
-        # 주요 가격 변화 (상위 5개)
-        if changes['price_changes']:
-            print(f"\n💰 주요 가격 변화 (TOP 5):")
-            sorted_changes = sorted(changes['price_changes'], 
-                                   key=lambda x: abs(x['change_magnitude']), 
-                                   reverse=True)
-            for i, change in enumerate(sorted_changes[:5], 1):
-                direction = "📈 인상" if change['change_magnitude'] > 0 else "📉 인하"
-                print(f"  {i}. {change['product_name'][:40]}...")
-                print(f"     {change['old_price']:,}원 → {change['new_price']:,}원 "
-                      f"({direction} {abs(change['change_magnitude']):,}원)")
     
     def close(self):
         """리소스 정리"""
@@ -631,7 +545,7 @@ class MultiCategoryMonitoringSystem:
         self.headless = headless
         
         print(f"\n{'='*70}")
-        print(f"🎯 개선된 다중 카테고리 모니터링 시스템 초기화")
+        print(f"🎯 간소화된 다중 카테고리 모니터링 시스템")
         print(f"{'='*70}")
         print(f"대상 카테고리: {len(categories_config)}개")
         for cat in categories_config:
@@ -648,13 +562,12 @@ class MultiCategoryMonitoringSystem:
                 print(f"🔄 사이클 [{cycle + 1}/{cycles}]")
                 print(f"{'='*70}\n")
             
-            # 각 카테고리별 모니터링
             for i, category_config in enumerate(self.categories_config, 1):
                 print(f"\n{'='*70}")
                 print(f"📂 [{i}/{len(self.categories_config)}] {category_config['name']} 모니터링")
                 print(f"{'='*70}")
                 
-                monitor = ImprovedCategoryMonitor(
+                monitor = CategoryMonitor(
                     category_config=category_config,
                     csv_baseline_path=self.csv_baseline_path,
                     db_path=self.db_path,
@@ -682,13 +595,13 @@ class MultiCategoryMonitoringSystem:
                 finally:
                     monitor.close()
                 
-                # 카테고리 간 대기 (봇 탐지 방지)
+                # 카테고리 간 대기
                 if i < len(self.categories_config):
                     wait_time = 30
                     print(f"\n⏰ 다음 카테고리까지 {wait_time}초 대기...\n")
                     time.sleep(wait_time)
             
-            # 사이클이 여러 개일 경우에만 대기
+            # 사이클 간 대기
             if cycle < cycles - 1:
                 print(f"\n⏰ 다음 사이클까지 10분 대기...\n")
                 time.sleep(600)
@@ -725,11 +638,10 @@ def main():
         categories_config=categories,
         csv_baseline_path=csv_baseline if os.path.exists(csv_baseline) else None,
         db_path="improved_monitoring.db",
-        headless=False  # 디버깅용: True로 변경하면 헤드리스 모드
+        headless=False
     )
     
     try:
-        # 1회만 실행 (cycles=1로 변경)
         monitoring_system.run_full_monitoring_cycle(cycles=1)
         
     except KeyboardInterrupt:

@@ -2,15 +2,14 @@
 # -*- coding: utf-8 -*-
 
 """
-개선된 모니터링 데이터베이스
-- 데이터 중복 제거
-- 순위 무결성 보장
-- 쿼리 최적화
+개선된 모니터링 데이터베이스 (최소 필수 버전)
+- URL 기반 카테고리 식별
+- 시계열 추적을 위한 핵심 기능만 유지
 """
 
 import sqlite3
 from datetime import datetime
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict
 import pandas as pd
 
 
@@ -22,42 +21,20 @@ class MonitoringDatabase:
         self.init_database()
     
     def init_database(self):
-        """데이터베이스 초기화 - 개선된 스키마"""
+        """데이터베이스 초기화"""
         conn = sqlite3.connect(self.db_path)
         
-        # 1. 카테고리 테이블
+        # 1. 카테고리 테이블 (URL UNIQUE!)
         conn.execute("""
             CREATE TABLE IF NOT EXISTS categories (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT UNIQUE NOT NULL,
-                url TEXT NOT NULL,
+                name TEXT NOT NULL,
+                url TEXT UNIQUE NOT NULL,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )
         """)
         
-        # 2. 매칭 참조 테이블 (개선: 추적 정보 추가)
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS matching_reference (
-                coupang_product_id TEXT PRIMARY KEY,
-                
-                -- 최초 발견 정보
-                first_discovered_category TEXT,
-                first_discovered_name TEXT,
-                first_discovered_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                
-                -- 아이허브 매칭 결과
-                iherb_upc TEXT,
-                iherb_part_number TEXT,
-                matched_at DATETIME,
-                matching_confidence REAL DEFAULT 1.0,
-                
-                -- 메타데이터
-                is_manually_verified BOOLEAN DEFAULT FALSE,
-                notes TEXT
-            )
-        """)
-        
-        # 3. 페이지 스냅샷 테이블 (개선: category_name 제거)
+        # 2. 페이지 스냅샷 테이블
         conn.execute("""
             CREATE TABLE IF NOT EXISTS page_snapshots (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -71,7 +48,7 @@ class MonitoringDatabase:
             )
         """)
         
-        # 4. 상품 상태 테이블 (개선: 매칭 정보 제거, 순위 NOT NULL)
+        # 3. 상품 상태 테이블
         conn.execute("""
             CREATE TABLE IF NOT EXISTS product_states (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -79,7 +56,6 @@ class MonitoringDatabase:
                 coupang_product_id TEXT NOT NULL,
                 category_rank INTEGER NOT NULL CHECK(category_rank > 0),
                 
-                -- 쿠팡 실시간 정보
                 product_name TEXT NOT NULL,
                 product_url TEXT NOT NULL,
                 current_price INTEGER DEFAULT 0,
@@ -88,7 +64,6 @@ class MonitoringDatabase:
                 review_count INTEGER DEFAULT 0,
                 rating_score REAL DEFAULT 0.0,
                 
-                -- 배송 정보
                 is_rocket_delivery BOOLEAN DEFAULT FALSE,
                 is_free_shipping BOOLEAN DEFAULT FALSE,
                 
@@ -96,7 +71,7 @@ class MonitoringDatabase:
             )
         """)
         
-        # 5. 변화 이벤트 테이블 (개선: snapshot_id, change_magnitude 추가)
+        # 4. 변화 이벤트 테이블 (선택적)
         conn.execute("""
             CREATE TABLE IF NOT EXISTS change_events (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -120,17 +95,33 @@ class MonitoringDatabase:
             )
         """)
         
-        # 6. 인덱스 생성 (쿼리 최적화)
+        # 5. 매칭 참조 테이블 (iHerb 매칭용, 선택적)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS matching_reference (
+                coupang_product_id TEXT PRIMARY KEY,
+                first_discovered_category TEXT,
+                first_discovered_name TEXT,
+                first_discovered_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                iherb_upc TEXT,
+                iherb_part_number TEXT,
+                matched_at DATETIME,
+                matching_confidence REAL DEFAULT 1.0,
+                is_manually_verified BOOLEAN DEFAULT FALSE,
+                notes TEXT
+            )
+        """)
+        
+        # 6. 인덱스 생성
         indexes = [
-            "CREATE INDEX IF NOT EXISTS idx_product_states_snapshot ON product_states(snapshot_id)",
-            "CREATE INDEX IF NOT EXISTS idx_product_states_product ON product_states(coupang_product_id)",
-            "CREATE INDEX IF NOT EXISTS idx_product_states_rank ON product_states(snapshot_id, category_rank)",
-            "CREATE INDEX IF NOT EXISTS idx_change_events_product ON change_events(coupang_product_id)",
-            "CREATE INDEX IF NOT EXISTS idx_change_events_time ON change_events(event_time)",
-            "CREATE INDEX IF NOT EXISTS idx_change_events_type_time ON change_events(event_type, event_time)",
-            "CREATE INDEX IF NOT EXISTS idx_change_events_snapshot ON change_events(snapshot_id)",
-            "CREATE INDEX IF NOT EXISTS idx_matching_upc ON matching_reference(iherb_upc)",
-            "CREATE INDEX IF NOT EXISTS idx_matching_part_number ON matching_reference(iherb_part_number)"
+            "CREATE INDEX IF NOT EXISTS idx_categories_url ON categories(url)",
+            "CREATE INDEX IF NOT EXISTS idx_snapshots_category ON page_snapshots(category_id)",
+            "CREATE INDEX IF NOT EXISTS idx_snapshots_time ON page_snapshots(snapshot_time)",
+            "CREATE INDEX IF NOT EXISTS idx_states_snapshot ON product_states(snapshot_id)",
+            "CREATE INDEX IF NOT EXISTS idx_states_product ON product_states(coupang_product_id)",
+            "CREATE INDEX IF NOT EXISTS idx_states_rank ON product_states(snapshot_id, category_rank)",
+            "CREATE INDEX IF NOT EXISTS idx_events_snapshot ON change_events(snapshot_id)",
+            "CREATE INDEX IF NOT EXISTS idx_events_category ON change_events(category_id)",
+            "CREATE INDEX IF NOT EXISTS idx_events_time ON change_events(event_time)"
         ]
         
         for index_sql in indexes:
@@ -139,101 +130,66 @@ class MonitoringDatabase:
         conn.commit()
         conn.close()
         
-        print(f"✅ 개선된 데이터베이스 초기화 완료: {self.db_path}")
+        print(f"✅ 데이터베이스 초기화 완료: {self.db_path}")
     
-    # database.py의 register_category() 수정
     def register_category(self, name: str, url: str) -> int:
-        """카테고리 등록 또는 기존 ID 반환"""
+        """
+        카테고리 등록 또는 기존 ID 반환
+        URL 기반 검색 (핵심!)
+        """
         conn = sqlite3.connect(self.db_path)
         
-        # 1. 기존 카테고리 확인
-        existing = conn.execute("""
-            SELECT id FROM categories WHERE name = ?
-        """, (name,)).fetchone()
-        
-        if existing:
-            # 기존 카테고리가 있으면 ID만 반환
-            category_id = existing[0]
-            
-            # URL만 업데이트 (변경되었을 수 있음)
-            conn.execute("""
-                UPDATE categories SET url = ? WHERE id = ?
-            """, (url, category_id))
-            conn.commit()
-        else:
-            # 새 카테고리 생성
-            conn.execute("""
-                INSERT INTO categories (name, url)
-                VALUES (?, ?)
-            """, (name, url))
-            conn.commit()
-            
-            category_id = conn.execute("""
-                SELECT id FROM categories WHERE name = ?
-            """, (name,)).fetchone()[0]
-        
-        conn.close()
-        return category_id
-    
-    def load_csv_baseline(self, csv_path: str) -> int:
-        """CSV 베이스라인 로드 (매칭 참조용) - 개선된 버전"""
         try:
-            df = pd.read_csv(csv_path, encoding='utf-8-sig')
+            # URL로 기존 카테고리 확인
+            existing = conn.execute("""
+                SELECT id FROM categories WHERE url = ?
+            """, (url,)).fetchone()
             
-            conn = sqlite3.connect(self.db_path)
-            loaded_count = 0
-            
-            for _, row in df.iterrows():
-                # 쿠팡 상품 URL에서 product_id 추출
-                url = str(row.get('쿠팡_상품URL', ''))
-                import re
-                match = re.search(r'itemId=(\d+)', url)
-                if not match:
-                    continue
-                
-                product_id = match.group(1)
-                category = str(row.get('카테고리', ''))
-                product_name = str(row.get('쿠팡_제품명', ''))
-                iherb_upc = str(row.get('아이허브_UPC', ''))
-                iherb_part = str(row.get('아이허브_파트넘버', ''))
-                
-                # 매칭 정보가 있는 경우만 저장 (UPC 또는 파트넘버)
-                if not iherb_upc and not iherb_part:
-                    continue
-                
+            if existing:
+                category_id = existing[0]
+                # name만 업데이트
                 conn.execute("""
-                    INSERT OR REPLACE INTO matching_reference 
-                    (coupang_product_id, first_discovered_category, first_discovered_name,
-                     iherb_upc, iherb_part_number, matched_at)
-                    VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-                """, (
-                    product_id,
-                    category,
-                    product_name,
-                    iherb_upc if iherb_upc else None,
-                    iherb_part if iherb_part else None
-                ))
-                loaded_count += 1
+                    UPDATE categories SET name = ? WHERE id = ?
+                """, (name, category_id))
+                conn.commit()
+                print(f"  ✅ 기존 카테고리 사용: {name} (ID: {category_id})")
+            else:
+                # 새 카테고리 생성
+                conn.execute("""
+                    INSERT INTO categories (name, url)
+                    VALUES (?, ?)
+                """, (name, url))
+                conn.commit()
+                
+                category_id = conn.execute("""
+                    SELECT id FROM categories WHERE url = ?
+                """, (url,)).fetchone()[0]
+                
+                print(f"  ✅ 새 카테고리 생성: {name} (ID: {category_id})")
             
-            conn.commit()
+            return category_id
+            
+        except sqlite3.IntegrityError:
+            # UNIQUE 제약조건 위반 (동시 실행 시)
+            print(f"  ⚠️  카테고리 중복 감지, 재조회: {url}")
+            category_id = conn.execute("""
+                SELECT id FROM categories WHERE url = ?
+            """, (url,)).fetchone()[0]
+            return category_id
+            
+        finally:
             conn.close()
-            
-            print(f"✅ CSV 베이스라인 로드 완료: {loaded_count}개 매칭 상품")
-            return loaded_count
-            
-        except Exception as e:
-            print(f"❌ CSV 로드 실패: {e}")
-            return 0
     
     def save_snapshot(self, category_id: int, page_url: str, 
                      products: List[Dict], crawl_duration: float) -> int:
-        """스냅샷 저장 - 개선: 순위 검증 강화"""
+        """스냅샷 저장"""
         conn = sqlite3.connect(self.db_path)
         
         # 순위 검증
         for product in products:
             if 'rank' not in product or product['rank'] <= 0:
-                raise ValueError(f"상품 {product.get('product_id')}의 순위가 올바르지 않습니다: {product.get('rank')}")
+                conn.close()
+                raise ValueError(f"상품 {product.get('product_id')}의 순위가 올바르지 않습니다")
         
         # 스냅샷 생성
         cursor = conn.execute("""
@@ -244,7 +200,7 @@ class MonitoringDatabase:
         
         snapshot_id = cursor.lastrowid
         
-        # 상품 상태 저장 (매칭 정보 제외)
+        # 상품 상태 저장
         for product in products:
             conn.execute("""
                 INSERT INTO product_states 
@@ -274,7 +230,7 @@ class MonitoringDatabase:
         return snapshot_id
     
     def get_latest_snapshot_data(self, category_id: int) -> List[Dict]:
-        """최신 스냅샷 데이터 조회 - 개선: category_id 사용"""
+        """최신 스냅샷 데이터 조회 (변화 감지용)"""
         conn = sqlite3.connect(self.db_path)
         
         query = """
@@ -318,7 +274,7 @@ class MonitoringDatabase:
                         category_id: int, event_type: str,
                         old_value, new_value, change_magnitude: float,
                         description: str):
-        """변화 이벤트 로깅 - 개선: snapshot_id, change_magnitude 추가"""
+        """변화 이벤트 로깅"""
         conn = sqlite3.connect(self.db_path)
         conn.execute("""
             INSERT INTO change_events 
@@ -335,89 +291,50 @@ class MonitoringDatabase:
         conn.commit()
         conn.close()
     
-    def get_matched_products_summary(self) -> pd.DataFrame:
-        """매칭 제품 요약 (아이허브 정보 포함)"""
-        conn = sqlite3.connect(self.db_path)
-        
-        query = """
-        SELECT 
-            c.name as category,
-            mr.iherb_part_number,
-            mr.iherb_upc,
-            ps.product_name,
-            ps.category_rank,
-            ps.current_price,
-            ps.review_count,
-            ps.rating_score,
-            snap.snapshot_time
-        FROM matching_reference mr
-        JOIN product_states ps ON mr.coupang_product_id = ps.coupang_product_id
-        JOIN page_snapshots snap ON ps.snapshot_id = snap.id
-        JOIN categories c ON snap.category_id = c.id
-        WHERE snap.id IN (
-            SELECT MAX(id) FROM page_snapshots GROUP BY category_id
-        )
-        AND mr.iherb_upc IS NOT NULL
-        ORDER BY c.name, ps.category_rank
-        """
-        
-        df = pd.read_sql_query(query, conn)
-        conn.close()
-        
-        return df
-    
-    def get_rank_history(self, product_id: str) -> pd.DataFrame:
-        """특정 상품의 순위 히스토리"""
-        conn = sqlite3.connect(self.db_path)
-        
-        query = """
-        SELECT 
-            snap.snapshot_time,
-            ps.category_rank,
-            ps.current_price,
-            ps.review_count,
-            ps.rating_score,
-            c.name as category
-        FROM product_states ps
-        JOIN page_snapshots snap ON ps.snapshot_id = snap.id
-        JOIN categories c ON snap.category_id = c.id
-        WHERE ps.coupang_product_id = ?
-        ORDER BY snap.snapshot_time
-        """
-        
-        df = pd.read_sql_query(query, conn, params=(product_id,))
-        conn.close()
-        
-        return df
-    
-    def get_trending_products(self, days: int = 7, min_improvement: int = 10) -> pd.DataFrame:
-        """급상승 제품 조회"""
-        conn = sqlite3.connect(self.db_path)
-        
-        query = """
-        SELECT 
-            ce.coupang_product_id,
-            ps.product_name,
-            mr.iherb_part_number,
-            mr.iherb_upc,
-            CAST(ce.old_value AS INTEGER) as old_rank,
-            CAST(ce.new_value AS INTEGER) as new_rank,
-            ce.change_magnitude as rank_improvement,
-            ps.current_price,
-            c.name as category,
-            ce.event_time
-        FROM change_events ce
-        JOIN product_states ps ON ce.coupang_product_id = ps.coupang_product_id
-        LEFT JOIN matching_reference mr ON ce.coupang_product_id = mr.coupang_product_id
-        JOIN categories c ON ce.category_id = c.id
-        WHERE ce.event_type = 'rank_change'
-        AND ce.event_time > datetime('now', '-' || ? || ' days')
-        AND ce.change_magnitude >= ?
-        AND ps.snapshot_id = (SELECT MAX(id) FROM page_snapshots WHERE category_id = ce.category_id)
-        ORDER BY ce.change_magnitude DESC
-        """
-        
-        df = pd.read_sql_query(query, conn, params=(days, min_improvement))
-        conn.close()
-        
-        return df
+    def load_csv_baseline(self, csv_path: str) -> int:
+        """CSV 베이스라인 로드 (iHerb 매칭용)"""
+        try:
+            df = pd.read_csv(csv_path, encoding='utf-8-sig')
+            
+            conn = sqlite3.connect(self.db_path)
+            loaded_count = 0
+            
+            for _, row in df.iterrows():
+                url = str(row.get('쿠팡_상품URL', ''))
+                import re
+                match = re.search(r'itemId=(\d+)', url)
+                if not match:
+                    continue
+                
+                product_id = match.group(1)
+                category = str(row.get('카테고리', ''))
+                product_name = str(row.get('쿠팡_제품명', ''))
+                iherb_upc = str(row.get('아이허브_UPC', ''))
+                iherb_part = str(row.get('아이허브_파트넘버', ''))
+                
+                if not iherb_upc and not iherb_part:
+                    continue
+                
+                conn.execute("""
+                    INSERT OR REPLACE INTO matching_reference 
+                    (coupang_product_id, first_discovered_category, first_discovered_name,
+                     iherb_upc, iherb_part_number, matched_at)
+                    VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                """, (
+                    product_id,
+                    category,
+                    product_name,
+                    iherb_upc if iherb_upc else None,
+                    iherb_part if iherb_part else None
+                ))
+                loaded_count += 1
+            
+            conn.commit()
+            conn.close()
+            
+            print(f"✅ CSV 베이스라인 로드 완료: {loaded_count}개 매칭 상품")
+            return loaded_count
+            
+        except Exception as e:
+            print(f"❌ CSV 로드 실패: {e}")
+            return 0
