@@ -2,347 +2,403 @@
 # -*- coding: utf-8 -*-
 
 """
-모니터링 데이터 분석 및 CSV 생성
-DB 구조 검증 및 데이터 품질 확인용
+쿼리 기반 분석 라이브러리 (change_events 대체)
+- 모든 변화 분석을 실시간 쿼리로 수행
+- 유연하고 확장 가능
 """
 
 import sqlite3
 import pandas as pd
-import os
-from datetime import datetime
+from typing import List, Tuple, Optional
 
 
-class MonitoringAnalyzer:
-    """모니터링 데이터 분석 및 CSV 생성 클래스"""
+class QueryAnalyzer:
+    """쿼리 기반 분석기"""
     
-    def __init__(self, db_path="improved_monitoring.db"):
+    def __init__(self, db_path: str):
         self.db_path = db_path
-        
-        if not os.path.exists(db_path):
-            raise FileNotFoundError(f"DB 파일을 찾을 수 없습니다: {db_path}")
-        
-        print(f"✅ DB 연결: {db_path}")
     
-    def export_snapshots_csv(self, output_path=None):
+    def get_rank_changes(self, snapshot_id_prev: int, snapshot_id_curr: int, 
+                         category_id: Optional[int] = None, 
+                         min_change: int = 10) -> pd.DataFrame:
         """
-        1. 스냅샷 원본 CSV 생성
-        page_snapshots + product_states + matching_reference 조인
+        두 스냅샷 간 순위 변화 조회
+        
+        Args:
+            snapshot_id_prev: 이전 스냅샷 ID
+            snapshot_id_curr: 현재 스냅샷 ID
+            category_id: 카테고리 필터 (선택)
+            min_change: 최소 순위 변화 (절대값)
+        
+        Returns:
+            순위 변화 DataFrame
         """
-        if not output_path:
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            output_path = f"snapshots_{timestamp}.csv"
+        conn = sqlite3.connect(self.db_path)
         
-        print(f"\n[1/3] 스냅샷 CSV 생성 중...")
+        query = """
+        WITH prev AS (
+            SELECT 
+                ps.coupang_product_id,
+                ps.product_name,
+                ps.category_rank,
+                ps.current_price,
+                ps.review_count,
+                snap.category_id
+            FROM product_states ps
+            JOIN page_snapshots snap ON ps.snapshot_id = snap.id
+            WHERE ps.snapshot_id = ?
+        ),
+        curr AS (
+            SELECT 
+                ps.coupang_product_id,
+                ps.product_name,
+                ps.category_rank,
+                ps.current_price,
+                ps.review_count,
+                snap.category_id
+            FROM product_states ps
+            JOIN page_snapshots snap ON ps.snapshot_id = snap.id
+            WHERE ps.snapshot_id = ?
+        )
+        SELECT 
+            curr.coupang_product_id,
+            curr.product_name,
+            prev.category_rank as old_rank,
+            curr.category_rank as new_rank,
+            (prev.category_rank - curr.category_rank) as rank_change,
+            prev.current_price as old_price,
+            curr.current_price as new_price,
+            (curr.current_price - prev.current_price) as price_change,
+            curr.review_count
+        FROM prev
+        JOIN curr ON prev.coupang_product_id = curr.coupang_product_id
+        WHERE ABS(prev.category_rank - curr.category_rank) >= ?
+        """
         
+        params = [snapshot_id_prev, snapshot_id_curr, min_change]
+        
+        if category_id:
+            query += " AND curr.category_id = ?"
+            params.append(category_id)
+        
+        query += " ORDER BY ABS(prev.category_rank - curr.category_rank) DESC"
+        
+        df = pd.read_sql_query(query, conn, params=params)
+        conn.close()
+        
+        return df
+    
+    def get_new_products(self, snapshot_id_prev: int, snapshot_id_curr: int) -> pd.DataFrame:
+        """신규 진입 상품 조회"""
+        conn = sqlite3.connect(self.db_path)
+        
+        query = """
+        SELECT 
+            curr.coupang_product_id,
+            curr.product_name,
+            curr.category_rank,
+            curr.current_price,
+            curr.review_count
+        FROM product_states curr
+        WHERE curr.snapshot_id = ?
+          AND curr.coupang_product_id NOT IN (
+              SELECT coupang_product_id 
+              FROM product_states 
+              WHERE snapshot_id = ?
+          )
+        ORDER BY curr.category_rank
+        """
+        
+        df = pd.read_sql_query(query, conn, params=(snapshot_id_curr, snapshot_id_prev))
+        conn.close()
+        
+        return df
+    
+    def get_removed_products(self, snapshot_id_prev: int, snapshot_id_curr: int) -> pd.DataFrame:
+        """이탈 상품 조회"""
+        conn = sqlite3.connect(self.db_path)
+        
+        query = """
+        SELECT 
+            prev.coupang_product_id,
+            prev.product_name,
+            prev.category_rank,
+            prev.current_price,
+            prev.review_count
+        FROM product_states prev
+        WHERE prev.snapshot_id = ?
+          AND prev.coupang_product_id NOT IN (
+              SELECT coupang_product_id 
+              FROM product_states 
+              WHERE snapshot_id = ?
+          )
+        ORDER BY prev.category_rank
+        """
+        
+        df = pd.read_sql_query(query, conn, params=(snapshot_id_prev, snapshot_id_curr))
+        conn.close()
+        
+        return df
+    
+    def get_price_changes(self, snapshot_id_prev: int, snapshot_id_curr: int,
+                         min_change_amount: int = 1000) -> pd.DataFrame:
+        """가격 변화 조회"""
+        conn = sqlite3.connect(self.db_path)
+        
+        query = """
+        WITH prev AS (
+            SELECT coupang_product_id, product_name, current_price, category_rank
+            FROM product_states WHERE snapshot_id = ?
+        ),
+        curr AS (
+            SELECT coupang_product_id, product_name, current_price, category_rank
+            FROM product_states WHERE snapshot_id = ?
+        )
+        SELECT 
+            curr.coupang_product_id,
+            curr.product_name,
+            curr.category_rank,
+            prev.current_price as old_price,
+            curr.current_price as new_price,
+            (curr.current_price - prev.current_price) as price_change,
+            ROUND(100.0 * (curr.current_price - prev.current_price) / prev.current_price, 2) as price_change_pct
+        FROM prev
+        JOIN curr ON prev.coupang_product_id = curr.coupang_product_id
+        WHERE ABS(curr.current_price - prev.current_price) >= ?
+        ORDER BY ABS(curr.current_price - prev.current_price) DESC
+        """
+        
+        df = pd.read_sql_query(query, conn, params=(snapshot_id_prev, snapshot_id_curr, min_change_amount))
+        conn.close()
+        
+        return df
+    
+    def get_product_history(self, product_id: str, category_id: Optional[int] = None) -> pd.DataFrame:
+        """특정 상품의 전체 이력 조회"""
         conn = sqlite3.connect(self.db_path)
         
         query = """
         SELECT 
             snap.id as snapshot_id,
             snap.snapshot_time,
-            cat.name as category,
-            ps.coupang_product_id as product_id,
-            ps.category_rank as rank,
-            ps.product_name,
-            ps.product_url,
+            ps.category_rank,
             ps.current_price,
-            ps.original_price,
-            ps.discount_rate,
+            ps.review_count,
+            ps.rating_score
+        FROM product_states ps
+        JOIN page_snapshots snap ON ps.snapshot_id = snap.id
+        WHERE ps.coupang_product_id = ?
+        """
+        
+        params = [product_id]
+        
+        if category_id:
+            query += " AND snap.category_id = ?"
+            params.append(category_id)
+        
+        query += " ORDER BY snap.snapshot_time"
+        
+        df = pd.read_sql_query(query, conn, params=params)
+        conn.close()
+        
+        return df
+    
+    def get_continuous_changes(self, snapshot_ids: List[int], product_id: Optional[str] = None) -> pd.DataFrame:
+        """
+        연속 스냅샷 간 변화 추적 (10 → 13 → 16 등)
+        
+        Args:
+            snapshot_ids: 추적할 스냅샷 ID 리스트 (예: [10, 13, 16])
+            product_id: 특정 상품만 조회 (선택)
+        
+        Returns:
+            연속 변화 DataFrame
+        """
+        if len(snapshot_ids) < 2:
+            raise ValueError("최소 2개 이상의 스냅샷 ID가 필요합니다")
+        
+        conn = sqlite3.connect(self.db_path)
+        
+        # 동적으로 쿼리 생성
+        snapshot_placeholders = ','.join(['?'] * len(snapshot_ids))
+        
+        query = f"""
+        WITH product_ranks AS (
+            SELECT 
+                ps.coupang_product_id,
+                ps.product_name,
+                ps.snapshot_id,
+                ps.category_rank,
+                ps.current_price
+            FROM product_states ps
+            WHERE ps.snapshot_id IN ({snapshot_placeholders})
+        )
+        SELECT 
+            pr.coupang_product_id,
+            pr.product_name
+        """
+        
+        # 각 스냅샷에 대한 컬럼 추가
+        for i, snap_id in enumerate(snapshot_ids):
+            query += f",\n            snap{i}.category_rank as rank_snap{snap_id}"
+            query += f",\n            snap{i}.current_price as price_snap{snap_id}"
+        
+        query += "\n        FROM product_ranks pr"
+        
+        # JOIN 추가
+        for i, snap_id in enumerate(snapshot_ids):
+            if i == 0:
+                query += f"\n        LEFT JOIN product_ranks snap{i} ON pr.coupang_product_id = snap{i}.coupang_product_id AND snap{i}.snapshot_id = {snap_id}"
+            else:
+                query += f"\n        LEFT JOIN product_ranks snap{i} ON pr.coupang_product_id = snap{i}.coupang_product_id AND snap{i}.snapshot_id = {snap_id}"
+        
+        query += f"\n        WHERE pr.snapshot_id = {snapshot_ids[0]}"
+        
+        params = snapshot_ids
+        
+        if product_id:
+            query += "\n          AND pr.coupang_product_id = ?"
+            params.append(product_id)
+        
+        df = pd.read_sql_query(query, conn, params=params)
+        conn.close()
+        
+        # 순위 변화량 계산
+        for i in range(len(snapshot_ids) - 1):
+            curr_snap = snapshot_ids[i]
+            next_snap = snapshot_ids[i + 1]
+            df[f'change_{curr_snap}_to_{next_snap}'] = df[f'rank_snap{curr_snap}'] - df[f'rank_snap{next_snap}']
+        
+        return df
+    
+    def get_category_summary(self, snapshot_id: int) -> pd.DataFrame:
+        """스냅샷의 카테고리 요약 정보"""
+        conn = sqlite3.connect(self.db_path)
+        
+        query = """
+        SELECT 
+            cat.name as category,
+            COUNT(*) as total_products,
+            AVG(ps.current_price) as avg_price,
+            AVG(ps.review_count) as avg_reviews,
+            AVG(ps.rating_score) as avg_rating,
+            MIN(ps.current_price) as min_price,
+            MAX(ps.current_price) as max_price
+        FROM product_states ps
+        JOIN page_snapshots snap ON ps.snapshot_id = snap.id
+        JOIN categories cat ON snap.category_id = cat.id
+        WHERE ps.snapshot_id = ?
+        GROUP BY cat.name
+        """
+        
+        df = pd.read_sql_query(query, conn, params=(snapshot_id,))
+        conn.close()
+        
+        return df
+    
+    def get_top_products(self, snapshot_id: int, category_id: Optional[int] = None, 
+                        limit: int = 20) -> pd.DataFrame:
+        """상위 상품 조회"""
+        conn = sqlite3.connect(self.db_path)
+        
+        query = """
+        SELECT 
+            ps.category_rank,
+            ps.coupang_product_id,
+            ps.product_name,
+            ps.current_price,
             ps.review_count,
             ps.rating_score,
-            ps.is_rocket_delivery,
-            ps.is_free_shipping,
-            mr.iherb_upc,
-            mr.iherb_part_number,
-            CASE 
-                WHEN mr.iherb_upc IS NOT NULL THEN 'matched'
-                ELSE 'unmatched'
-            END as matching_status
-        FROM page_snapshots snap
-        JOIN categories cat ON snap.category_id = cat.id
-        JOIN product_states ps ON snap.id = ps.snapshot_id
+            mr.iherb_upc
+        FROM product_states ps
+        JOIN page_snapshots snap ON ps.snapshot_id = snap.id
         LEFT JOIN matching_reference mr ON ps.coupang_product_id = mr.coupang_product_id
-        ORDER BY snap.snapshot_time DESC, cat.name, ps.category_rank
+        WHERE ps.snapshot_id = ?
         """
         
-        df = pd.read_sql_query(query, conn)
+        params = [snapshot_id]
+        
+        if category_id:
+            query += " AND snap.category_id = ?"
+            params.append(category_id)
+        
+        query += " ORDER BY ps.category_rank LIMIT ?"
+        params.append(limit)
+        
+        df = pd.read_sql_query(query, conn, params=params)
         conn.close()
         
-        if df.empty:
-            print("  ⚠️ 스냅샷 데이터가 없습니다")
-            return None
-        
-        df.to_csv(output_path, index=False, encoding='utf-8-sig')
-        
-        print(f"  ✅ 스냅샷 CSV 생성 완료: {output_path}")
-        print(f"     - 총 {len(df)}개 레코드")
-        print(f"     - 스냅샷 수: {df['snapshot_id'].nunique()}개")
-        print(f"     - 카테고리: {df['category'].nunique()}개")
-        print(f"     - 매칭된 상품: {len(df[df['matching_status']=='matched'])}개")
-        
-        return output_path
+        return df
     
-    def export_change_events_csv(self, output_path=None):
-        """
-        2. 변화 이벤트 원본 CSV 생성
-        change_events 테이블 그대로
-        """
-        if not output_path:
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            output_path = f"change_events_{timestamp}.csv"
+    def compare_snapshots_summary(self, snapshot_id_prev: int, snapshot_id_curr: int) -> dict:
+        """두 스냅샷 간 변화 요약"""
         
-        print(f"\n[2/3] 변화 이벤트 CSV 생성 중...")
+        # 순위 변화
+        rank_changes = self.get_rank_changes(snapshot_id_prev, snapshot_id_curr, min_change=1)
         
-        conn = sqlite3.connect(self.db_path)
+        # 신규/제거
+        new_products = self.get_new_products(snapshot_id_prev, snapshot_id_curr)
+        removed_products = self.get_removed_products(snapshot_id_prev, snapshot_id_curr)
         
-        query = """
-        SELECT 
-            ce.id as event_id,
-            ce.event_time,
-            ce.snapshot_id,
-            cat.name as category,
-            ce.coupang_product_id as product_id,
-            ps.product_name,
-            ce.event_type,
-            ce.old_value,
-            ce.new_value,
-            ce.change_magnitude,
-            ce.description
-        FROM change_events ce
-        JOIN categories cat ON ce.category_id = cat.id
-        LEFT JOIN (
-            SELECT DISTINCT coupang_product_id, product_name
-            FROM product_states
-        ) ps ON ce.coupang_product_id = ps.coupang_product_id
-        ORDER BY ce.event_time DESC
-        """
+        # 가격 변화
+        price_changes = self.get_price_changes(snapshot_id_prev, snapshot_id_curr, min_change_amount=100)
         
-        df = pd.read_sql_query(query, conn)
-        conn.close()
-        
-        if df.empty:
-            print("  ⚠️ 변화 이벤트 데이터가 없습니다")
-            return None
-        
-        df.to_csv(output_path, index=False, encoding='utf-8-sig')
-        
-        print(f"  ✅ 변화 이벤트 CSV 생성 완료: {output_path}")
-        print(f"     - 총 {len(df)}개 이벤트")
-        
-        # 이벤트 타입별 통계
-        event_counts = df['event_type'].value_counts()
-        for event_type, count in event_counts.items():
-            print(f"     - {event_type}: {count}개")
-        
-        return output_path
-    
-    def export_categories_summary_csv(self, output_path=None):
-        """
-        3. 카테고리 요약 CSV 생성
-        카테고리별 수집 현황 및 매칭률
-        """
-        if not output_path:
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            output_path = f"categories_summary_{timestamp}.csv"
-        
-        print(f"\n[3/3] 카테고리 요약 CSV 생성 중...")
-        
-        conn = sqlite3.connect(self.db_path)
-        
-        query = """
-        SELECT 
-            cat.id as category_id,
-            cat.name as category_name,
-            cat.url as category_url,
-            MAX(snap.snapshot_time) as latest_snapshot_time,
-            COUNT(DISTINCT snap.id) as total_snapshots,
-            (
-                SELECT COUNT(*)
-                FROM product_states ps2
-                WHERE ps2.snapshot_id = (
-                    SELECT MAX(id) 
-                    FROM page_snapshots 
-                    WHERE category_id = cat.id
-                )
-            ) as total_products_in_latest,
-            (
-                SELECT COUNT(DISTINCT ps3.coupang_product_id)
-                FROM product_states ps3
-                JOIN matching_reference mr ON ps3.coupang_product_id = mr.coupang_product_id
-                WHERE ps3.snapshot_id = (
-                    SELECT MAX(id) 
-                    FROM page_snapshots 
-                    WHERE category_id = cat.id
-                )
-                AND mr.iherb_upc IS NOT NULL
-            ) as matched_products,
-            ROUND(
-                100.0 * (
-                    SELECT COUNT(DISTINCT ps3.coupang_product_id)
-                    FROM product_states ps3
-                    JOIN matching_reference mr ON ps3.coupang_product_id = mr.coupang_product_id
-                    WHERE ps3.snapshot_id = (
-                        SELECT MAX(id) 
-                        FROM page_snapshots 
-                        WHERE category_id = cat.id
-                    )
-                    AND mr.iherb_upc IS NOT NULL
-                ) / NULLIF((
-                    SELECT COUNT(*)
-                    FROM product_states ps2
-                    WHERE ps2.snapshot_id = (
-                        SELECT MAX(id) 
-                        FROM page_snapshots 
-                        WHERE category_id = cat.id
-                    )
-                ), 0),
-                2
-            ) as matching_rate_percent,
-            (
-                SELECT AVG(ps4.current_price)
-                FROM product_states ps4
-                WHERE ps4.snapshot_id = (
-                    SELECT MAX(id) 
-                    FROM page_snapshots 
-                    WHERE category_id = cat.id
-                )
-            ) as avg_price,
-            (
-                SELECT AVG(ps5.review_count)
-                FROM product_states ps5
-                WHERE ps5.snapshot_id = (
-                    SELECT MAX(id) 
-                    FROM page_snapshots 
-                    WHERE category_id = cat.id
-                )
-            ) as avg_review_count
-        FROM categories cat
-        LEFT JOIN page_snapshots snap ON cat.id = snap.category_id
-        GROUP BY cat.id, cat.name, cat.url
-        ORDER BY cat.name
-        """
-        
-        df = pd.read_sql_query(query, conn)
-        conn.close()
-        
-        if df.empty:
-            print("  ⚠️ 카테고리 데이터가 없습니다")
-            return None
-        
-        df.to_csv(output_path, index=False, encoding='utf-8-sig')
-        
-        print(f"  ✅ 카테고리 요약 CSV 생성 완료: {output_path}")
-        print(f"     - 총 {len(df)}개 카테고리")
-        
-        for _, row in df.iterrows():
-            print(f"     - {row['category_name']}: {row['total_products_in_latest']}개 상품, "
-                  f"매칭률 {row['matching_rate_percent']:.1f}%")
-        
-        return output_path
-    
-    def export_all_csvs(self, output_dir="csv_reports"):
-        """모든 CSV 파일 일괄 생성"""
-        print(f"\n{'='*70}")
-        print(f"📊 모니터링 데이터 CSV 생성 시작")
-        print(f"{'='*70}")
-        
-        # 출력 디렉토리 생성
-        os.makedirs(output_dir, exist_ok=True)
-        
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        
-        # 1. 스냅샷
-        snapshot_path = os.path.join(output_dir, f"snapshots_{timestamp}.csv")
-        self.export_snapshots_csv(snapshot_path)
-        
-        # 2. 변화 이벤트
-        events_path = os.path.join(output_dir, f"change_events_{timestamp}.csv")
-        self.export_change_events_csv(events_path)
-        
-        # 3. 카테고리 요약
-        summary_path = os.path.join(output_dir, f"categories_summary_{timestamp}.csv")
-        self.export_categories_summary_csv(summary_path)
-        
-        print(f"\n{'='*70}")
-        print(f"✅ 모든 CSV 생성 완료!")
-        print(f"{'='*70}")
-        print(f"출력 디렉토리: {output_dir}")
-        print(f"타임스탬프: {timestamp}")
-        print(f"\n생성된 파일:")
-        print(f"  1. {snapshot_path}")
-        print(f"  2. {events_path}")
-        print(f"  3. {summary_path}")
-        print(f"{'='*70}")
-    
-    def get_db_statistics(self):
-        """DB 전체 통계 조회"""
-        print(f"\n{'='*70}")
-        print(f"📊 DB 전체 통계")
-        print(f"{'='*70}")
-        
-        conn = sqlite3.connect(self.db_path)
-        
-        # 카테고리 수
-        cat_count = conn.execute("SELECT COUNT(*) FROM categories").fetchone()[0]
-        print(f"카테고리: {cat_count}개")
-        
-        # 스냅샷 수
-        snap_count = conn.execute("SELECT COUNT(*) FROM page_snapshots").fetchone()[0]
-        print(f"스냅샷: {snap_count}개")
-        
-        # 상품 상태 수
-        state_count = conn.execute("SELECT COUNT(*) FROM product_states").fetchone()[0]
-        print(f"상품 상태 레코드: {state_count}개")
-        
-        # 변화 이벤트 수
-        event_count = conn.execute("SELECT COUNT(*) FROM change_events").fetchone()[0]
-        print(f"변화 이벤트: {event_count}개")
-        
-        # 매칭 참조 수
-        match_count = conn.execute(
-            "SELECT COUNT(*) FROM matching_reference WHERE iherb_upc IS NOT NULL"
-        ).fetchone()[0]
-        print(f"매칭 참조: {match_count}개")
-        
-        # 최신 스냅샷 시간
-        latest = conn.execute(
-            "SELECT MAX(snapshot_time) FROM page_snapshots"
-        ).fetchone()[0]
-        print(f"최신 스냅샷: {latest}")
-        
-        conn.close()
-        print(f"{'='*70}")
+        return {
+            'rank_changes_count': len(rank_changes),
+            'new_products_count': len(new_products),
+            'removed_products_count': len(removed_products),
+            'price_changes_count': len(price_changes),
+            'top_rank_up': rank_changes.nlargest(5, 'rank_change') if not rank_changes.empty else pd.DataFrame(),
+            'top_rank_down': rank_changes.nsmallest(5, 'rank_change') if not rank_changes.empty else pd.DataFrame(),
+            'new_products': new_products,
+            'removed_products': removed_products
+        }
 
 
-def main():
-    """메인 실행 함수"""
+def demo_analysis():
+    """분석 데모"""
     
-    # DB 경로 (improved_monitoring.db 또는 page_monitoring.db)
-    db_path = "improved_monitoring.db"
+    db_path = "monitoring.db"
+    analyzer = QueryAnalyzer(db_path)
     
-    if not os.path.exists(db_path):
-        db_path = "page_monitoring.db"
+    print("="*80)
+    print("쿼리 기반 분석 데모")
+    print("="*80)
     
-    if not os.path.exists(db_path):
-        print("❌ DB 파일을 찾을 수 없습니다")
-        print("   - improved_monitoring.db 또는")
-        print("   - page_monitoring.db")
-        return
+    # 스냅샷 목록 조회
+    conn = sqlite3.connect(db_path)
+    snapshots = pd.read_sql_query("""
+        SELECT snap.id, snap.snapshot_time, cat.name as category
+        FROM page_snapshots snap
+        LEFT JOIN categories cat ON snap.category_id = cat.id
+        ORDER BY snap.snapshot_time DESC
+        LIMIT 5
+    """, conn)
+    conn.close()
     
-    try:
-        analyzer = MonitoringAnalyzer(db_path)
+    print("\n최근 스냅샷:")
+    print(snapshots.to_string(index=False))
+    
+    if len(snapshots) >= 2:
+        prev_id = snapshots.iloc[1]['id']
+        curr_id = snapshots.iloc[0]['id']
         
-        # DB 통계 출력
-        analyzer.get_db_statistics()
+        print(f"\n스냅샷 {prev_id} → {curr_id} 비교:")
         
-        # 모든 CSV 생성
-        analyzer.export_all_csvs("csv_reports")
+        # 순위 변화
+        rank_changes = analyzer.get_rank_changes(prev_id, curr_id, min_change=10)
+        print(f"\n주요 순위 변화 (10위 이상): {len(rank_changes)}개")
+        if not rank_changes.empty:
+            print(rank_changes.head().to_string(index=False))
         
-    except Exception as e:
-        print(f"\n❌ 오류 발생: {e}")
-        import traceback
-        traceback.print_exc()
+        # 신규 상품
+        new_products = analyzer.get_new_products(prev_id, curr_id)
+        print(f"\n신규 상품: {len(new_products)}개")
+        
+        # 제거 상품
+        removed_products = analyzer.get_removed_products(prev_id, curr_id)
+        print(f"제거 상품: {len(removed_products)}개")
 
 
 if __name__ == "__main__":
-    main()
+    demo_analysis()
