@@ -1,125 +1,139 @@
-"""
-긴급 수정: 쿠팡 차단 우회 - 어제까지 됐는데 오늘 갑자기 안될 때
-"""
-
+# coupang_manager.py
 import undetected_chromedriver as uc
 import time
+from typing import Optional
 from coupang_config import CoupangConfig
 
+COUPANG_DOMAINS = ("coupang.com",)
+# 쿠팡에서 딥링크로 접근 시 차단 가능성이 높은 경로 키워드
+COUPANG_DEEPLINK_HINTS = ("/np/search", "/vp/product", "/vp/products", "/shop.coupang.com")
 
 class BrowserManager:
-    def __init__(self, headless=False):
+    def __init__(self, headless: bool = False):
         self.headless = headless
         self.driver = None
-    
-    def start_driver(self):
-        """Chrome 드라이버 시작 - 긴급 수정 버전"""
-        try:
-            print("Chrome 드라이버 시작 중... (긴급 수정 버전)")
-            
-            # 방법 1: undetected-chromedriver 강제 업데이트 후 재시작
-            print("\n🔧 시도 1: 최신 버전으로 드라이버 강제 업데이트")
-            try:
-                # version_main 파라미터로 최신 Chrome 버전 강제 지정
-                self.driver = uc.Chrome(
-                    headless=self.headless,
-                    use_subprocess=True,  # 서브프로세스 사용
-                    version_main=None,     # 자동 감지
-                )
-                
-                # 추가 스텔스 설정
-                self._apply_stealth_settings()
-                
-                print("✅ 드라이버 시작 성공 (방법 1)")
-                return True
-                
-            except Exception as e1:
-                print(f"⚠️ 방법 1 실패: {e1}")
-            
-            # 방법 2: 옵션 최소화 + 드라이버 캐시 무시
-            print("\n🔧 시도 2: 최소 옵션 + 캐시 무시")
-            try:
-                options = uc.ChromeOptions()
-                
-                # 최소한의 옵션만
-                options.add_argument('--no-sandbox')
-                options.add_argument('--disable-blink-features=AutomationControlled')
-                
-                # 캐시 무시하고 새로 다운로드
-                self.driver = uc.Chrome(
-                    options=options,
-                    headless=self.headless,
-                    driver_executable_path=None,  # 캐시 무시
-                )
-                
-                self._apply_stealth_settings()
-                
-                print("✅ 드라이버 시작 성공 (방법 2)")
-                return True
-                
-            except Exception as e2:
-                print(f"⚠️ 방법 2 실패: {e2}")
-            
-            # 방법 3: 완전 초기화
-            print("\n🔧 시도 3: 완전 기본 설정")
-            try:
-                self.driver = uc.Chrome(headless=self.headless)
-                self._apply_stealth_settings()
-                
-                print("✅ 드라이버 시작 성공 (방법 3)")
-                return True
-                
-            except Exception as e3:
-                print(f"❌ 모든 시도 실패: {e3}")
-                return False
-                
-        except Exception as e:
-            print(f"❌ 예상치 못한 오류: {e}")
+
+    # -----------------------
+    # 내부 유틸
+    # -----------------------
+    def _is_coupang_deeplink(self, url: str) -> bool:
+        if not url:
             return False
-    
-    def _apply_stealth_settings(self):
-        """스텔스 설정 적용"""
+        return any(d in url for d in COUPANG_DOMAINS) and any(h in url for h in COUPANG_DEEPLINK_HINTS)
+
+    def _is_coupang(self, url: str) -> bool:
+        if not url:
+            return False
+        return any(d in url for d in COUPANG_DOMAINS)
+
+    # -----------------------
+    # 핵심: ‘클릭으로 이동’(Referer/쿠키 유지)
+    # -----------------------
+    def open_with_referrer(self, target_url: str, home: str = "https://www.coupang.com", settle_sec: float = 4.0):
+        """쿠팡 홈에서 referer/쿠키 컨텍스트 확보 후 '클릭' 방식으로 target_url 진입"""
+        d = self.driver
+        if d is None:
+            raise RuntimeError("driver not started. call start_driver() first.")
+
+        cur = (d.current_url or "")
+        if "coupang.com" not in cur:
+            d.get(home)
+            time.sleep(settle_sec)
+
+        # 홈 문서에서 실제 '클릭' 이벤트로 이동 (브라우저가 Referer 자동 추가)
+        d.execute_script("""
+            const a = document.createElement('a');
+            a.href = arguments[0];
+            a.rel = 'noopener';
+            a.target = '_self';
+            document.body.appendChild(a);
+            a.click();
+        """, target_url)
+
+    # 편의: 쿠팡이면 referrer 보존 이동, 아니면 일반 get
+    def get_with_coupang_referrer(self, url: str, settle_sec: float = 4.0):
+        if self._is_coupang(url):
+            return self.open_with_referrer(url, settle_sec=settle_sec)
+        else:
+            return self.driver.get(url)
+
+    # -----------------------
+    # 드라이버 시작
+    # -----------------------
+    def start_driver(self) -> bool:
+        """Chrome 드라이버 시작 - 설정 활용 + 안정화 옵션"""
         try:
-            # 웹드라이버 감지 제거
-            self.driver.execute_cdp_cmd('Page.addScriptToEvaluateOnNewDocument', {
-                'source': '''
-                    Object.defineProperty(navigator, 'webdriver', {
-                        get: () => undefined
-                    });
-                    
-                    // Chrome 객체 추가
-                    window.chrome = {
-                        runtime: {},
-                        loadTimes: function() {},
-                        csi: function() {},
-                        app: {}
-                    };
-                    
-                    // Permissions API 오버라이드
-                    const originalQuery = window.navigator.permissions.query;
-                    window.navigator.permissions.query = (parameters) => (
-                        parameters.name === 'notifications' ?
-                            Promise.resolve({ state: Notification.permission }) :
-                            originalQuery(parameters)
-                    );
-                    
-                    // Plugin 배열
-                    Object.defineProperty(navigator, 'plugins', {
-                        get: () => [1, 2, 3, 4, 5]
-                    });
-                    
-                    // 언어
-                    Object.defineProperty(navigator, 'languages', {
-                        get: () => ['ko-KR', 'ko', 'en-US', 'en']
-                    });
-                '''
-            })
-            
-            print("✅ 스텔스 설정 적용 완료")
-            
+            print("Chrome 드라이버 시작 중... (macOS)")
+            print("단순 옵션으로 드라이버 시작...")
+
+            opts = uc.ChromeOptions()
+            # 설정에서 옵션 주입
+            for option in getattr(CoupangConfig, "CHROME_OPTIONS_SIMPLE", []):
+                opts.add_argument(option)
+
+            # 안정화 권장 옵션(중복되면 Chrome이 무시)
+            opts.add_argument("--disable-blink-features=AutomationControlled")
+            opts.add_argument("--disable-dev-shm-usage")
+            opts.add_argument("--no-sandbox")
+            opts.add_argument("--window-size=1920,1080")
+            if self.headless:
+                opts.add_argument("--headless=new")
+
+            # ✅ 핵심: use_subprocess=True, version_main=None
+            self.driver = uc.Chrome(
+                options=opts,
+                use_subprocess=True,
+                version_main=None
+            )
+
+            # 설정에서 제공하는 스텔스 스크립트 실행 (실패해도 무시)
+            try:
+                stealth_js = getattr(CoupangConfig, "WEBDRIVER_STEALTH_SCRIPT", None)
+                if stealth_js:
+                    self.driver.execute_script(stealth_js)
+            except Exception:
+                pass
+
+            # -----------------------
+            # ✅ 핵심: .get() 오토패치
+            # -----------------------
+            original_get = self.driver.get
+
+            def smart_get(url: Optional[str] = None):
+                # 쿠팡 + 딥링크 라면: referrer/쿠키 컨텍스트로 ‘클릭 이동’
+                if url and self._is_coupang_deeplink(url):
+                    return self.open_with_referrer(url)
+                # 그 외: 기존 동작
+                return original_get(url)
+
+            # driver.get 를 스마트 버전으로 바꿉니다 (monitoring.py 변경 불필요)
+            self.driver.get = smart_get  # type: ignore[attr-defined]
+
+            print("Chrome 드라이버 시작 완료")
+            return True
+
         except Exception as e:
-            print(f"⚠️ 스텔스 설정 실패 (계속 진행): {e}")
-    
+            print(f"드라이버 시작 실패: {e}")
+
+            # 최후의 수단: 아무 옵션 없이(그래도 use_subprocess 유지 권장)
+            try:
+                print("최후 수단: 기본 드라이버 시작...")
+                self.driver = uc.Chrome(use_subprocess=True, version_main=None)
+                print("기본 드라이버 시작 성공")
+
+                # .get 오토패치 (옵션 없는 드라이버에도 동일 적용)
+                original_get = self.driver.get
+                def smart_get(url: Optional[str] = None):
+                    if url and self._is_coupang_deeplink(url):
+                        return self.open_with_referrer(url)
+                    return original_get(url)
+                self.driver.get = smart_get  # type: ignore[attr-defined]
+
+                return True
+            except Exception as final_e:
+                print(f"모든 시도 실패: {final_e}")
+                return False
+
     def close(self):
         """브라우저 종료"""
         try:
@@ -128,38 +142,3 @@ class BrowserManager:
                 self.driver.quit()
         except:
             pass
-
-
-# ============ 테스트용 ============
-if __name__ == "__main__":
-    print("="*80)
-    print("🚨 긴급 수정 버전 테스트")
-    print("="*80)
-    
-    manager = BrowserManager(headless=False)
-    
-    if manager.start_driver():
-        print("\n✅ 드라이버 시작 성공!")
-        print("쿠팡 접속 테스트 중...")
-        
-        try:
-            manager.driver.get("https://www.coupang.com")
-            time.sleep(5)
-            
-            title = manager.driver.title
-            print(f"페이지 제목: {title}")
-            
-            if "차단" in title.lower() or "blocked" in title.lower():
-                print("❌ 여전히 차단됨")
-            else:
-                print("✅ 정상 접속!")
-            
-            input("\n확인 후 Enter를 눌러 종료...")
-            
-        except Exception as e:
-            print(f"❌ 테스트 실패: {e}")
-        
-        finally:
-            manager.close()
-    else:
-        print("❌ 드라이버 시작 실패")

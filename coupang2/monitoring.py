@@ -292,7 +292,7 @@ class ScrollExtractor:
 class CategoryMonitor:
     """순수 카테고리 모니터 (iHerb 매칭 제거!)"""
     
-    def __init__(self, category_config: dict, db_path: str = "monitoring_clean.db", 
+    def __init__(self, category_config: dict, db_path: str = "monitoring.db", 
                  headless: bool = True):
         """
         순수 모니터링 초기화
@@ -392,7 +392,7 @@ class CategoryMonitor:
 class MultiCategoryMonitoringSystem:
     """다중 카테고리 모니터링 시스템 (순수 크롤링)"""
     
-    def __init__(self, categories_config: list, db_path: str = "monitoring_clean.db", 
+    def __init__(self, categories_config: list, db_path: str = "monitoring.db", 
                  headless: bool = True):
         """
         다중 카테고리 모니터링 초기화
