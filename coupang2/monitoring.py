@@ -28,7 +28,6 @@ from selenium.webdriver.common.by import By
 # 간소화된 DB 임포트
 from database import MonitoringDatabase
 
-
 class ScrollExtractor:
     """무한 스크롤 상품 추출기"""
     
