@@ -190,13 +190,13 @@ class ScrollExtractor:
             return []
     
     def _parse_product_data(self, element, product_id: str, product_url: str) -> dict:
-        """상품 데이터 파싱"""
+        """상품 데이터 파싱 (개선 버전)"""
         try:
             html = element.get_attribute('outerHTML')
             soup = BeautifulSoup(html, 'html.parser')
             
-            # 상품명 (필수)
-            name_elem = soup.select_one('div.name, div.product-name, div[class*="name"]')
+            # 1. 상품명 (필수) - 정확한 셀렉터 사용
+            name_elem = soup.select_one('div.name')
             if not name_elem:
                 return None
             
@@ -204,64 +204,75 @@ class ScrollExtractor:
             if not product_name:
                 return None
             
-            # 가격
+            # 2. 현재가 (할인가)
             current_price = 0
-            price_selectors = ['strong.price-value', 'span.price-value', 'em.sale', 'span[class*="price"]']
-            for selector in price_selectors:
-                price_elem = soup.select_one(selector)
-                if price_elem:
-                    price_text = price_elem.get_text(strip=True)
-                    price_text = re.sub(r'[^\d]', '', price_text)
-                    if price_text:
-                        current_price = int(price_text)
-                        break
+            price_elem = soup.select_one('strong.price-value')
+            if price_elem:
+                price_text = price_elem.get_text(strip=True)
+                price_text = re.sub(r'[^\d]', '', price_text)  # 숫자만 추출
+                current_price = int(price_text) if price_text else 0
             
-            # 할인율
+            # 3. 정가 (원가)
+            original_price = 0
+            original_elem = soup.select_one('del.base-price')
+            if original_elem:
+                price_text = original_elem.get_text(strip=True)
+                price_text = re.sub(r'[^\d]', '', price_text)
+                original_price = int(price_text) if price_text else 0
+            
+            # 정가가 없으면 현재가를 정가로 사용
+            if original_price == 0:
+                original_price = current_price
+            
+            # 4. 할인율
             discount_rate = 0
-            discount_selectors = ['span.discount-percentage', 'em.discount-rate', 'span[class*="discount"]']
-            for selector in discount_selectors:
-                discount_elem = soup.select_one(selector)
-                if discount_elem:
-                    discount_text = discount_elem.get_text(strip=True)
-                    discount_text = re.sub(r'[^\d]', '', discount_text)
-                    if discount_text:
-                        discount_rate = int(discount_text)
-                        break
+            discount_elem = soup.select_one('span.discount-percentage')
+            if discount_elem:
+                discount_text = discount_elem.get_text(strip=True)
+                discount_text = re.sub(r'[^\d]', '', discount_text)
+                discount_rate = int(discount_text) if discount_text else 0
             
-            # 리뷰 수
+            # 5. 리뷰 수
             review_count = 0
-            review_selectors = ['span.rating-total-count', 'span[class*="review"]', 'em.rating-count']
-            for selector in review_selectors:
-                review_elem = soup.select_one(selector)
-                if review_elem:
-                    review_text = review_elem.get_text(strip=True)
-                    review_text = re.sub(r'[^\d]', '', review_text)
-                    if review_text:
-                        review_count = int(review_text)
-                        break
+            review_elem = soup.select_one('span.rating-total-count')
+            if review_elem:
+                review_text = review_elem.get_text(strip=True)
+                # "(26,789)" -> "26789"
+                review_text = re.sub(r'[^\d]', '', review_text)
+                review_count = int(review_text) if review_text else 0
             
-            # 평점
+            # 6. 평점
             rating_score = 0.0
-            rating_elem = soup.select_one('em.rating, span[class*="rating"]')
-            if rating_elem:
+            rating_elem = soup.select_one('div.rating-light')
+            if rating_elem and rating_elem.has_attr('data-rating'):
                 try:
-                    rating_text = rating_elem.get_text(strip=True)
-                    rating_score = float(re.sub(r'[^\d.]', '', rating_text))
+                    rating_score = float(rating_elem['data-rating'])
                 except:
-                    pass
+                    rating_score = 0.0
+            
+            # 7. 로켓배송 여부
+            is_rocket_delivery = bool(soup.select_one('span.badge.rocket'))
+            
+            # 8. 무료배송 여부
+            is_free_shipping = bool(soup.select_one('span.text.shippingtype'))
             
             return {
                 'product_id': product_id,
                 'product_name': product_name,
                 'product_url': product_url,
                 'current_price': current_price,
+                'original_price': original_price,
                 'discount_rate': discount_rate,
                 'review_count': review_count,
-                'rating_score': rating_score
+                'rating_score': rating_score,
+                'is_rocket_delivery': is_rocket_delivery,
+                'is_free_shipping': is_free_shipping
             }
-        except:
+            
+        except Exception as e:
+            print(f"  ⚠️ 상품 파싱 오류 (ID: {product_id}): {e}")
             return None
-    
+        
     def _scroll_to_bottom(self) -> bool:
         """스크롤 & 새 콘텐츠 확인"""
         try:
