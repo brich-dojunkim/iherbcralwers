@@ -2,10 +2,10 @@
 # -*- coding: utf-8 -*-
 
 """
-재설계된 모니터링 시스템 v2
-- 순수 크롤링만 수행 (매칭 로직 제거)
-- 로켓직구 / iHerb 공식 통합 지원
-- matching_reference는 참조만
+모니터링 시스템 (최종 개선 버전)
+- 터미널 콘솔 인터랙티브 선택 기능
+- 필터 미적용 시 워크플로우 개선
+- error_message 활용
 """
 
 import sys
@@ -13,7 +13,6 @@ import os
 import time
 import re
 import random
-import argparse
 from datetime import datetime
 from bs4 import BeautifulSoup
 
@@ -26,47 +25,108 @@ sys.path.insert(0, os.path.join(parent_dir, 'coupang'))
 from coupang.coupang_manager import BrowserManager
 from selenium.webdriver.common.by import By
 
-# 재설계된 DB 임포트
+# 개선된 DB 임포트
 from database import MonitoringDatabase
 
 
 class ScrollExtractor:
-    """무한 스크롤 상품 추출기 (기존 코드 재사용)"""
+    """무한 스크롤 상품 추출기 (최종 개선 버전)"""
     
     def __init__(self, browser_manager):
         self.browser = browser_manager
+        self.filter_applied = False
     
     @property
     def driver(self):
         return self.browser.driver if self.browser else None
     
-    def extract_all_products_with_scroll(self, page_url: str) -> list:
-        """무한 스크롤로 모든 상품 추출"""
+    def extract_all_products_with_scroll(self, page_url: str, max_retry_filter: int = 3) -> tuple:
+        """
+        무한 스크롤로 모든 상품 추출
+        
+        Args:
+            page_url: 크롤링할 페이지 URL
+            max_retry_filter: 필터 적용 최대 재시도 횟수
+        
+        Returns:
+            (products_list, filter_applied, error_message)
+            - products_list: 상품 리스트 (실패 시 [])
+            - filter_applied: 필터 적용 여부
+            - error_message: 에러 메시지 (없으면 None)
+        """
         if not self.driver:
-            print("❌ 브라우저 드라이버가 초기화되지 않았습니다")
-            return []
+            return [], False, "브라우저 드라이버 초기화 실패"
+        
+        # 필터 적용 재시도 로직
+        for attempt in range(max_retry_filter):
+            try:
+                print(f"📜 무한 스크롤 크롤링 시작 (시도 {attempt + 1}/{max_retry_filter}): {page_url}")
+                self.driver.get(page_url)
+                time.sleep(random.uniform(3, 5))
+                
+                # 판매량순 필터 적용 시도
+                filter_success = self._click_sales_filter()
+                
+                if filter_success:
+                    self.filter_applied = True
+                    break
+                else:
+                    if attempt < max_retry_filter - 1:
+                        print(f"  ⚠️  필터 적용 실패, 페이지 새로고침 후 재시도... ({attempt + 1}/{max_retry_filter})")
+                        time.sleep(3)
+                    else:
+                        # 3회 시도 실패 - 사용자에게 선택 요청
+                        print(f"\n{'='*70}")
+                        print(f"⚠️  {max_retry_filter}회 시도 후에도 판매량순 필터 적용 실패")
+                        print(f"{'='*70}")
+                        print(f"선택지:")
+                        print(f"  1. 'skip'  - 이 URL을 건너뛰고 다음 작업으로 진행")
+                        print(f"  2. 'abort' - 전체 크롤링 중단")
+                        print(f"  3. 'force' - 필터 없이 강제 크롤링 (⚠️ 나중에 삭제 필요)")
+                        print(f"{'='*70}")
+                        
+                        while True:
+                            user_input = input("선택 (skip/abort/force): ").strip().lower()
+                            
+                            if user_input == 'skip':
+                                print("  ⏭️  이 URL을 건너뛰고 다음 작업으로 진행합니다")
+                                return [], False, "판매량순 필터 적용 실패 - 사용자가 skip 선택"
+                            
+                            elif user_input == 'abort':
+                                print("  🛑 전체 크롤링을 중단합니다")
+                                return [], False, "판매량순 필터 적용 실패 - 사용자가 abort 선택"
+                            
+                            elif user_input == 'force':
+                                print("  ⚠️  필터 없이 강제 크롤링을 진행합니다")
+                                print("  ⚠️  주의: 이 스냅샷은 나중에 반드시 삭제해야 합니다!")
+                                self.filter_applied = False
+                                break
+                            
+                            else:
+                                print(f"  ❌ 잘못된 입력: '{user_input}'. skip, abort, force 중 하나를 입력하세요.")
+                        
+                        break
+            
+            except Exception as e:
+                error_msg = f"페이지 로드 오류 (시도 {attempt + 1}): {e}"
+                print(f"  ❌ {error_msg}")
+                if attempt < max_retry_filter - 1:
+                    time.sleep(5)
+                else:
+                    return [], False, error_msg
+        
+        # 스크롤 크롤링 시작
+        all_products = []
+        seen_product_ids = set()
+        scroll_count = 0
+        max_scrolls = 200
+        no_new_products_count = 0
+        max_no_new_attempts = 15
+        consecutive_no_height_change = 0
+        
+        print("🔄 상품 수집 중...")
         
         try:
-            print(f"📜 무한 스크롤 크롤링 시작: {page_url}")
-            self.driver.get(page_url)
-            time.sleep(random.uniform(3, 5))
-            
-            # 판매량순 필터 적용
-            self._click_sales_filter()
-            
-            all_products = []
-            seen_product_ids = set()
-            scroll_count = 0
-            max_scrolls = 200
-            no_new_products_count = 0
-            max_no_new_attempts = 15
-            consecutive_no_height_change = 0
-            
-            print("🔄 상품 수집 중...")
-            
-            last_dom_count = 0
-            same_count_runs = 0  # DOM 상품 수가 동일하게 유지된 연속 횟수
-
             while scroll_count < max_scrolls:
                 scroll_count += 1
                 
@@ -86,48 +146,19 @@ class ScrollExtractor:
                 
                 if not height_changed:
                     consecutive_no_height_change += 1
-                    if consecutive_no_height_change >= 8 and no_new_products_count >= 8:
+                    if consecutive_no_height_change >= 5 and no_new_products_count >= 5:
                         print(f"🏁 더 이상 신규 상품이 없습니다")
                         break
                 else:
                     consecutive_no_height_change = 0
                 
-                # 현재 DOM에 보이는 상품 li 개수 (셀렉터 기준)
-                try:
-                    dom_count = len(self.driver.find_elements(By.CSS_SELECTOR, 'li.product-wrap'))
-                except:
-                    dom_count = 0
-
-                if dom_count == last_dom_count:
-                    same_count_runs += 1
-                else:
-                    same_count_runs = 0
-                last_dom_count = dom_count
-
-                # --- 강화된 종료 조건 ---
-                # 1) 페이지 높이 변화 없음이 누적되고
-                # 2) DOM 상품 수가 여러 번 연속 그대로이고
-                # 3) 로더가 보이지 않으며
-                # 4) 실제 바닥에 닿아있다면 → 종료
-                END_SAME_COUNT_THRESH = 5
-                NO_HEIGHT_THRESH = 5
-
-                if (not height_changed and
-                    consecutive_no_height_change >= NO_HEIGHT_THRESH and
-                    same_count_runs >= END_SAME_COUNT_THRESH and
-                    not self._loader_visible() and
-                    self._at_bottom()):
-                    print("🏁 바닥 도달 + 로더 없음 + 상품 수 정지 → 스크롤 종료")
-                    break
-
                 if no_new_products_count >= max_no_new_attempts:
                     print(f"🏁 {max_no_new_attempts}회 연속 신규 없음, 크롤링 종료")
                     break
                 
-                # 스크롤 간 대기 시간 증가 (봇 감지 회피)
-                time.sleep(random.uniform(2, 3))
+                time.sleep(random.uniform(1, 2))
             
-            # 순위 할당 (DOM 순서 = 순위)
+            # 순위 할당
             ranked_products = []
             for rank, product in enumerate(all_products, 1):
                 product['rank'] = rank
@@ -136,15 +167,15 @@ class ScrollExtractor:
             print(f"✅ 무한 스크롤 완료: 총 {len(ranked_products)}개 상품 수집")
             
             # 순위 검증
-            self._verify_ranks(ranked_products)
+            if ranked_products:
+                self._verify_ranks(ranked_products)
             
-            return ranked_products
+            return ranked_products, self.filter_applied, None
             
         except Exception as e:
-            print(f"❌ 크롤링 오류: {e}")
-            import traceback
-            traceback.print_exc()
-            return []
+            error_msg = f"스크롤 크롤링 중 오류: {e}"
+            print(f"❌ {error_msg}")
+            return [], False, error_msg
     
     def _verify_ranks(self, products: list):
         """순위 무결성 검증"""
@@ -165,7 +196,7 @@ class ScrollExtractor:
         
         print(f"  ✅ 순위 검증 완료: 1~{len(products)}위")
     
-    def _click_sales_filter(self):
+    def _click_sales_filter(self) -> bool:
         """판매량순 필터 클릭"""
         try:
             print("🔍 판매량순 필터 적용 중...")
@@ -179,13 +210,16 @@ class ScrollExtractor:
                         button.click()
                         print("✅ 판매량순 필터 적용 완료")
                         time.sleep(3)
-                        return
+                        return True
                 except:
                     continue
             
-            print("⚠️ 판매량순 필터 없음 (기본 정렬 사용)")
+            print("⚠️ 판매량순 필터 없음")
+            return False
+            
         except Exception as e:
             print(f"⚠️ 필터 적용 오류: {e}")
+            return False
     
     def _extract_products_from_current_page(self, seen_product_ids: set) -> list:
         """현재 페이지에서 신규 상품만 추출"""
@@ -238,7 +272,7 @@ class ScrollExtractor:
             if not product_name:
                 return None
             
-            # 2. 현재가 (할인가)
+            # 2. 현재가
             current_price = 0
             price_elem = soup.select_one('strong.price-value')
             if price_elem:
@@ -246,7 +280,7 @@ class ScrollExtractor:
                 price_text = re.sub(r'[^\d]', '', price_text)
                 current_price = int(price_text) if price_text else 0
             
-            # 3. 정가 (원가)
+            # 3. 정가
             original_price = 0
             original_elem = soup.select_one('del.base-price')
             if original_elem:
@@ -274,184 +308,88 @@ class ScrollExtractor:
                 review_count = int(review_text) if review_text else 0
             
             # 6. 평점
-            rating = 0.0
-            rating_elem = soup.select_one('span.rating')
-            if rating_elem:
-                rating_text = rating_elem.get_text(strip=True)
-                rating_text = rating_text.replace('별점', '').strip()
+            rating_score = 0.0
+            rating_elem = soup.select_one('div.rating-light')
+            if rating_elem and rating_elem.has_attr('data-rating'):
                 try:
-                    rating = float(rating_text)
+                    rating_score = float(rating_elem['data-rating'])
                 except:
-                    rating = 0.0
+                    rating_score = 0.0
             
-            # 7. 배지
-            badge = ""
-            badge_elem = soup.select_one('span.badge-text')
-            if badge_elem:
-                badge = badge_elem.get_text(strip=True)
+            # 7. 로켓배송
+            is_rocket_delivery = bool(soup.select_one('span.badge.rocket'))
             
-            # 8. 썸네일
-            thumbnail_url = ""
-            img_elem = soup.select_one('img.product-image')
-            if img_elem:
-                thumbnail_url = img_elem.get('src', '')
+            # 8. 무료배송
+            is_free_shipping = bool(soup.select_one('span.text.shippingtype'))
             
             return {
                 'product_id': product_id,
                 'product_name': product_name,
+                'product_url': product_url,
                 'current_price': current_price,
                 'original_price': original_price,
                 'discount_rate': discount_rate,
                 'review_count': review_count,
-                'rating': rating,
-                'badge': badge,
-                'product_url': product_url,
-                'thumbnail_url': thumbnail_url
+                'rating_score': rating_score,
+                'is_rocket_delivery': is_rocket_delivery,
+                'is_free_shipping': is_free_shipping
             }
-        except:
+            
+        except Exception as e:
             return None
     
     def _scroll_to_bottom(self) -> bool:
-        """페이지 하단으로 스크롤 (로딩바 확실히 트리거: 크게 올렸다가 다시 끝까지 내림)"""
+        """스크롤 & 새 콘텐츠 확인"""
         try:
             last_height = self.driver.execute_script("return document.body.scrollHeight")
-            viewport_h = self.driver.execute_script("return window.innerHeight || document.documentElement.clientHeight || 800")
-
-            # 현재 스크롤 위치
-            current_y = self.driver.execute_script("return window.pageYOffset || document.documentElement.scrollTop || 0")
-
-            # 1) 먼저 자연스러운 하향 스텝 스크롤로 끝까지 진입
-            steps = 5
-            target_y = last_height
-            step = max(1, int((target_y - current_y) / steps))
-            for i in range(steps):
-                self.driver.execute_script(f"window.scrollTo(0, {int(current_y + step*(i+1))});")
-                time.sleep(random.uniform(0.25, 0.5))
-
-            # 2) 로딩바를 유발하기 위해 '크게' 위로 올렸다가(뷰포트 0.8~1.2배) 다시 내림
-            bump_up = int(viewport_h * random.uniform(0.9, 1.3))
-            self.driver.execute_script(f"window.scrollBy(0, {-bump_up});")  # 크게 위로
-            time.sleep(random.uniform(0.7, 1.2))
-
-            # 3) 다시 끝까지 + 여유분으로 내리기 (트리거 강제)
+            
+            # 천천히 단계적으로 스크롤
+            scroll_steps = random.randint(3, 5)
+            for i in range(scroll_steps):
+                scroll_amount = (last_height / scroll_steps) * (i + 1)
+                self.driver.execute_script(f"window.scrollTo(0, {scroll_amount});")
+                time.sleep(0.3)
+            
+            # 완전히 끝까지
             self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-            # 하단 여유로 추가 스크롤 (일부 페이지는 끝자락 추가 이동이 트리거 됨)
-            self.driver.execute_script("window.scrollBy(0, 300);")
-            time.sleep(random.uniform(0.6, 1.0))
-
-            # 4) 로딩바/높이 변화 대기 (최대 12초)
-            #    - 높이 증가 또는 로딩 요소가 보였다가 사라지는 경우를 감지
-            def has_loader():
-                return self.driver.execute_script("""
-                    const sels = [
-                    '.loading', '.loading-bar', '.progress', '.spinner',
-                    '.infinite-loader', '.search-loading-indicator'
-                    ];
-                    for (const s of sels) {
-                    const el = document.querySelector(s);
-                    if (el && getComputedStyle(el).display !== 'none' && el.offsetParent !== null) return true;
-                    }
-                    return false;
-                """)
-
-            saw_loader = False
-            for _ in range(12):
-                time.sleep(1)
-                new_height = self.driver.execute_script("return document.body.scrollHeight")
-                if has_loader():
-                    saw_loader = True
-                if new_height > last_height:
-                    print(f"    ↓ 페이지 확장됨: {last_height} -> {new_height}")
-                    return True
-
-            # 5) 첫 시도 실패 시 한 번 더 공격적으로 '큰 범프' 재시도
-            #    (현재 높이의 10% 지점으로 점프 후 다시 끝까지)
-            self.driver.execute_script("window.scrollTo(0, Math.floor(document.body.scrollHeight * 0.9));")
-            time.sleep(random.uniform(0.4, 0.8))
-            self.driver.execute_script(f"window.scrollBy(0, {-int(viewport_h * 1.2)});")  # 더 크게 올림
-            time.sleep(random.uniform(0.6, 1.0))
-            self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-            self.driver.execute_script("window.scrollBy(0, 500);")  # 여유분 더 크게
-            time.sleep(random.uniform(0.6, 1.0))
-
-            for _ in range(10):
+            
+            # 새 콘텐츠 로딩 대기
+            for _ in range(5):
                 time.sleep(1)
                 new_height = self.driver.execute_script("return document.body.scrollHeight")
                 if new_height > last_height:
-                    print(f"    ↓ 페이지 확장됨(2차): {last_height} -> {new_height}")
                     return True
-
-            # 높이 변화가 없더라도 로더를 봤다면 다음 루프에서 변화를 기대
-            if saw_loader:
-                print("    ↺ 로딩바 감지됨(높이 변화 대기 중이었음)")
+            
             return False
-
-        except Exception as e:
-            print(f"    ⚠️ 스크롤 오류: {e}")
-            return False
-
-    def _at_bottom(self) -> bool:
-        """뷰포트가 실질적으로 페이지 바닥에 닿았는지"""
-        try:
-            return self.driver.execute_script("""
-                const scrollY = window.scrollY || window.pageYOffset || 0;
-                const innerH = window.innerHeight || document.documentElement.clientHeight || 0;
-                const docH = document.body.scrollHeight || 0;
-                return (scrollY + innerH) >= (docH - 4);  // 4px 여유
-            """) is True
-        except:
-            return False
-
-    def _loader_visible(self) -> bool:
-        """무한스크롤 로더가 보이는지(일반적인 클래스들 대상)"""
-        try:
-            return self.driver.execute_script("""
-                const sels = [
-                    '.loading', '.loading-bar', '.progress', '.spinner',
-                    '.infinite-loader', '.search-loading-indicator'
-                ];
-                for (const s of sels) {
-                    const el = document.querySelector(s);
-                    if (el && getComputedStyle(el).display !== 'none' && el.offsetParent !== null) {
-                        return true;
-                    }
-                }
-                return false;
-            """) is True
         except:
             return False
 
 
-class UnifiedMonitor:
-    """통합 모니터 (로켓직구 + iHerb 공식)"""
+class CategoryMonitor:
+    """카테고리 모니터 (최종 개선 버전)"""
     
-    def __init__(self, source_type: str, config: dict, 
+    def __init__(self, source_config: dict, category_config: dict, 
                  db_path: str = "monitoring.db", headless: bool = True):
-        """
-        통합 모니터 초기화
-        
-        Args:
-            source_type: 'rocket_direct' or 'iherb_official'
-            config: 설정 딕셔너리 (name, url, category_id 등)
-            db_path: DB 경로
-            headless: 헤드리스 모드
-        """
-        self.source_type = source_type
-        self.config = config
+        """모니터 초기화"""
+        self.source_config = source_config
+        self.category_config = category_config
         self.db = MonitoringDatabase(db_path)
         self.browser = BrowserManager(headless=headless)
         self.extractor = None
         
-        # 카테고리 등록
-        if config.get('category_id'):
-            self.category_id = self.db.register_category(
-                config['name'], 
-                config['category_id']
-            )
-        else:
-            self.category_id = None
+        # 소스 및 카테고리 등록
+        self.source_id = self.db.register_source(
+            source_config['type'],
+            source_config['name'],
+            source_config['base_url']
+        )
         
-        print(f"✅ {config['name']} 모니터 초기화 완료 ({source_type})")
+        self.category_id = self.db.register_category(
+            category_config['name'],
+            category_config['url_path']
+        )
+        
+        print(f"✅ {category_config['name']} 모니터 초기화 완료 ({source_config['type']})")
     
     def start_driver(self) -> bool:
         """브라우저 드라이버 시작"""
@@ -465,63 +403,104 @@ class UnifiedMonitor:
     
     def run_monitoring_cycle(self) -> dict:
         """모니터링 사이클 실행"""
-        name = self.config['name']
-        page_url = self.config['url']
+        category_name = self.category_config['name']
+        source_name = self.source_config['name']
+        
+        # 전체 URL 생성
+        page_url = self.source_config['base_url'] + self.category_config['url_path']
         
         print(f"\n{'='*70}")
-        print(f"📊 [{name}] 모니터링 시작: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        print(f"📍 소스: {self.source_type}")
+        print(f"📊 [{category_name}] 모니터링 시작: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"📍 소스: {source_name}")
         print(f"{'='*70}")
         
         start_time = time.time()
         
         try:
             if not self.extractor:
-                print(f"❌ Extractor 초기화 안됨")
-                return None
+                return {
+                    'success': False,
+                    'error_message': 'Extractor 초기화 실패',
+                    'action': 'continue'
+                }
             
             # 1. 페이지 크롤링
             print(f"\n[1/2] 📜 페이지 크롤링 중...")
-            current_products = self.extractor.extract_all_products_with_scroll(page_url)
+            current_products, filter_applied, error_message = self.extractor.extract_all_products_with_scroll(page_url)
             
+            # 크롤링 실패 처리
             if not current_products:
                 print(f"❌ 상품 수집 실패")
-                return None
+                
+                # error_message에 따라 워크플로우 결정
+                if error_message and 'abort' in error_message.lower():
+                    return {
+                        'success': False,
+                        'error_message': error_message,
+                        'action': 'abort'  # 전체 중단
+                    }
+                else:
+                    return {
+                        'success': False,
+                        'error_message': error_message or '상품 수집 실패',
+                        'action': 'continue'  # 다음 작업 진행
+                    }
             
             print(f"✅ {len(current_products)}개 상품 수집 완료")
             
-            # 2. 스냅샷 저장 (순수 크롤링 데이터만)
+            # 필터 미적용 경고
+            if not filter_applied:
+                print(f"\n⚠️⚠️⚠️  주의: 판매량순 필터가 적용되지 않았습니다!")
+                print(f"⚠️⚠️⚠️  이 스냅샷은 나중에 삭제해야 합니다!")
+            
+            # 2. 스냅샷 저장
             print(f"\n[2/2] 💾 스냅샷 저장 중...")
             crawl_duration = time.time() - start_time
             
             try:
                 snapshot_id = self.db.save_snapshot(
-                    self.source_type,
-                    self.category_id,
-                    page_url,
-                    current_products,
-                    crawl_duration
+                    self.source_id, self.category_id, page_url, 
+                    current_products, crawl_duration, 
+                    snapshot_time=datetime.now(),
+                    error_message=None if filter_applied else "판매량순 필터 미적용"
                 )
                 print(f"✅ 스냅샷 저장 완료: ID {snapshot_id}")
+                
+                if not filter_applied:
+                    print(f"\n⚠️  삭제 명령어:")
+                    print(f"   DELETE FROM product_states WHERE snapshot_id = {snapshot_id};")
+                    print(f"   DELETE FROM snapshots WHERE id = {snapshot_id};")
+                
             except ValueError as e:
-                print(f"❌ 스냅샷 저장 실패: {e}")
-                return None
+                return {
+                    'success': False,
+                    'error_message': f'스냅샷 저장 실패: {e}',
+                    'action': 'continue'
+                }
             
             print(f"\n{'='*70}")
-            print(f"✅ [{name}] 모니터링 완료 (소요시간: {crawl_duration:.1f}초)")
+            print(f"✅ [{category_name}] 모니터링 완료 (소요시간: {crawl_duration:.1f}초)")
             print(f"{'='*70}\n")
             
             return {
+                'success': True,
                 'snapshot_id': snapshot_id,
                 'product_count': len(current_products),
-                'crawl_duration': crawl_duration
+                'crawl_duration': crawl_duration,
+                'filter_applied': filter_applied,
+                'error_message': None,
+                'action': 'continue'
             }
             
         except Exception as e:
-            print(f"❌ [{name}] 모니터링 오류: {e}")
+            print(f"❌ [{category_name}] 모니터링 오류: {e}")
             import traceback
             traceback.print_exc()
-            return None
+            return {
+                'success': False,
+                'error_message': str(e),
+                'action': 'continue'
+            }
     
     def close(self):
         """리소스 정리"""
@@ -529,145 +508,287 @@ class UnifiedMonitor:
             self.browser.close()
 
 
+class MultiCategoryMonitoringSystem:
+    """다중 카테고리 모니터링 시스템 (최종 개선 버전)"""
+    
+    def __init__(self, sources_config: list, categories_config: list,
+                 db_path: str = "monitoring.db", headless: bool = True):
+        """초기화"""
+        self.sources_config = sources_config
+        self.categories_config = categories_config
+        self.db_path = db_path
+        self.headless = headless
+    
+    def interactive_selection(self) -> tuple:
+        """
+        터미널 콘솔에서 인터랙티브하게 소스와 카테고리 선택
+        
+        Returns:
+            (selected_sources, selected_categories)
+        """
+        print(f"\n{'='*70}")
+        print(f"🎯 크롤링 대상 선택")
+        print(f"{'='*70}\n")
+        
+        # 1. 소스 선택
+        print("📍 소스 선택:")
+        print("  0. 전체 소스")
+        for i, source in enumerate(self.sources_config, 1):
+            print(f"  {i}. {source['name']} ({source['type']})")
+        
+        while True:
+            source_input = input("\n소스 번호 선택 (쉼표로 구분, 예: 1,2 또는 0): ").strip()
+            
+            if source_input == '0':
+                selected_sources = None
+                print("  ✅ 전체 소스 선택됨")
+                break
+            
+            try:
+                source_indices = [int(x.strip()) for x in source_input.split(',')]
+                selected_sources = [self.sources_config[i-1]['type'] for i in source_indices if 1 <= i <= len(self.sources_config)]
+                
+                if selected_sources:
+                    print(f"  ✅ 선택된 소스: {', '.join(selected_sources)}")
+                    break
+                else:
+                    print(f"  ❌ 유효하지 않은 번호입니다. 다시 선택하세요.")
+            except (ValueError, IndexError):
+                print(f"  ❌ 잘못된 입력입니다. 숫자를 쉼표로 구분해서 입력하세요.")
+        
+        # 2. 카테고리 선택
+        print(f"\n📂 카테고리 선택:")
+        print("  0. 전체 카테고리")
+        for i, category in enumerate(self.categories_config, 1):
+            print(f"  {i}. {category['name']}")
+        
+        while True:
+            category_input = input("\n카테고리 번호 선택 (쉼표로 구분, 예: 1,2 또는 0): ").strip()
+            
+            if category_input == '0':
+                selected_categories = None
+                print("  ✅ 전체 카테고리 선택됨")
+                break
+            
+            try:
+                category_indices = [int(x.strip()) for x in category_input.split(',')]
+                selected_categories = [self.categories_config[i-1]['name'] for i in category_indices if 1 <= i <= len(self.categories_config)]
+                
+                if selected_categories:
+                    print(f"  ✅ 선택된 카테고리: {', '.join(selected_categories)}")
+                    break
+                else:
+                    print(f"  ❌ 유효하지 않은 번호입니다. 다시 선택하세요.")
+            except (ValueError, IndexError):
+                print(f"  ❌ 잘못된 입력입니다. 숫자를 쉼표로 구분해서 입력하세요.")
+        
+        print(f"{'='*70}\n")
+        
+        return selected_sources, selected_categories
+    
+    def run_full_monitoring_cycle(self, cycles: int = 1, 
+                                  selected_sources: list = None,
+                                  selected_categories: list = None,
+                                  interactive: bool = False):
+        """
+        전체 카테고리 모니터링 사이클 실행
+        
+        Args:
+            cycles: 반복 횟수
+            selected_sources: 선택한 소스 타입 리스트
+            selected_categories: 선택한 카테고리 이름 리스트
+            interactive: True이면 터미널에서 인터랙티브하게 선택
+        """
+        # 인터랙티브 선택
+        if interactive:
+            selected_sources, selected_categories = self.interactive_selection()
+        
+        # 필터링
+        sources_to_run = self.sources_config
+        if selected_sources:
+            sources_to_run = [s for s in self.sources_config if s['type'] in selected_sources]
+        
+        categories_to_run = self.categories_config
+        if selected_categories:
+            categories_to_run = [c for c in self.categories_config if c['name'] in selected_categories]
+        
+        total_jobs = len(sources_to_run) * len(categories_to_run)
+        
+        print(f"\n{'='*70}")
+        print(f"🎯 모니터링 시작")
+        print(f"{'='*70}")
+        print(f"소스: {', '.join([s['name'] for s in sources_to_run])}")
+        print(f"카테고리: {', '.join([c['name'] for c in categories_to_run])}")
+        print(f"총 작업: {total_jobs}개")
+        print(f"사이클: {cycles}회")
+        print(f"{'='*70}\n")
+        
+        # 통계
+        stats = {
+            'total': 0,
+            'success': 0,
+            'failed': 0,
+            'skipped': 0,
+            'filter_not_applied': 0
+        }
+        
+        for cycle in range(cycles):
+            if cycles > 1:
+                print(f"\n{'='*70}")
+                print(f"🔄 사이클 [{cycle + 1}/{cycles}]")
+                print(f"{'='*70}\n")
+            
+            job_num = 1
+            
+            for source_config in sources_to_run:
+                for category_config in categories_to_run:
+                    print(f"\n{'='*70}")
+                    print(f"📂 [{job_num}/{total_jobs}] [{source_config['name']}] {category_config['name']}")
+                    print(f"{'='*70}")
+                    
+                    stats['total'] += 1
+                    
+                    monitor = CategoryMonitor(
+                        source_config=source_config,
+                        category_config=category_config,
+                        db_path=self.db_path,
+                        headless=self.headless
+                    )
+                    
+                    try:
+                        if not monitor.start_driver():
+                            print(f"❌ 브라우저 시작 실패\n")
+                            stats['failed'] += 1
+                            job_num += 1
+                            continue
+                        
+                        result = monitor.run_monitoring_cycle()
+                        
+                        # 결과 처리
+                        if result['success']:
+                            stats['success'] += 1
+                            if not result.get('filter_applied', True):
+                                stats['filter_not_applied'] += 1
+                            print(f"✅ 성공: {result['product_count']}개 제품")
+                        else:
+                            # abort 시 전체 중단
+                            if result.get('action') == 'abort':
+                                print(f"\n🛑 사용자 요청으로 전체 크롤링을 중단합니다")
+                                monitor.close()
+                                self._print_final_stats(stats)
+                                return
+                            
+                            # skip/continue 시 다음 작업 진행
+                            stats['skipped'] += 1
+                            print(f"⏭️  건너뜀: {result.get('error_message', '알 수 없는 오류')}")
+                    
+                    except KeyboardInterrupt:
+                        print(f"\n⚠️ 사용자 중단 (Ctrl+C)")
+                        monitor.close()
+                        self._print_final_stats(stats)
+                        return
+                    except Exception as e:
+                        print(f"❌ 오류: {e}")
+                        stats['failed'] += 1
+                    finally:
+                        monitor.close()
+                    
+                    job_num += 1
+                    
+                    # 작업 간 대기
+                    if job_num <= total_jobs:
+                        wait_time = 30
+                        print(f"\n⏰ 다음 작업까지 {wait_time}초 대기...\n")
+                        time.sleep(wait_time)
+            
+            # 사이클 간 대기
+            if cycle < cycles - 1:
+                print(f"\n⏰ 다음 사이클까지 10분 대기...\n")
+                time.sleep(600)
+        
+        # 최종 통계 출력
+        self._print_final_stats(stats)
+    
+    def _print_final_stats(self, stats: dict):
+        """최종 통계 출력"""
+        print(f"\n{'='*70}")
+        print(f"🎉 모니터링 완료!")
+        print(f"{'='*70}")
+        print(f"총 작업: {stats['total']}개")
+        print(f"  ✅ 성공: {stats['success']}개")
+        print(f"  ❌ 실패: {stats['failed']}개")
+        print(f"  ⏭️  건너뜀: {stats['skipped']}개")
+        if stats['filter_not_applied'] > 0:
+            print(f"  ⚠️  필터 미적용: {stats['filter_not_applied']}개 (삭제 필요!)")
+        print(f"{'='*70}\n")
+
+
 def main():
     """메인 함수"""
     
-    parser = argparse.ArgumentParser(description='통합 모니터링 시스템 v2')
-    parser.add_argument('--source', choices=['rocket', 'official'],
-                       help='모니터링 소스: rocket(로켓직구) or official(아이허브 공식) - 생략 시 모두 실행')
-    parser.add_argument('--category', help='특정 카테고리만 (생략 시 전체)')
-    parser.add_argument('--headless', action='store_true', help='헤드리스 모드')
-    parser.add_argument('--db', default='monitoring.db', help='DB 파일 경로')
+    # 소스 설정
+    sources = [
+        {
+            'type': 'rocket_direct',
+            'name': '로켓직구',
+            'base_url': 'https://shop.coupang.com/coupangus/74511'
+        },
+        {
+            'type': 'iherb_official',
+            'name': 'iHerb 공식',
+            'base_url': 'https://shop.coupang.com/iherb/135493'
+        }
+    ]
     
-    args = parser.parse_args()
+    # 카테고리 설정
+    categories = [
+        {
+            'name': '헬스/건강식품',
+            'url_path': '?category=305433&platform=p&brandId=0'
+        },
+        {
+            'name': '출산유아동',
+            'url_path': '?category=219079&platform=p&brandId=0'
+        },
+        {
+            'name': '스포츠레저',
+            'url_path': '?category=317675&platform=p&brandId=0'
+        }
+    ]
     
-    # 소스 리스트 결정
-    if args.source:
-        # 특정 소스만 실행
-        sources = [args.source]
-    else:
-        # 모든 소스 실행
-        sources = ['rocket', 'official']
+    # 모니터링 시스템 생성
+    monitoring_system = MultiCategoryMonitoringSystem(
+        sources_config=sources,
+        categories_config=categories,
+        db_path="monitoring.db",
+        headless=False
+    )
     
-    # 모든 소스별 설정 생성
-    all_source_configs = []
-    
-    for source in sources:
-        if source == 'rocket':
-            source_type = 'rocket_direct'
-            
-            # 로켓직구 카테고리 설정
-            categories = [
-                {
-                    'name': '헬스/건강식품',
-                    'category_id': '305433',
-                    'url': 'https://shop.coupang.com/coupangus/74511?category=305433&platform=p&brandId=0'
-                },
-                {
-                    'name': '출산유아동',
-                    'category_id': '219079',
-                    'url': 'https://shop.coupang.com/coupangus/74511?category=219079&platform=p&brandId=0'
-                },
-                {
-                    'name': '스포츠레저',
-                    'category_id': '317675',
-                    'url': 'https://shop.coupang.com/coupangus/74511?category=317675&platform=p&brandId=0'
-                }
-            ]
+    try:
+        # ===== 사용 방법 =====
         
-        else:  # official
-            source_type = 'iherb_official'
-            
-            # iHerb 공식 스토어 설정 (로켓직구와 동일한 카테고리)
-            # storeId: 135493 (125596 아님!)
-            categories = [
-                {
-                    'name': '헬스/건강식품',
-                    'category_id': '305433',
-                    'url': 'https://shop.coupang.com/iherb/135493?category=305433&platform=p&brandId=0&source=brandstore_direct'
-                },
-                {
-                    'name': '출산유아동',
-                    'category_id': '219079',
-                    'url': 'https://shop.coupang.com/iherb/135493?category=219079&platform=p&brandId=0&source=brandstore_direct'
-                },
-                {
-                    'name': '스포츠레저',
-                    'category_id': '317675',
-                    'url': 'https://shop.coupang.com/iherb/135493?category=317675&platform=p&brandId=0&source=brandstore_direct'
-                }
-            ]
-        
-        # 특정 카테고리 필터
-        if args.category:
-            categories = [c for c in categories if args.category.lower() in c['name'].lower()]
-            if not categories:
-                continue
-        
-        # 소스별 설정 추가
-        for cat in categories:
-            all_source_configs.append({
-                'source_type': source_type,
-                'config': cat
-            })
-    
-    # 설정이 없으면 종료
-    if not all_source_configs:
-        print(f"❌ 실행할 소스/카테고리가 없습니다")
-        return
-    
-    print(f"\n{'='*70}")
-    print(f"🎯 모니터링 시작")
-    print(f"{'='*70}")
-    print(f"소스: {', '.join(sources)}")
-    print(f"총 작업: {len(all_source_configs)}개")
-    for idx, sc in enumerate(all_source_configs, 1):
-        print(f"  {idx}. [{sc['source_type']}] {sc['config']['name']}")
-    print(f"{'='*70}\n")
-    
-    # 순차 실행
-    for i, source_config in enumerate(all_source_configs, 1):
-        print(f"\n{'='*70}")
-        print(f"📂 [{i}/{len(all_source_configs)}] [{source_config['source_type']}] {source_config['config']['name']}")
-        print(f"{'='*70}")
-        
-        monitor = UnifiedMonitor(
-            source_type=source_config['source_type'],
-            config=source_config['config'],
-            db_path=args.db,
-            headless=args.headless
+        # 1. 인터랙티브 모드 (터미널에서 선택)
+        monitoring_system.run_full_monitoring_cycle(
+            cycles=1,
+            interactive=True  # 이것만 True로 설정하면 됨!
         )
         
-        try:
-            if not monitor.start_driver():
-                print(f"❌ 브라우저 시작 실패\n")
-                continue
-            
-            result = monitor.run_monitoring_cycle()
-            
-            if result:
-                print(f"✅ 성공: {result['product_count']}개 제품")
-            else:
-                print(f"❌ 실패")
+        # 2. 전체 크롤링
+        # monitoring_system.run_full_monitoring_cycle(cycles=1)
         
-        except KeyboardInterrupt:
-            print(f"\n⚠️ 사용자 중단")
-            monitor.close()
-            return
-        except Exception as e:
-            print(f"❌ 오류: {e}")
-        finally:
-            monitor.close()
+        # 3. 프로그래밍 방식 선택
+        # monitoring_system.run_full_monitoring_cycle(
+        #     cycles=1,
+        #     selected_sources=['rocket_direct'],
+        #     selected_categories=['헬스/건강식품']
+        # )
         
-        # 작업 간 대기
-        if i < len(all_source_configs):
-            wait_time = 30
-            print(f"\n⏰ 다음 작업까지 {wait_time}초 대기...\n")
-            time.sleep(wait_time)
-    
-    print(f"\n{'='*70}")
-    print(f"🎉 모든 모니터링 완료!")
-    print(f"{'='*70}\n")
+    except KeyboardInterrupt:
+        print("\n⚠️ 모니터링 중단됨")
+    except Exception as e:
+        print(f"❌ 시스템 오류: {e}")
+        import traceback
+        traceback.print_exc()
 
 
 if __name__ == "__main__":
