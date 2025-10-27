@@ -732,7 +732,7 @@ def main():
             'type': 'rocket_direct',
             'name': '로켓직구',
             'base_url': 'https://shop.coupang.com/coupangus/74511'
-        },
+        }, 
         {
             'type': 'iherb_official',
             'name': 'iHerb 공식',
@@ -747,7 +747,7 @@ def main():
             'url_path': '?category=305433&platform=p&brandId=0'
         },
         {
-            'name': '출산유아동',
+            'name': '출산유아동', 
             'url_path': '?category=219079&platform=p&brandId=0'
         },
         {
@@ -772,16 +772,6 @@ def main():
             cycles=1,
             interactive=True  # 이것만 True로 설정하면 됨!
         )
-        
-        # 2. 전체 크롤링
-        # monitoring_system.run_full_monitoring_cycle(cycles=1)
-        
-        # 3. 프로그래밍 방식 선택
-        # monitoring_system.run_full_monitoring_cycle(
-        #     cycles=1,
-        #     selected_sources=['rocket_direct'],
-        #     selected_categories=['헬스/건강식품']
-        # )
         
     except KeyboardInterrupt:
         print("\n⚠️ 모니터링 중단됨")
