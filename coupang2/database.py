@@ -8,6 +8,7 @@
 """
 
 import sqlite3
+import re
 from datetime import datetime
 from typing import List, Dict
 
@@ -147,14 +148,56 @@ class MonitoringDatabase:
         finally:
             conn.close()
     
+    @staticmethod
+    def extract_category_id(url_or_id: str) -> str:
+        """
+        URL 또는 파라미터에서 순수 카테고리 ID 추출
+        
+        Examples:
+            "305433" → "305433"
+            "?category=305433&platform=p&brandId=0" → "305433"
+            "https://...?category=305433&..." → "305433"
+        """
+        # 이미 숫자만 있으면 그대로 반환
+        if url_or_id.isdigit():
+            return url_or_id
+        
+        # URL 파라미터에서 category= 추출
+        match = re.search(r'category=(\d+)', url_or_id)
+        if match:
+            return match.group(1)
+        
+        # ?category=로 시작하는 경우
+        match = re.search(r'^\?category=(\d+)', url_or_id)
+        if match:
+            return match.group(1)
+        
+        # 숫자가 포함된 경우 숫자만 추출
+        numbers = re.findall(r'\d+', url_or_id)
+        if numbers:
+            return numbers[0]
+        
+        # 아무것도 안되면 그대로 반환
+        return url_or_id
+    
     def register_category(self, name: str, coupang_category_id: str) -> int:
-        """카테고리 등록 또는 기존 ID 반환"""
+        """
+        카테고리 등록 또는 기존 ID 반환
+        
+        Args:
+            name: 카테고리 이름 (예: "헬스/건강식품")
+            coupang_category_id: 쿠팡 카테고리 ID 또는 URL 파라미터
+                                (예: "305433" 또는 "?category=305433&...")
+        """
+        # 순수 카테고리 ID 추출
+        pure_category_id = self.extract_category_id(coupang_category_id)
+        
         conn = sqlite3.connect(self.db_path)
         
         try:
             existing = conn.execute("""
                 SELECT id FROM categories WHERE coupang_category_id = ?
-            """, (coupang_category_id,)).fetchone()
+            """, (pure_category_id,)).fetchone()
             
             if existing:
                 category_id = existing[0]
@@ -162,12 +205,12 @@ class MonitoringDatabase:
                 conn.execute("""
                     INSERT INTO categories (name, coupang_category_id)
                     VALUES (?, ?)
-                """, (name, coupang_category_id))
+                """, (name, pure_category_id))
                 conn.commit()
                 
                 category_id = conn.execute("""
                     SELECT id FROM categories WHERE coupang_category_id = ?
-                """, (coupang_category_id,)).fetchone()[0]
+                """, (pure_category_id,)).fetchone()[0]
             
             return category_id
             
