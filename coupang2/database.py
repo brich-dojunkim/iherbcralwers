@@ -2,9 +2,9 @@
 # -*- coding: utf-8 -*-
 
 """
-모니터링 데이터베이스
-- DB 초기화
-- 데이터 저장
+모니터링 데이터베이스 (개선 버전)
+- vendor_item_id 지원
+- 개선된 matching_reference 구조
 """
 
 import sqlite3
@@ -60,7 +60,7 @@ class MonitoringDatabase:
             )
         """)
         
-        # 4. product_states 테이블
+        # 4. product_states 테이블 (vendor_item_id 추가)
         conn.execute("""
             CREATE TABLE IF NOT EXISTS product_states (
                 snapshot_id INTEGER NOT NULL,
@@ -78,26 +78,26 @@ class MonitoringDatabase:
                 is_rocket_delivery BOOLEAN DEFAULT FALSE,
                 is_free_shipping BOOLEAN DEFAULT FALSE,
                 
+                vendor_item_id TEXT,
+                
                 PRIMARY KEY (snapshot_id, coupang_product_id),
                 FOREIGN KEY (snapshot_id) REFERENCES snapshots (id)
             )
         """)
         
-        # 5. matching_reference 테이블
+        # 5. matching_reference 테이블 (개선된 구조)
         conn.execute("""
             CREATE TABLE IF NOT EXISTS matching_reference (
-                coupang_product_id TEXT PRIMARY KEY,
-                first_discovered_category TEXT,
-                first_discovered_name TEXT,
-                first_discovered_at DATETIME,
+                vendor_item_id TEXT PRIMARY KEY,
                 iherb_upc TEXT,
                 iherb_part_number TEXT,
-                matched_at DATETIME,
+                
+                matching_source TEXT NOT NULL,
                 matching_confidence REAL DEFAULT 1.0,
-                is_manually_verified BOOLEAN DEFAULT FALSE,
-                notes TEXT,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                matched_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                
+                product_name TEXT,
+                notes TEXT
             )
         """)
         
@@ -109,8 +109,11 @@ class MonitoringDatabase:
             "CREATE INDEX IF NOT EXISTS idx_states_snapshot ON product_states(snapshot_id)",
             "CREATE INDEX IF NOT EXISTS idx_states_product ON product_states(coupang_product_id)",
             "CREATE INDEX IF NOT EXISTS idx_states_rank ON product_states(snapshot_id, category_rank)",
+            "CREATE INDEX IF NOT EXISTS idx_states_vendor ON product_states(vendor_item_id)",
+            "CREATE INDEX IF NOT EXISTS idx_matching_vendor ON matching_reference(vendor_item_id)",
             "CREATE INDEX IF NOT EXISTS idx_matching_upc ON matching_reference(iherb_upc)",
-            "CREATE INDEX IF NOT EXISTS idx_matching_part ON matching_reference(iherb_part_number)"
+            "CREATE INDEX IF NOT EXISTS idx_matching_part ON matching_reference(iherb_part_number)",
+            "CREATE INDEX IF NOT EXISTS idx_matching_source ON matching_reference(matching_source)"
         ]
         
         for index_sql in indexes:
@@ -158,38 +161,36 @@ class MonitoringDatabase:
             "?category=305433&platform=p&brandId=0" → "305433"
             "https://...?category=305433&..." → "305433"
         """
-        # 이미 숫자만 있으면 그대로 반환
         if url_or_id.isdigit():
             return url_or_id
         
-        # URL 파라미터에서 category= 추출
         match = re.search(r'category=(\d+)', url_or_id)
         if match:
             return match.group(1)
         
-        # ?category=로 시작하는 경우
         match = re.search(r'^\?category=(\d+)', url_or_id)
         if match:
             return match.group(1)
         
-        # 숫자가 포함된 경우 숫자만 추출
         numbers = re.findall(r'\d+', url_or_id)
         if numbers:
             return numbers[0]
         
-        # 아무것도 안되면 그대로 반환
         return url_or_id
     
-    def register_category(self, name: str, coupang_category_id: str) -> int:
-        """
-        카테고리 등록 또는 기존 ID 반환
+    @staticmethod
+    def extract_vendor_item_id(url: str) -> str:
+        """URL에서 vendorItemId 추출"""
+        if not url:
+            return None
         
-        Args:
-            name: 카테고리 이름 (예: "헬스/건강식품")
-            coupang_category_id: 쿠팡 카테고리 ID 또는 URL 파라미터
-                                (예: "305433" 또는 "?category=305433&...")
-        """
-        # 순수 카테고리 ID 추출
+        match = re.search(r'vendorItemId=(\d+)', url)
+        if match:
+            return match.group(1)
+        return None
+    
+    def register_category(self, name: str, coupang_category_id: str) -> int:
+        """카테고리 등록 또는 기존 ID 반환"""
         pure_category_id = self.extract_category_id(coupang_category_id)
         
         conn = sqlite3.connect(self.db_path)
@@ -221,7 +222,7 @@ class MonitoringDatabase:
                      products: List[Dict], crawl_duration: float,
                      snapshot_time: datetime = None,
                      error_message: str = None) -> int:
-        """스냅샷 저장"""
+        """스냅샷 저장 (vendor_item_id 자동 추출)"""
         conn = sqlite3.connect(self.db_path)
         
         if snapshot_time is None:
@@ -243,15 +244,17 @@ class MonitoringDatabase:
         
         snapshot_id = cursor.lastrowid
         
-        # 상품 상태 저장
+        # 상품 상태 저장 (vendor_item_id 자동 추출)
         for product in products:
+            vendor_item_id = self.extract_vendor_item_id(product.get('product_url'))
+            
             conn.execute("""
                 INSERT INTO product_states 
                 (snapshot_id, coupang_product_id, category_rank,
                  product_name, product_url, current_price, original_price,
                  discount_rate, review_count, rating_score,
-                 is_rocket_delivery, is_free_shipping)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 is_rocket_delivery, is_free_shipping, vendor_item_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 snapshot_id, 
                 product['product_id'], 
@@ -264,7 +267,8 @@ class MonitoringDatabase:
                 product.get('review_count', 0),
                 product.get('rating_score', 0.0),
                 product.get('is_rocket_delivery', False),
-                product.get('is_free_shipping', False)
+                product.get('is_free_shipping', False),
+                vendor_item_id
             ))
         
         conn.commit()
