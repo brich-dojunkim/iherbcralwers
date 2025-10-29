@@ -23,6 +23,7 @@ env/
 *.parquet
 *.xlsx
 *.feather
+*.db
 *.sqlite
 *.jpg
 
