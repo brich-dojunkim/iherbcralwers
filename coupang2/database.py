@@ -2,9 +2,8 @@
 # -*- coding: utf-8 -*-
 
 """
-모니터링 데이터베이스 (개선 버전)
-- vendor_item_id 지원
-- 개선된 matching_reference 구조
+모니터링 데이터베이스 (현재 DB 구조와 일치하도록 수정)
+- vendor_item_id 사용 (coupang_product_id 아님)
 """
 
 import sqlite3
@@ -47,24 +46,22 @@ class MonitoringDatabase:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS snapshots (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                source_id INTEGER NOT NULL,
-                category_id INTEGER NOT NULL,
-                page_url TEXT NOT NULL,
-                snapshot_time DATETIME NOT NULL,
+                source_id INTEGER,
+                category_id INTEGER,
+                page_url TEXT,
+                snapshot_time DATETIME,
                 total_products INTEGER,
                 crawl_duration_seconds REAL,
                 status TEXT DEFAULT 'completed',
-                error_message TEXT,
-                FOREIGN KEY (source_id) REFERENCES sources (id),
-                FOREIGN KEY (category_id) REFERENCES categories (id)
+                error_message TEXT
             )
         """)
         
-        # 4. product_states 테이블 (vendor_item_id 추가)
+        # 4. product_states 테이블
         conn.execute("""
             CREATE TABLE IF NOT EXISTS product_states (
                 snapshot_id INTEGER NOT NULL,
-                coupang_product_id TEXT NOT NULL,
+                vendor_item_id TEXT NOT NULL,
                 category_rank INTEGER NOT NULL CHECK(category_rank > 0),
                 
                 product_name TEXT NOT NULL,
@@ -78,14 +75,12 @@ class MonitoringDatabase:
                 is_rocket_delivery BOOLEAN DEFAULT FALSE,
                 is_free_shipping BOOLEAN DEFAULT FALSE,
                 
-                vendor_item_id TEXT,
-                
-                PRIMARY KEY (snapshot_id, coupang_product_id),
+                PRIMARY KEY (snapshot_id, vendor_item_id),
                 FOREIGN KEY (snapshot_id) REFERENCES snapshots (id)
             )
         """)
         
-        # 5. matching_reference 테이블 (개선된 구조)
+        # 5. matching_reference 테이블
         conn.execute("""
             CREATE TABLE IF NOT EXISTS matching_reference (
                 vendor_item_id TEXT PRIMARY KEY,
@@ -106,11 +101,10 @@ class MonitoringDatabase:
             "CREATE INDEX IF NOT EXISTS idx_snapshots_source ON snapshots(source_id)",
             "CREATE INDEX IF NOT EXISTS idx_snapshots_category ON snapshots(category_id)",
             "CREATE INDEX IF NOT EXISTS idx_snapshots_time ON snapshots(snapshot_time)",
+            "CREATE INDEX IF NOT EXISTS idx_snapshots_combo ON snapshots(source_id, category_id)",
             "CREATE INDEX IF NOT EXISTS idx_states_snapshot ON product_states(snapshot_id)",
-            "CREATE INDEX IF NOT EXISTS idx_states_product ON product_states(coupang_product_id)",
-            "CREATE INDEX IF NOT EXISTS idx_states_rank ON product_states(snapshot_id, category_rank)",
             "CREATE INDEX IF NOT EXISTS idx_states_vendor ON product_states(vendor_item_id)",
-            "CREATE INDEX IF NOT EXISTS idx_matching_vendor ON matching_reference(vendor_item_id)",
+            "CREATE INDEX IF NOT EXISTS idx_states_rank ON product_states(snapshot_id, category_rank)",
             "CREATE INDEX IF NOT EXISTS idx_matching_upc ON matching_reference(iherb_upc)",
             "CREATE INDEX IF NOT EXISTS idx_matching_part ON matching_reference(iherb_part_number)",
             "CREATE INDEX IF NOT EXISTS idx_matching_source ON matching_reference(matching_source)"
@@ -248,16 +242,20 @@ class MonitoringDatabase:
         for product in products:
             vendor_item_id = self.extract_vendor_item_id(product.get('product_url'))
             
+            if not vendor_item_id:
+                # vendorItemId가 없으면 product_id 사용
+                vendor_item_id = product.get('product_id')
+            
             conn.execute("""
                 INSERT INTO product_states 
-                (snapshot_id, coupang_product_id, category_rank,
+                (snapshot_id, vendor_item_id, category_rank,
                  product_name, product_url, current_price, original_price,
                  discount_rate, review_count, rating_score,
-                 is_rocket_delivery, is_free_shipping, vendor_item_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 is_rocket_delivery, is_free_shipping)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 snapshot_id, 
-                product['product_id'], 
+                vendor_item_id,
                 product['rank'],
                 product['product_name'], 
                 product['product_url'],
@@ -267,8 +265,7 @@ class MonitoringDatabase:
                 product.get('review_count', 0),
                 product.get('rating_score', 0.0),
                 product.get('is_rocket_delivery', False),
-                product.get('is_free_shipping', False),
-                vendor_item_id
+                product.get('is_free_shipping', False)
             ))
         
         conn.commit()
