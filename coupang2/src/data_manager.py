@@ -2,20 +2,20 @@
 # -*- coding: utf-8 -*-
 
 """
-통합 데이터 관리자 (rocket.csv 기반)
+통합 데이터 관리자 (rocket_cleaned.csv 기반)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📌 역할: DB(로켓직구) + CSV(매칭) + Excel(아이허브) → 통합 DataFrame
 
 데이터 흐름:
 1. 로켓직구 DB (product_states) - 크롤링 데이터
-2. rocket.csv - 매칭 테이블 (product_id ↔ 아이허브_파트넘버)
+2. rocket_cleaned.csv - 매칭 테이블 (vendor_item_id ↔ 아이허브_파트넘버)
 3. price_inventory.xlsx - 아이허브 가격/재고 (업체상품코드)
 4. SELLER_INSIGHTS.xlsx - 아이허브 판매 성과
 
-장점:
-- DB의 matching_reference 테이블 불필요
-- rocket.csv만 업데이트하면 매칭 데이터 갱신
-- 단순하고 투명한 데이터 흐름
+개선사항:
+- vendor_item_id 기반 매칭 (URL에서 추출한 정확한 ID)
+- 불필요한 컬럼 제거
+- 깔끔한 데이터 구조
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 """
 
@@ -26,16 +26,16 @@ from typing import Optional
 
 
 class DataManager:
-    """통합 데이터 관리 (rocket.csv 기반)"""
+    """통합 데이터 관리 (rocket_cleaned.csv 기반)"""
     
     def __init__(self, 
                  db_path: str = "monitoring.db", 
-                 rocket_csv_path: str = "data/rocket/rocket.csv",
+                 rocket_csv_path: str = "data/rocket/rocket_cleaned.csv",
                  excel_dir: str = "data/iherb"):
         """
         Args:
             db_path: 로켓직구 모니터링 DB 경로
-            rocket_csv_path: 매칭 CSV 경로
+            rocket_csv_path: 매칭 CSV 경로 (vendor_item_id 기반)
             excel_dir: 아이허브 Excel 파일 디렉토리
         """
         self.db_path = db_path
@@ -51,10 +51,10 @@ class DataManager:
         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         
         1. DB에서 로켓직구 데이터 로드 (vendor_item_id)
-        2. rocket.csv에서 매칭 정보 로드 (product_id → 파트넘버)
+        2. rocket_cleaned.csv에서 매칭 정보 로드 (vendor_item_id → 파트넘버)
         3. Excel에서 아이허브 데이터 로드 (업체상품코드)
-        4. vendor_item_id = product_id로 조인
-        5. 파트넘버 = 업체상품코드로 조인
+        4. vendor_item_id로 DB + CSV 조인
+        5. 파트넘버 = 업체상품코드로 아이허브 조인
         
         Returns:
             DataFrame with columns:
@@ -88,7 +88,7 @@ class DataManager:
         """
         
         print(f"\n{'='*80}")
-        print(f"🔗 통합 데이터프레임 생성 (rocket.csv 기반)")
+        print(f"🔗 통합 데이터프레임 생성 (rocket_cleaned.csv 기반)")
         print(f"{'='*80}\n")
         
         # 1. 로켓직구 데이터 (DB)
@@ -135,7 +135,7 @@ class DataManager:
         
         print(f"   날짜: {target_date}")
         
-        # 쿼리 (matching_reference 제외!)
+        # 쿼리
         query = """
         SELECT 
             ps.vendor_item_id as rocket_vendor_id,
@@ -164,21 +164,20 @@ class DataManager:
         return df
     
     def _load_matching_df(self) -> pd.DataFrame:
-        """매칭 데이터 로드 (rocket.csv)"""
+        """매칭 데이터 로드 (rocket_cleaned.csv)"""
         
-        print(f"📥 2. 매칭 데이터 (rocket.csv)")
+        print(f"📥 2. 매칭 데이터 (rocket_cleaned.csv)")
         
         df = pd.read_csv(self.rocket_csv_path)
         
-        # 필요한 컬럼만 선택
+        # vendor_item_id를 문자열로 변환 (DB와 타입 일치)
         result = pd.DataFrame({
-            'product_id': df['product_id'].astype(str),
-            'part_number': df['아이허브_파트넘버'].fillna('').astype(str),
-            'upc': df['아이허브_UPC'].astype('Int64').astype(str)
+            'vendor_item_id': df['vendor_item_id'].astype(str),
+            'part_number': df['iherb_part_number'].fillna('').astype(str).str.strip().str.upper(),
+            'upc': df['iherb_upc'].astype('Int64').astype(str)
         })
         
-        # 정규화 (공백 제거, 대문자)
-        result['part_number'] = result['part_number'].str.strip().str.upper()
+        # UPC의 <NA> 제거
         result['upc'] = result['upc'].replace('<NA>', '')
         
         print(f"   ✓ {len(result):,}개 매칭 정보")
@@ -188,20 +187,23 @@ class DataManager:
         return result
     
     def _join_rocket_matching(self, df_rocket: pd.DataFrame, df_matching: pd.DataFrame) -> pd.DataFrame:
-        """로켓직구 + 매칭 조인"""
+        """로켓직구 + 매칭 조인 (vendor_item_id 기반)"""
         
-        print(f"\n🔗 3. 로켓직구 + 매칭 조인")
+        print(f"\n🔗 3. 로켓직구 + 매칭 조인 (vendor_item_id 기반)")
         
-        # vendor_item_id = product_id로 조인
+        # DB의 vendor_item_id도 문자열로 변환
+        df_rocket['rocket_vendor_id'] = df_rocket['rocket_vendor_id'].astype(str)
+        
+        # vendor_item_id로 조인
         df = df_rocket.merge(
             df_matching,
             left_on='rocket_vendor_id',
-            right_on='product_id',
+            right_on='vendor_item_id',
             how='left'
         )
         
-        # product_id 컬럼 제거 (rocket_vendor_id와 중복)
-        df = df.drop(columns=['product_id'])
+        # 중복 컬럼 제거
+        df = df.drop(columns=['vendor_item_id'])
         
         matched_count = (df['part_number'].notna() & (df['part_number'] != '')).sum()
         print(f"   ✓ 매칭 정보 있음: {matched_count:,}개 ({matched_count/len(df)*100:.1f}%)")
@@ -227,11 +229,10 @@ class DataManager:
             'iherb_product_name': df['쿠팡 노출 상품명'],
             'iherb_price': pd.to_numeric(df['판매가격'], errors='coerce').fillna(0).astype(int),
             'iherb_stock': pd.to_numeric(df['잔여수량(재고)'], errors='coerce').fillna(0).astype(int),
-            'iherb_part_number': df['업체상품코드'].fillna('').astype(str)
+            'iherb_part_number': df['업체상품코드'].fillna('').astype(str).str.strip().str.upper()
         })
         
         result = result[result['iherb_vendor_id'] != '<NA>'].copy()
-        result['iherb_part_number'] = result['iherb_part_number'].str.strip().str.upper()
         result['iherb_stock_status'] = result['iherb_stock'].apply(
             lambda x: '재고있음' if x > 0 else '품절'
         )
@@ -358,7 +359,7 @@ def main():
     """사용 예시"""
     
     print(f"\n{'='*80}")
-    print(f"📊 DataManager 사용 예시 (rocket.csv 기반)")
+    print(f"📊 DataManager 사용 예시 (rocket")
     print(f"{'='*80}\n")
     
     manager = DataManager(

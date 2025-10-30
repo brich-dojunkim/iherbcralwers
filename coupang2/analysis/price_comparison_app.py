@@ -4,7 +4,7 @@
 """
 로켓직구 vs 아이허브 가격 비교 Streamlit 대시보드
 - 로켓직구 전체 상품 기준
-- 매칭된 아이허브 상품 정보 표시
+- rocket.csv 기반 매칭
 - 인터랙티브 필터링 및 정렬
 """
 
@@ -13,7 +13,16 @@ import sqlite3
 import pandas as pd
 import numpy as np
 import re
+import sys
 from datetime import datetime
+from pathlib import Path
+
+# 프로젝트 루트 추가
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
+
+from src.data_manager import DataManager
+from config.settings import Config
 
 # 페이지 설정
 st.set_page_config(
@@ -23,25 +32,11 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# DB 경로 (실제 경로로 수정 필요)
-DB_PATH = "/Users/brich/Desktop/iherb_price/coupang2/monitoring.db"
-
-
-@st.cache_data
-def extract_quantity_from_product_name(product_name):
-    """상품명에서 개수 추출"""
-    if not product_name:
-        return None
-    match = re.search(r'(\d+)개\s*$', str(product_name).strip())
-    if match:
-        return int(match.group(1))
-    return None
-
 
 @st.cache_data
 def get_available_dates():
     """사용 가능한 날짜 목록"""
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(str(Config.DB_PATH))
     query = "SELECT DISTINCT DATE(snapshot_time) as date FROM snapshots ORDER BY date DESC"
     df = pd.read_sql_query(query, conn)
     conn.close()
@@ -51,7 +46,7 @@ def get_available_dates():
 @st.cache_data
 def get_categories():
     """카테고리 목록"""
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(str(Config.DB_PATH))
     query = "SELECT DISTINCT name FROM categories ORDER BY name"
     df = pd.read_sql_query(query, conn)
     conn.close()
@@ -60,168 +55,36 @@ def get_categories():
 
 @st.cache_data
 def load_comparison_data(target_date):
-    """가격 비교 데이터 로드"""
-
-    conn = sqlite3.connect(DB_PATH)
-
-    query = """
-    WITH latest_snapshots AS (
-        SELECT 
-            snap.id as snapshot_id,
-            s.source_type,
-            c.name as category
-        FROM snapshots snap
-        JOIN sources s ON snap.source_id = s.id
-        JOIN categories c ON snap.category_id = c.id
-        WHERE DATE(snap.snapshot_time) = ?
-    ),
-    rocket_products AS (
-        SELECT 
-            ps.vendor_item_id,
-            ps.product_name,
-            ps.current_price,
-            ps.original_price,
-            ps.discount_rate,
-            ps.category_rank,
-            ps.rating_score,
-            ps.review_count,
-            ps.product_url,
-            mr.iherb_upc as upc,
-            mr.iherb_part_number,
-            ls.category
-        FROM product_states ps
-        JOIN latest_snapshots ls ON ps.snapshot_id = ls.snapshot_id
-        LEFT JOIN matching_reference mr ON ps.vendor_item_id = mr.vendor_item_id
-        WHERE ls.source_type = 'rocket_direct'
-    ),
-    iherb_products AS (
-        SELECT 
-            ps.vendor_item_id,
-            ps.product_name,
-            ps.current_price,
-            ps.original_price,
-            ps.discount_rate,
-            ps.category_rank,
-            ps.rating_score,
-            ps.review_count,
-            ps.product_url,
-            mr.iherb_upc as upc,
-            ls.category
-        FROM product_states ps
-        JOIN latest_snapshots ls ON ps.snapshot_id = ls.snapshot_id
-        LEFT JOIN matching_reference mr ON ps.vendor_item_id = mr.vendor_item_id
-        WHERE ls.source_type = 'iherb_official'
+    """가격 비교 데이터 로드 (rocket.csv 기반)"""
+    
+    # DataManager를 사용하여 통합 데이터 로드
+    manager = DataManager(
+        db_path=str(Config.DB_PATH),
+        rocket_csv_path=str(Config.MATCHING_CSV_PATH),
+        excel_dir=str(Config.IHERB_EXCEL_DIR)
     )
-    SELECT 
-        r.category,
-        r.category_rank as rocket_rank,
-        r.upc,
-        r.iherb_part_number,
-        
-        r.vendor_item_id as rocket_vendor_id,
-        r.product_name as rocket_product_name,
-        r.current_price as rocket_price,
-        r.original_price as rocket_original_price,
-        r.discount_rate as rocket_discount_rate,
-        r.rating_score as rocket_rating,
-        r.review_count as rocket_reviews,
-        r.product_url as rocket_url,
-        
-        i.vendor_item_id as iherb_vendor_id,
-        i.product_name as iherb_product_name,
-        i.current_price as iherb_price,
-        i.original_price as iherb_original_price,
-        i.discount_rate as iherb_discount_rate,
-        i.category_rank as iherb_rank,
-        i.rating_score as iherb_rating,
-        i.review_count as iherb_reviews,
-        i.product_url as iherb_url
-        
-    FROM rocket_products r
-    LEFT JOIN iherb_products i ON r.upc = i.upc AND r.category = i.category
-    ORDER BY r.category, r.category_rank
-    """
-
-    df = pd.read_sql_query(query, conn, params=(target_date,))
-    conn.close()
-
-    # ─────────────────────────────────────────────────────────
-    # 숫자형 강제 변환 (문자/공백/기호 섞여도 안전)
-    # ─────────────────────────────────────────────────────────
-    def to_num(s):
-        # 문자열로 들어온 경우 쉼표/원/공백 제거 후 숫자화
-        if s is None:
-            return pd.Series([], dtype="float64")
-        if isinstance(s, pd.Series):
-            cleaned = s.astype(str).str.replace(",", "", regex=False)\
-                                   .str.replace("원", "", regex=False)\
-                                   .str.strip()
-            return pd.to_numeric(cleaned, errors="coerce")
-        return pd.to_numeric(s, errors="coerce")
-
-    numeric_cols = [
-        "rocket_rank", "rocket_price", "rocket_original_price", "rocket_discount_rate",
-        "rocket_rating", "rocket_reviews",
-        "iherb_price", "iherb_original_price", "iherb_discount_rate",
-        "iherb_rank", "iherb_rating", "iherb_reviews"
-    ]
-    for c in numeric_cols:
-        if c in df.columns:
-            df[c] = to_num(df[c]).astype("float64")
-
-    # 개수 추출
-    df['rocket_quantity'] = df['rocket_product_name'].apply(extract_quantity_from_product_name)
-    df['iherb_quantity']  = df['iherb_product_name'].apply(extract_quantity_from_product_name)
-
-    # 매칭 조건
-    def should_match(row):
-        if pd.isna(row['upc']) or pd.isna(row['iherb_vendor_id']):
-            return False
-        if pd.notna(row['rocket_quantity']) and pd.notna(row['iherb_quantity']):
-            return row['rocket_quantity'] == row['iherb_quantity']
-        if pd.notna(row['rocket_quantity']) or pd.notna(row['iherb_quantity']):
-            return False
-        return True
-
-    df['is_matched'] = df.apply(should_match, axis=1)
-
-    # 매칭 안 된 행: 아이허브 정보 제거
-    iherb_columns = [
-        'iherb_vendor_id', 'iherb_product_name', 'iherb_price', 
-        'iherb_original_price', 'iherb_discount_rate', 'iherb_rank',
-        'iherb_rating', 'iherb_reviews', 'iherb_url'
-    ]
-    for col in iherb_columns:
-        df.loc[~df['is_matched'], col] = None
-
-    # ─────────────────────────────────────────────────────────
-    # 비교 지표 계산 (dtype을 끝까지 float로 유지)
-    # ─────────────────────────────────────────────────────────
-    df['price_diff'] = np.nan
-    df['price_diff_pct'] = np.nan
-    df['cheaper_source'] = pd.NA
-
-    matched_mask = df['is_matched'].fillna(False)
-    valid_mask = matched_mask & df['rocket_price'].notna() & df['iherb_price'].notna() & (df['rocket_price'] > 0)
-
-    # 값 뽑아서 float로 계산
-    rprice = df.loc[valid_mask, 'rocket_price'].astype(float)
-    iprice = df.loc[valid_mask, 'iherb_price'].astype(float)
-
-    price_diff_vals = iprice.values - rprice.values
-    df.loc[valid_mask, 'price_diff'] = price_diff_vals
-
-    pct_vals = (price_diff_vals / rprice.values) * 100.0
-    df.loc[valid_mask, 'price_diff_pct'] = pct_vals
-
-    # 마지막에 dtype을 확실히 float로 고정 후 반올림
-    df['price_diff'] = pd.to_numeric(df['price_diff'], errors='coerce')
-    df['price_diff_pct'] = pd.to_numeric(df['price_diff_pct'], errors='coerce').round(1)
-
-    df.loc[valid_mask, 'cheaper_source'] = df.loc[valid_mask, 'price_diff'].apply(
-        lambda x: '로켓직구' if x > 0 else ('아이허브' if x < 0 else '동일')
-    )
-
+    
+    df = manager.get_integrated_df(target_date=target_date)
+    
+    if df.empty:
+        return df
+    
+    # 컬럼 이름 변환 (기존 코드와 호환성)
+    df = df.rename(columns={
+        'rocket_vendor_id': 'vendor_item_id',
+        'rocket_product_name': 'product_name',
+        'rocket_category': 'category',
+        'rocket_rank': 'category_rank',
+        'rocket_price': 'current_price',
+        'rocket_original_price': 'original_price',
+        'rocket_discount_rate': 'discount_rate',
+        'rocket_rating': 'rating_score',
+        'rocket_reviews': 'review_count',
+        'rocket_url': 'product_url',
+        'part_number': 'iherb_part_number',
+        'upc': 'iherb_upc',
+    })
+    
     return df
 
 
@@ -279,7 +142,7 @@ def main():
     """메인 함수"""
 
     st.title("💰 로켓직구 vs 아이허브 가격 비교")
-    st.caption("로켓직구 전체 상품을 기준으로 매칭되는 아이허브 상품과 가격을 비교합니다")
+    st.caption("로켓직구 전체 상품을 기준으로 매칭되는 아이허브 상품과 가격을 비교합니다 (rocket.csv 기반)")
 
     # 사이드바 필터
     st.sidebar.header("🔍 필터 설정")
@@ -326,7 +189,7 @@ def main():
     st.sidebar.markdown("**📊 로켓직구 순위 범위**")
 
     # NaN 방지: 순위 존재하는 행만 사용
-    rank_series = df['rocket_rank'].dropna().astype(float)
+    rank_series = df['category_rank'].dropna().astype(float)
     if len(rank_series) == 0:
         st.warning("표시할 로켓직구 순위 데이터가 없습니다.")
         return
@@ -341,7 +204,7 @@ def main():
         step=1
     )
 
-    df = df[(df['rocket_rank'] >= rank_range[0]) & (df['rocket_rank'] <= rank_range[1])]
+    df = df[(df['category_rank'] >= rank_range[0]) & (df['category_rank'] <= rank_range[1])]
 
     # 가격 차이 필터 (매칭된 제품만)
     if df['iherb_vendor_id'].notna().any():
@@ -367,14 +230,14 @@ def main():
     search_term = st.sidebar.text_input("🔍 상품명 검색")
 
     if search_term:
-        df = df[df['rocket_product_name'].fillna("").str.contains(search_term, case=False, na=False)]
+        df = df[df['product_name'].fillna("").str.contains(search_term, case=False, na=False)]
 
     # 정렬
     st.sidebar.markdown("---")
     sort_options = {
-        '로켓 순위 (오름차순)': ('rocket_rank', True),
-        '로켓 가격 (낮은순)': ('rocket_price', True),
-        '로켓 가격 (높은순)': ('rocket_price', False),
+        '로켓 순위 (오름차순)': ('category_rank', True),
+        '로켓 가격 (낮은순)': ('current_price', True),
+        '로켓 가격 (높은순)': ('current_price', False),
         '가격 차이 (큰순)': ('price_diff', False),
         '가격 차이 (작은순)': ('price_diff', True),
     }
@@ -416,8 +279,8 @@ def main():
     st.markdown(f"### 📦 상품 목록 ({len(df)}개)")
 
     for _, row in df.iterrows():
-        rank_label = int(row['rocket_rank']) if pd.notna(row['rocket_rank']) else 0
-        title = row['rocket_product_name'] if pd.notna(row['rocket_product_name']) else ""
+        rank_label = int(row['category_rank']) if pd.notna(row['category_rank']) else 0
+        title = row['product_name'] if pd.notna(row['product_name']) else ""
         display_title = f"**{rank_label}위** | {title[:60]}..." if len(title) > 60 else f"**{rank_label}위** | {title}"
 
         with st.expander(display_title):
@@ -428,26 +291,26 @@ def main():
 
             with col1:
                 st.markdown("**가격**")
-                st.markdown(format_currency(row['rocket_price']))
-                if pd.notna(row['rocket_discount_rate']) and row['rocket_discount_rate'] > 0:
-                    st.caption(f"할인 {format_percentage(row['rocket_discount_rate'])}")
+                st.markdown(format_currency(row['current_price']))
+                if pd.notna(row['discount_rate']) and row['discount_rate'] > 0:
+                    st.caption(f"할인 {format_percentage(row['discount_rate'])}")
 
             with col2:
                 st.markdown("**평점**")
-                st.markdown(format_rating(row['rocket_rating']))
+                st.markdown(format_rating(row['rating_score']))
 
             with col3:
                 st.markdown("**리뷰**")
-                st.markdown(format_count(row['rocket_reviews']))
+                st.markdown(format_count(row['review_count']))
 
             with col4:
                 st.markdown("**UPC**")
-                st.markdown(row['upc'] if pd.notna(row['upc']) else "-")
+                st.markdown(row['iherb_upc'] if pd.notna(row['iherb_upc']) else "-")
 
             with col5:
                 st.markdown("**링크**")
-                if pd.notna(row['rocket_url']) and str(row['rocket_url']).strip():
-                    st.markdown(f"[바로가기]({row['rocket_url']})")
+                if pd.notna(row['product_url']) and str(row['product_url']).strip():
+                    st.markdown(f"[바로가기]({row['product_url']})")
 
             # 아이허브 정보
             if pd.notna(row['iherb_vendor_id']):
@@ -459,24 +322,28 @@ def main():
                 with col1:
                     st.markdown("**가격**")
                     st.markdown(format_currency(row['iherb_price']))
-                    if pd.notna(row['iherb_discount_rate']) and row['iherb_discount_rate'] > 0:
+                    if pd.notna(row.get('iherb_discount_rate')) and row.get('iherb_discount_rate', 0) > 0:
                         st.caption(f"할인 {format_percentage(row['iherb_discount_rate'])}")
 
                 with col2:
                     st.markdown("**평점**")
-                    st.markdown(format_rating(row['iherb_rating']))
+                    st.markdown(format_rating(row.get('iherb_rating')))
 
                 with col3:
                     st.markdown("**리뷰**")
-                    st.markdown(format_count(row['iherb_reviews']))
+                    st.markdown(format_count(row.get('iherb_reviews')))
 
                 with col4:
-                    st.markdown("**순위**")
-                    st.markdown(format_rank(row['iherb_rank']))
+                    st.markdown("**재고**")
+                    stock_status = row.get('iherb_stock_status', '-')
+                    if stock_status == '재고있음':
+                        st.success(stock_status)
+                    else:
+                        st.error(stock_status)
 
                 with col5:
                     st.markdown("**링크**")
-                    if pd.notna(row['iherb_url']) and str(row['iherb_url']).strip():
+                    if pd.notna(row.get('iherb_url')) and str(row.get('iherb_url')).strip():
                         st.markdown(f"[바로가기]({row['iherb_url']})")
 
                 # 비교
@@ -501,7 +368,7 @@ def main():
 
                 with col3:
                     st.markdown(f"**제품명**")
-                    st.caption(row['iherb_product_name'] if pd.notna(row['iherb_product_name']) else "-")
+                    st.caption(row['iherb_product_name'] if pd.notna(row.get('iherb_product_name')) else "-")
 
             else:
                 st.info("ℹ️ 매칭되는 아이허브 상품이 없습니다")
