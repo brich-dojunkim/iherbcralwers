@@ -369,7 +369,7 @@ class RocketDirectMonitor:
     """로켓직구 카테고리 모니터"""
     
     def __init__(self, category_config: dict, 
-                 db_path: str = "monitoring.db", headless: bool = True):
+                 db_path: str = "/Users/brich/Desktop/iherb_price/coupang2/data/rocket/monitoring.db", headless: bool = True):
         """모니터 초기화"""
         self.category_config = category_config
         self.db = MonitoringDatabase(db_path)
@@ -510,7 +510,7 @@ class RocketDirectMonitoringSystem:
     """로켓직구 다중 카테고리 모니터링 시스템"""
     
     def __init__(self, categories_config: list,
-                 db_path: str = "monitoring.db", headless: bool = True):
+                 db_path: str = "/Users/brich/Desktop/iherb_price/coupang2/data/rocket/monitoring.db", headless: bool = True):
         """초기화"""
         self.categories_config = categories_config
         self.db_path = db_path
@@ -707,7 +707,7 @@ def main():
     # 모니터링 시스템 생성
     monitoring_system = RocketDirectMonitoringSystem(
         categories_config=categories,
-        db_path="monitoring.db",
+        db_path="/Users/brich/Desktop/iherb_price/coupang2/data/rocket/monitoring.db",
         headless=False
     )
     

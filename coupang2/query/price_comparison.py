@@ -24,7 +24,13 @@ from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 from openpyxl.utils import get_column_letter
 from datetime import datetime
 import os
+import sys
 import re
+
+# 상위 디렉토리를 sys.path에 추가
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+sys.path.insert(0, parent_dir)
 
 # data_manager 임포트
 from data_manager import DataManager
@@ -34,7 +40,6 @@ DB_PATH = "/Users/brich/Desktop/iherb_price/coupang2/data/rocket/monitoring.db"
 EXCEL_DIR = "/Users/brich/Desktop/iherb_price/coupang2/data/iherb"
 OUTPUT_DIR = "./output"
 # =============================================
-
 
 def get_available_dates():
     """사용 가능한 날짜 목록 조회"""
