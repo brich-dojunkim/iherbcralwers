@@ -4,19 +4,22 @@
 """
 monitoring.db 스키마 관리
 - 로켓직구 시계열 데이터 저장
-- 스키마 정의 및 기본 CRUD
+- 카테고리 중복 방지 로직 추가
 """
 
 import sqlite3
 from datetime import datetime
 from typing import List, Dict
+from pathlib import Path
 
 
 class MonitoringDatabase:
     """모니터링 DB 관리 (로켓직구 전용)"""
     
-    def __init__(self, db_path: str = "/Users/brich/Desktop/iherb_price/coupang2/data/rocket/monitoring.db"):
-        self.db_path = db_path
+    def __init__(self, db_path: str):
+        self.db_path = str(db_path)
+        # DB 디렉토리 생성
+        Path(db_path).parent.mkdir(parents=True, exist_ok=True)
     
     def init_database(self):
         """DB 초기화"""
@@ -77,22 +80,9 @@ class MonitoringDatabase:
             )
         """)
         
-        # matching_reference 테이블 (로켓직구 ↔ 아이허브 매칭)
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS matching_reference (
-                vendor_item_id TEXT PRIMARY KEY,
-                iherb_upc TEXT,
-                iherb_part_number TEXT,
-                matching_source TEXT NOT NULL,
-                matching_confidence REAL DEFAULT 1.0,
-                product_name TEXT
-            )
-        """)
-        
         # 인덱스
         conn.execute("CREATE INDEX IF NOT EXISTS idx_snapshots_time ON snapshots(snapshot_time DESC)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_product_states_vendor ON product_states(vendor_item_id)")
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_matching_upc ON matching_reference(iherb_upc)")
         
         conn.commit()
         conn.close()
@@ -118,14 +108,29 @@ class MonitoringDatabase:
         return source_id
     
     def register_category(self, name: str, coupang_category_id: str) -> int:
-        """카테고리 등록"""
+        """
+        카테고리 등록 (중복 방지)
+        
+        Args:
+            name: 카테고리 이름
+            coupang_category_id: 쿠팡 카테고리 ID (숫자만, URL 파라미터 제외)
+        
+        Returns:
+            category_id
+        """
         conn = sqlite3.connect(self.db_path)
         
-        existing = conn.execute("SELECT id FROM categories WHERE coupang_category_id = ?", (coupang_category_id,)).fetchone()
+        # coupang_category_id로 기존 카테고리 확인 (UNIQUE 제약)
+        existing = conn.execute(
+            "SELECT id FROM categories WHERE coupang_category_id = ?", 
+            (coupang_category_id,)
+        ).fetchone()
+        
         if existing:
             conn.close()
             return existing[0]
         
+        # 새로 생성
         cursor = conn.execute(
             "INSERT INTO categories (name, coupang_category_id) VALUES (?, ?)",
             (name, coupang_category_id)
@@ -133,6 +138,7 @@ class MonitoringDatabase:
         conn.commit()
         category_id = cursor.lastrowid
         conn.close()
+        
         return category_id
     
     def save_snapshot(self, source_id: int, category_id: int, page_url: str,
@@ -253,3 +259,75 @@ class MonitoringDatabase:
         
         conn.close()
         return snapshots
+    
+    def cleanup_duplicate_categories(self):
+        """
+        중복 카테고리 정리
+        
+        URL 파라미터가 포함된 카테고리 ID는 삭제하고
+        숫자만 있는 깔끔한 ID로 통일
+        """
+        conn = sqlite3.connect(self.db_path)
+        
+        # URL 파라미터 포함된 카테고리 찾기
+        duplicates = conn.execute("""
+            SELECT id, name, coupang_category_id 
+            FROM categories 
+            WHERE coupang_category_id LIKE '?%'
+        """).fetchall()
+        
+        if not duplicates:
+            print("✅ 중복 카테고리 없음")
+            conn.close()
+            return
+        
+        print(f"🔍 발견된 중복 카테고리: {len(duplicates)}개")
+        
+        for dup_id, name, bad_cat_id in duplicates:
+            # 숫자만 추출 (예: ?category=305433&... → 305433)
+            import re
+            match = re.search(r'category=(\d+)', bad_cat_id)
+            if not match:
+                continue
+            
+            clean_cat_id = match.group(1)
+            
+            # 깨끗한 ID를 가진 카테고리 찾기
+            good = conn.execute(
+                "SELECT id FROM categories WHERE coupang_category_id = ?",
+                (clean_cat_id,)
+            ).fetchone()
+            
+            if good:
+                good_id = good[0]
+                print(f"   • {name}: {dup_id} → {good_id}")
+                
+                # 스냅샷의 category_id 업데이트
+                conn.execute(
+                    "UPDATE snapshots SET category_id = ? WHERE category_id = ?",
+                    (good_id, dup_id)
+                )
+                
+                # 중복 카테고리 삭제
+                conn.execute("DELETE FROM categories WHERE id = ?", (dup_id,))
+        
+        conn.commit()
+        conn.close()
+        print("✅ 중복 카테고리 정리 완료")
+
+
+def main():
+    """테스트"""
+    from config.settings import Config
+    
+    Config.ensure_directories()
+    
+    db = MonitoringDatabase(Config.DB_PATH)
+    db.init_database()
+    db.cleanup_duplicate_categories()
+    
+    print(f"\n✅ DB 위치: {Config.DB_PATH}")
+
+
+if __name__ == "__main__":
+    main()
