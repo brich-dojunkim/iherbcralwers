@@ -732,11 +732,6 @@ def main():
             'type': 'rocket_direct',
             'name': '로켓직구',
             'base_url': 'https://shop.coupang.com/coupangus/74511'
-        }, 
-        {
-            'type': 'iherb_official',
-            'name': 'iHerb 공식',
-            'base_url': 'https://shop.coupang.com/iherb/135493'
         }
     ]
     
