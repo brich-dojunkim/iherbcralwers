@@ -2,18 +2,20 @@
 # -*- coding: utf-8 -*-
 
 """
-매칭 데이터 준비 스크립트 (완전한 워크플로우)
+로켓직구 ↔ 아이허브 매칭 데이터 준비 스크립트
+- 로켓직구: DB에서 로드
+- 아이허브: Excel 파일에서 로드
+- UPC 기반 매칭
 
 데이터 소스:
-1. iHerb 공식 스토어 (iherb_official):
-   - vendor_item_id: price_inventory의 '옵션 ID'
-   - UPC: 20251024_1444의 'UPC' (Product ID로 조인)
-   - Part Number: price_inventory의 '업체상품코드' 우선, 없으면 20251024_1444의 '판매자상품코드'
+1. 로켓직구 (rocket_direct):
+   - vendor_item_id: DB의 product_states.vendor_item_id
+   - 매칭 정보는 rocket.csv 또는 자동 매칭
 
-2. 로켓직구 (rocket_direct):
-   - vendor_item_id: rocket.csv의 'product_id'
-   - UPC: rocket.csv의 '아이허브_UPC'
-   - Part Number: rocket.csv의 '아이허브_파트넘버'
+2. 아이허브 (Excel):
+   - price_inventory: 가격/재고 정보
+   - 20251024_1444: UPC 정보
+   - UPC를 키로 매칭
 """
 
 import sqlite3
@@ -23,148 +25,27 @@ from pathlib import Path
 
 
 # ==================== 설정 ====================
-PRICE_INVENTORY_PATH = "/mnt/user-data/uploads/price_inventory_251028.xlsx"
-OFFICIAL_EXCEL_PATH = "/mnt/user-data/uploads/20251024_1444.xlsx"
-ROCKET_CSV_PATH = "/mnt/user-data/uploads/rocket.csv"
-DB_PATH = "/home/claude/monitoring.db"
+PRICE_INVENTORY_PATH = "/Users/brich/Desktop/iherb_price/coupang2/data/iherb/price_inventory_251028.xlsx"
+OFFICIAL_EXCEL_PATH = "/Users/brich/Desktop/iherb_price/coupang2/data/iherb/20251024_1444.xlsx"
+ROCKET_CSV_PATH = "/Users/brich/Desktop/iherb_price/coupang2/data/rocket/rocket.csv"
+DB_PATH = "/Users/brich/Desktop/iherb_price/coupang2/data/rocket/monitoring.db"
 # =============================================
 
 
-class ComprehensiveMatchingLoader:
-    """완전한 워크플로우 매칭 데이터 로더"""
+class RocketIherbMatcher:
+    """로켓직구 ↔ 아이허브 매칭"""
     
     def __init__(self, db_path=DB_PATH):
         self.db_path = db_path
     
-    def load_iherb_official_matching(self, price_inventory_path: str, official_excel_path: str):
+    def load_rocket_csv_matching(self, csv_path: str):
         """
-        iHerb 공식 스토어 매칭 (두 파일 조인)
-        
-        전략:
-        1. price_inventory에서 옵션 ID (vendor_item_id) 로드
-        2. 20251024_1444에서 UPC 로드
-        3. Product ID를 키로 조인하여 통합
+        로켓직구 CSV 매칭 데이터 로드
+        - rocket.csv에 이미 UPC/품번이 매핑되어 있음
         """
         
         print(f"\n{'='*80}")
-        print(f"📥 iHerb 공식 스토어 매칭 (price_inventory + 20251024_1444)")
-        print(f"{'='*80}\n")
-        
-        # 1. price_inventory 로드
-        print(f"1. price_inventory 로드...")
-        df_price = pd.read_excel(price_inventory_path, header=1, skiprows=[0])
-        print(f"   ✓ {len(df_price):,}개 레코드")
-        
-        # 타입 변환
-        df_price['옵션 ID'] = df_price['옵션 ID'].astype('Int64').astype(str)
-        df_price['Product ID'] = df_price['Product ID'].astype('Int64').astype(str)
-        df_price['업체상품코드'] = df_price['업체상품코드'].fillna('').astype(str)
-        
-        # 옵션 ID가 있는 것만
-        df_price = df_price[df_price['옵션 ID'] != '<NA>'].copy()
-        print(f"   ✓ 유효한 옵션 ID: {len(df_price):,}개")
-        
-        # 2. 20251024_1444 로드
-        print(f"\n2. 20251024_1444 (UPC 소스) 로드...")
-        df_official = pd.read_excel(official_excel_path)
-        print(f"   ✓ {len(df_official):,}개 레코드")
-        
-        # 타입 변환
-        df_official['쿠팡 상품번호'] = df_official['쿠팡 상품번호'].astype('Int64').astype(str)
-        
-        # UPC 처리 (EAN-13 → UPC 변환)
-        df_official['iherb_upc'] = df_official['UPC'].apply(self._process_barcode)
-        
-        # 유효한 쿠팡 상품번호만
-        df_official = df_official[df_official['쿠팡 상품번호'] != '<NA>'].copy()
-        print(f"   ✓ 유효한 쿠팡 상품번호: {len(df_official):,}개")
-        print(f"   ✓ UPC 있는 레코드: {df_official['iherb_upc'].notna().sum():,}개")
-        
-        # 3. 업체상품코드 기준 조인
-        print(f"\n3. 업체상품코드 ↔ 판매자상품코드 조인...")
-        merged = df_price.merge(
-            df_official[['판매자상품코드', 'iherb_upc']],
-            left_on='업체상품코드',
-            right_on='판매자상품코드',
-            how='left'
-        )
-        print(f"   ✓ 조인 결과: {len(merged):,}개 레코드")
-        print(f"   ✓ UPC 매칭된 레코드: {merged['iherb_upc'].notna().sum():,}개")
-        
-        # 4. 옵션 ID별 그룹화 (중복 제거)
-        print(f"\n4. 옵션 ID별 데이터 통합...")
-        
-        # 그룹별 첫 번째 값 선택
-        grouped = merged.groupby('옵션 ID').agg({
-            'iherb_upc': 'first',
-            '업체상품코드': 'first',
-            '쿠팡 노출 상품명': 'first'
-        }).reset_index()
-        
-        print(f"   ✓ 고유 옵션 ID: {len(grouped):,}개")
-        print(f"   ✓ UPC 있는 레코드: {grouped['iherb_upc'].notna().sum():,}개")
-        print(f"   ✓ Part Number 있는 레코드: {grouped['업체상품코드'].notna().sum():,}개")
-        
-        # 5. DB 저장
-        print(f"\n5. matching_reference 테이블 업데이트...")
-        
-        conn = sqlite3.connect(self.db_path)
-        
-        inserted = 0
-        updated = 0
-        
-        for idx, row in grouped.iterrows():
-            vendor_id = row['옵션 ID']
-            
-            # 기존 레코드 확인
-            existing = conn.execute("""
-                SELECT vendor_item_id FROM matching_reference 
-                WHERE vendor_item_id = ?
-            """, (vendor_id,)).fetchone()
-            
-            upc_value = row['iherb_upc'] if pd.notna(row['iherb_upc']) else None
-            part_value = row['업체상품코드'] if pd.notna(row['업체상품코드']) else None
-            product_name = row['쿠팡 노출 상품명'] if pd.notna(row['쿠팡 노출 상품명']) else None
-            
-            if existing:
-                # 업데이트
-                conn.execute("""
-                    UPDATE matching_reference 
-                    SET iherb_upc = ?,
-                        iherb_part_number = ?,
-                        matching_source = 'iherb_official',
-                        matching_confidence = 1.0,
-                        product_name = ?
-                    WHERE vendor_item_id = ?
-                """, (upc_value, part_value, product_name, vendor_id))
-                updated += 1
-            else:
-                # 신규 생성
-                conn.execute("""
-                    INSERT INTO matching_reference 
-                    (vendor_item_id, iherb_upc, iherb_part_number, 
-                     matching_source, matching_confidence, product_name)
-                    VALUES (?, ?, ?, 'iherb_official', 1.0, ?)
-                """, (vendor_id, upc_value, part_value, product_name))
-                inserted += 1
-            
-            if (idx + 1) % 1000 == 0:
-                conn.commit()
-                print(f"   ... {idx + 1:,}개 처리 중")
-        
-        conn.commit()
-        conn.close()
-        
-        print(f"\n✅ iHerb 공식 매칭 완료")
-        print(f"   • 신규 생성: {inserted:,}개")
-        print(f"   • 업데이트: {updated:,}개")
-        print(f"   • 총 처리: {inserted + updated:,}개")
-    
-    def load_rocket_direct_matching(self, csv_path: str):
-        """로켓직구 매칭 데이터 로드"""
-        
-        print(f"\n{'='*80}")
-        print(f"📥 로켓직구 매칭 데이터 로드")
+        print(f"📥 로켓직구 CSV 매칭 데이터 로드")
         print(f"{'='*80}\n")
         
         # CSV 로드
@@ -189,40 +70,36 @@ class ComprehensiveMatchingLoader:
         
         inserted = 0
         updated = 0
-        skipped = 0
         
         for idx, row in df_valid.iterrows():
             vendor_id = row['vendor_item_id']
             
             # 기존 레코드 확인
             existing = conn.execute("""
-                SELECT vendor_item_id, matching_source FROM matching_reference 
+                SELECT vendor_item_id FROM matching_reference 
                 WHERE vendor_item_id = ?
             """, (vendor_id,)).fetchone()
             
             if existing:
-                # iherb_official이 아닌 경우에만 업데이트
-                if existing[1] != 'iherb_official':
-                    conn.execute("""
-                        UPDATE matching_reference 
-                        SET iherb_upc = ?,
-                            iherb_part_number = ?,
-                            matching_source = 'rocket_direct',
-                            matching_confidence = 1.0,
-                            product_name = ?
-                        WHERE vendor_item_id = ?
-                    """, (row['iherb_upc'], row['iherb_part_number'], 
-                          row['product_name'], vendor_id))
-                    updated += 1
-                else:
-                    skipped += 1
+                # 업데이트
+                conn.execute("""
+                    UPDATE matching_reference 
+                    SET iherb_upc = ?,
+                        iherb_part_number = ?,
+                        matching_source = 'rocket_csv',
+                        matching_confidence = 1.0,
+                        product_name = ?
+                    WHERE vendor_item_id = ?
+                """, (row['iherb_upc'], row['iherb_part_number'], 
+                      row['product_name'], vendor_id))
+                updated += 1
             else:
                 # 신규 생성
                 conn.execute("""
                     INSERT INTO matching_reference 
                     (vendor_item_id, iherb_upc, iherb_part_number, 
                      matching_source, matching_confidence, product_name)
-                    VALUES (?, ?, ?, 'rocket_direct', 1.0, ?)
+                    VALUES (?, ?, ?, 'rocket_csv', 1.0, ?)
                 """, (vendor_id, row['iherb_upc'], row['iherb_part_number'], 
                       row['product_name']))
                 inserted += 1
@@ -234,10 +111,55 @@ class ComprehensiveMatchingLoader:
         conn.commit()
         conn.close()
         
-        print(f"\n✅ 로켓직구 매칭 완료")
+        print(f"\n✅ 로켓직구 CSV 매칭 완료")
         print(f"   • 신규 생성: {inserted:,}개")
         print(f"   • 업데이트: {updated:,}개")
-        print(f"   • 건너뜀 (iHerb 공식 우선): {skipped:,}개")
+        print(f"   • 총 처리: {inserted + updated:,}개")
+    
+    def verify_iherb_excel_data(self, price_inventory_path: str, official_excel_path: str):
+        """
+        아이허브 Excel 데이터 검증
+        - price_inventory: 가격/재고 정보 확인
+        - 20251024_1444: UPC 정보 확인
+        """
+        
+        print(f"\n{'='*80}")
+        print(f"📥 아이허브 Excel 데이터 검증")
+        print(f"{'='*80}\n")
+        
+        # 1. price_inventory 확인
+        print(f"1. price_inventory 로드...")
+        df_price = pd.read_excel(price_inventory_path, header=1, skiprows=[0])
+        print(f"   ✓ {len(df_price):,}개 레코드")
+        
+        # 주요 컬럼 확인
+        required_cols = ['옵션 ID', '쿠팡 노출 상품명', '판매가격', '잔여수량(재고)']
+        missing_cols = [col for col in required_cols if col not in df_price.columns]
+        
+        if missing_cols:
+            print(f"   ⚠️  누락된 컬럼: {missing_cols}")
+        else:
+            print(f"   ✅ 필수 컬럼 모두 존재")
+        
+        # 유효 데이터 확인
+        valid_count = df_price['옵션 ID'].notna().sum()
+        print(f"   ✓ 유효한 옵션 ID: {valid_count:,}개")
+        
+        # 2. 20251024_1444 확인
+        print(f"\n2. 20251024_1444 (UPC 소스) 로드...")
+        df_official = pd.read_excel(official_excel_path)
+        print(f"   ✓ {len(df_official):,}개 레코드")
+        
+        # UPC 컬럼 확인
+        if 'UPC' in df_official.columns:
+            upc_count = df_official['UPC'].notna().sum()
+            print(f"   ✓ UPC 있는 레코드: {upc_count:,}개")
+        else:
+            print(f"   ⚠️  UPC 컬럼 없음")
+        
+        print(f"\n💡 아이허브 데이터는 Excel 파일로 관리됩니다")
+        print(f"   - data_manager.py를 통해 로켓직구 DB와 통합됩니다")
+        print(f"   - 매칭은 UPC를 기준으로 자동 수행됩니다")
     
     @staticmethod
     def _process_barcode(barcode) -> str:
@@ -294,19 +216,6 @@ class ComprehensiveMatchingLoader:
         print(f"  • UPC 있음: {with_upc:,}개 ({with_upc/total*100:.1f}%)")
         print(f"  • 품번 있음: {with_part:,}개 ({with_part/total*100:.1f}%)")
         
-        # 소스별 UPC 통계
-        print(f"\n소스별 UPC 통계:")
-        cursor = conn.execute("""
-            SELECT 
-                matching_source,
-                COUNT(*) as total,
-                SUM(CASE WHEN iherb_upc IS NOT NULL THEN 1 ELSE 0 END) as with_upc
-            FROM matching_reference
-            GROUP BY matching_source
-        """)
-        for source, total_cnt, upc_cnt in cursor.fetchall():
-            print(f"  • {source:20s}: {upc_cnt:,}/{total_cnt:,} ({upc_cnt/total_cnt*100:.1f}%)")
-        
         # product_states와 매칭률
         in_db = conn.execute("""
             SELECT COUNT(DISTINCT ps.vendor_item_id)
@@ -323,23 +232,6 @@ class ComprehensiveMatchingLoader:
         print(f"  • 매칭됨: {in_db:,}개 ({in_db/total_products*100:.1f}%)")
         print(f"  • 미매칭: {total_products - in_db:,}개")
         
-        # 소스별 DB 매칭률
-        print(f"\n소스별 DB 매칭률:")
-        cursor = conn.execute("""
-            SELECT 
-                src.source_type,
-                COUNT(DISTINCT ps.vendor_item_id) as total,
-                COUNT(DISTINCT CASE WHEN mr.vendor_item_id IS NOT NULL THEN ps.vendor_item_id END) as matched
-            FROM product_states ps
-            JOIN snapshots s ON ps.snapshot_id = s.id
-            JOIN sources src ON s.source_id = src.id
-            LEFT JOIN matching_reference mr ON ps.vendor_item_id = mr.vendor_item_id
-            GROUP BY src.source_type
-        """)
-        for source, total_cnt, matched_cnt in cursor.fetchall():
-            rate = matched_cnt / total_cnt * 100 if total_cnt > 0 else 0
-            print(f"  • {source:20s}: {matched_cnt:,}/{total_cnt:,} ({rate:.1f}%)")
-        
         conn.close()
 
 
@@ -347,45 +239,44 @@ def main():
     """메인 함수"""
     
     print(f"\n{'='*80}")
-    print(f"🎯 완전한 매칭 데이터 준비")
+    print(f"🎯 로켓직구 ↔ 아이허브 매칭 데이터 준비")
     print(f"{'='*80}\n")
+    print(f"rocket.csv:      {ROCKET_CSV_PATH}")
     print(f"price_inventory: {PRICE_INVENTORY_PATH}")
     print(f"official_excel:  {OFFICIAL_EXCEL_PATH}")
-    print(f"rocket.csv:      {ROCKET_CSV_PATH}")
     print(f"DB:              {DB_PATH}")
     
     # 파일 존재 확인
-    if not Path(PRICE_INVENTORY_PATH).exists():
-        print(f"\n❌ price_inventory 파일이 없습니다")
-        return
-    
-    if not Path(OFFICIAL_EXCEL_PATH).exists():
-        print(f"\n❌ 20251024_1444 파일이 없습니다")
-        return
-    
-    if not Path(ROCKET_CSV_PATH).exists():
-        print(f"\n⚠️  rocket.csv 파일이 없습니다")
-    
     if not Path(DB_PATH).exists():
-        print(f"\n❌ DB 파일이 없습니다")
+        print(f"\n❌ DB 파일이 없습니다: {DB_PATH}")
         return
     
-    loader = ComprehensiveMatchingLoader(DB_PATH)
+    matcher = RocketIherbMatcher(DB_PATH)
     
     try:
-        # 1. iHerb 공식 매칭 (두 파일 조인)
-        loader.load_iherb_official_matching(PRICE_INVENTORY_PATH, OFFICIAL_EXCEL_PATH)
-        
-        # 2. 로켓직구 매칭
+        # 1. 로켓직구 CSV 매칭
         if Path(ROCKET_CSV_PATH).exists():
-            loader.load_rocket_direct_matching(ROCKET_CSV_PATH)
+            matcher.load_rocket_csv_matching(ROCKET_CSV_PATH)
+        else:
+            print(f"\n⚠️  rocket.csv 파일이 없습니다")
+        
+        # 2. 아이허브 Excel 데이터 검증
+        if Path(PRICE_INVENTORY_PATH).exists() and Path(OFFICIAL_EXCEL_PATH).exists():
+            matcher.verify_iherb_excel_data(PRICE_INVENTORY_PATH, OFFICIAL_EXCEL_PATH)
+        else:
+            print(f"\n⚠️  아이허브 Excel 파일이 누락되었습니다")
         
         # 3. 통계 출력
-        loader.show_statistics()
+        matcher.show_statistics()
         
         print(f"\n{'='*80}")
-        print(f"✅ 완전한 매칭 데이터 준비 완료!")
-        print(f"{'='*80}\n")
+        print(f"✅ 매칭 데이터 준비 완료!")
+        print(f"{'='*80}")
+        print(f"\n💡 다음 단계:")
+        print(f"   1. data_manager.py로 통합 데이터프레임 생성")
+        print(f"   2. price_comparison.py로 가격 비교 리포트 생성")
+        print(f"   3. price_comparison_app.py로 대시보드 실행")
+        print()
         
     except Exception as e:
         print(f"\n❌ 오류 발생: {e}")

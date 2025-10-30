@@ -4,7 +4,7 @@
 """
 monitoring.db 스키마 관리
 - 로켓직구 시계열 데이터 저장
-- 스키마 정의 및 기본 CRUD만 포함
+- 스키마 정의 및 기본 CRUD
 """
 
 import sqlite3
@@ -13,9 +13,9 @@ from typing import List, Dict
 
 
 class MonitoringDatabase:
-    """모니터링 DB 관리"""
+    """모니터링 DB 관리 (로켓직구 전용)"""
     
-    def __init__(self, db_path: str = "monitoring.db"):
+    def __init__(self, db_path: str = "/Users/brich/Desktop/iherb_price/coupang2/data/rocket/monitoring.db"):
         self.db_path = db_path
     
     def init_database(self):
@@ -23,7 +23,7 @@ class MonitoringDatabase:
         conn = sqlite3.connect(self.db_path)
         conn.execute("PRAGMA foreign_keys = ON")
         
-        # sources 테이블
+        # sources 테이블 (로켓직구만 사용)
         conn.execute("""
             CREATE TABLE IF NOT EXISTS sources (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -42,7 +42,7 @@ class MonitoringDatabase:
             )
         """)
         
-        # snapshots 테이블
+        # snapshots 테이블 (로켓직구 크롤링 기록)
         conn.execute("""
             CREATE TABLE IF NOT EXISTS snapshots (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -59,7 +59,7 @@ class MonitoringDatabase:
             )
         """)
         
-        # product_states 테이블
+        # product_states 테이블 (로켓직구 상품 상태)
         conn.execute("""
             CREATE TABLE IF NOT EXISTS product_states (
                 snapshot_id INTEGER NOT NULL,
@@ -77,7 +77,7 @@ class MonitoringDatabase:
             )
         """)
         
-        # matching_reference 테이블
+        # matching_reference 테이블 (로켓직구 ↔ 아이허브 매칭)
         conn.execute("""
             CREATE TABLE IF NOT EXISTS matching_reference (
                 vendor_item_id TEXT PRIMARY KEY,
@@ -96,9 +96,11 @@ class MonitoringDatabase:
         
         conn.commit()
         conn.close()
+        
+        print("✅ DB 초기화 완료 (로켓직구 전용)")
     
-    def add_source(self, source_type: str, display_name: str, base_url: str) -> int:
-        """소스 등록"""
+    def register_source(self, source_type: str, display_name: str, base_url: str) -> int:
+        """소스 등록 (로켓직구 전용)"""
         conn = sqlite3.connect(self.db_path)
         
         existing = conn.execute("SELECT id FROM sources WHERE source_type = ?", (source_type,)).fetchone()
@@ -115,7 +117,7 @@ class MonitoringDatabase:
         conn.close()
         return source_id
     
-    def add_category(self, name: str, coupang_category_id: str) -> int:
+    def register_category(self, name: str, coupang_category_id: str) -> int:
         """카테고리 등록"""
         conn = sqlite3.connect(self.db_path)
         
@@ -133,54 +135,121 @@ class MonitoringDatabase:
         conn.close()
         return category_id
     
-    def create_snapshot(self, source_id: int, category_id: int, page_url: str = None) -> int:
-        """스냅샷 생성"""
-        conn = sqlite3.connect(self.db_path)
+    def save_snapshot(self, source_id: int, category_id: int, page_url: str,
+                     products: List[Dict], crawl_duration: float,
+                     snapshot_time: datetime = None, error_message: str = None) -> int:
+        """
+        스냅샷 저장 (원자적 트랜잭션)
         
-        cursor = conn.execute(
-            "INSERT INTO snapshots (source_id, category_id, page_url, snapshot_time, status) VALUES (?, ?, ?, ?, 'in_progress')",
-            (source_id, category_id, page_url, datetime.now())
-        )
-        conn.commit()
-        snapshot_id = cursor.lastrowid
-        conn.close()
-        return snapshot_id
-    
-    def complete_snapshot(self, snapshot_id: int, total_products: int, crawl_duration: float = None, error_message: str = None):
-        """스냅샷 완료"""
-        conn = sqlite3.connect(self.db_path)
-        status = 'completed' if error_message is None else 'failed'
+        Args:
+            source_id: 소스 ID
+            category_id: 카테고리 ID
+            page_url: 페이지 URL
+            products: 상품 리스트
+            crawl_duration: 크롤링 소요시간
+            snapshot_time: 스냅샷 시각 (None이면 현재)
+            error_message: 에러 메시지 (필터 미적용 등)
         
-        conn.execute(
-            "UPDATE snapshots SET total_products = ?, crawl_duration_seconds = ?, status = ?, error_message = ? WHERE id = ?",
-            (total_products, crawl_duration, status, error_message, snapshot_id)
-        )
-        conn.commit()
-        conn.close()
-    
-    def save_product_states(self, snapshot_id: int, products: List[Dict]):
-        """제품 상태 저장"""
-        conn = sqlite3.connect(self.db_path)
+        Returns:
+            snapshot_id
+        """
+        if not products:
+            raise ValueError("상품 리스트가 비어있습니다")
         
-        for product in products:
-            conn.execute(
-                """INSERT OR REPLACE INTO product_states 
-                   (snapshot_id, vendor_item_id, category_rank, product_name, product_url,
-                    current_price, original_price, discount_rate, rating_score, review_count)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (
-                    snapshot_id,
-                    product['vendor_item_id'],
-                    product['category_rank'],
-                    product['product_name'],
-                    product['product_url'],
-                    product.get('current_price', 0),
-                    product.get('original_price', 0),
-                    product.get('discount_rate', 0.0),
-                    product.get('rating_score'),
-                    product.get('review_count', 0)
-                )
+        # 순위 검증
+        ranks = [p.get('rank', 0) for p in products]
+        if min(ranks) != 1:
+            raise ValueError(f"순위가 1부터 시작하지 않습니다: min={min(ranks)}")
+        
+        expected_ranks = set(range(1, len(products) + 1))
+        actual_ranks = set(ranks)
+        if expected_ranks != actual_ranks:
+            missing = expected_ranks - actual_ranks
+            raise ValueError(f"순위가 연속적이지 않습니다. 누락: {sorted(missing)}")
+        
+        conn = sqlite3.connect(self.db_path)
+        conn.execute("PRAGMA foreign_keys = ON")
+        
+        try:
+            # 1. 스냅샷 생성
+            status = 'completed' if error_message is None else 'completed_with_warning'
+            snapshot_time = snapshot_time or datetime.now()
+            
+            cursor = conn.execute(
+                """INSERT INTO snapshots 
+                   (source_id, category_id, page_url, snapshot_time, 
+                    total_products, crawl_duration_seconds, status, error_message)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                (source_id, category_id, page_url, snapshot_time,
+                 len(products), crawl_duration, status, error_message)
             )
-        
-        conn.commit()
+            snapshot_id = cursor.lastrowid
+            
+            # 2. 제품 상태 저장
+            for product in products:
+                conn.execute(
+                    """INSERT INTO product_states 
+                       (snapshot_id, vendor_item_id, category_rank, product_name, product_url,
+                        current_price, original_price, discount_rate, rating_score, review_count)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (
+                        snapshot_id,
+                        product['product_id'],  # vendor_item_id
+                        product['rank'],        # category_rank
+                        product['product_name'],
+                        product['product_url'],
+                        product.get('current_price', 0),
+                        product.get('original_price', 0),
+                        product.get('discount_rate', 0.0),
+                        product.get('rating_score'),
+                        product.get('review_count', 0)
+                    )
+                )
+            
+            conn.commit()
+            return snapshot_id
+            
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.close()
+    
+    def get_latest_snapshot_date(self) -> str:
+        """최신 스냅샷 날짜 조회"""
+        conn = sqlite3.connect(self.db_path)
+        result = conn.execute(
+            "SELECT DATE(MAX(snapshot_time)) FROM snapshots"
+        ).fetchone()
         conn.close()
+        return result[0] if result and result[0] else None
+    
+    def get_snapshots_by_date(self, target_date: str) -> List[Dict]:
+        """특정 날짜의 스냅샷 목록"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.execute(
+            """SELECT s.id, s.snapshot_time, s.total_products, 
+                      src.display_name as source, cat.name as category,
+                      s.status, s.error_message
+               FROM snapshots s
+               JOIN sources src ON s.source_id = src.id
+               JOIN categories cat ON s.category_id = cat.id
+               WHERE DATE(s.snapshot_time) = ?
+               ORDER BY s.snapshot_time DESC""",
+            (target_date,)
+        )
+        
+        snapshots = []
+        for row in cursor.fetchall():
+            snapshots.append({
+                'id': row[0],
+                'snapshot_time': row[1],
+                'total_products': row[2],
+                'source': row[3],
+                'category': row[4],
+                'status': row[5],
+                'error_message': row[6]
+            })
+        
+        conn.close()
+        return snapshots

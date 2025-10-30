@@ -2,10 +2,10 @@
 # -*- coding: utf-8 -*-
 
 """
-모니터링 시스템 (최종 개선 버전)
+로켓직구 모니터링 시스템
+- 로켓직구 상품만 크롤링
+- 아이허브 공식은 Excel로 대체
 - 터미널 콘솔 인터랙티브 선택 기능
-- 필터 미적용 시 워크플로우 개선
-- error_message 활용
 """
 
 import sys
@@ -30,7 +30,7 @@ from database import MonitoringDatabase
 
 
 class ScrollExtractor:
-    """무한 스크롤 상품 추출기 (최종 개선 버전)"""
+    """무한 스크롤 상품 추출기"""
     
     def __init__(self, browser_manager):
         self.browser = browser_manager
@@ -365,31 +365,31 @@ class ScrollExtractor:
             return False
 
 
-class CategoryMonitor:
-    """카테고리 모니터 (최종 개선 버전)"""
+class RocketDirectMonitor:
+    """로켓직구 카테고리 모니터"""
     
-    def __init__(self, source_config: dict, category_config: dict, 
+    def __init__(self, category_config: dict, 
                  db_path: str = "monitoring.db", headless: bool = True):
         """모니터 초기화"""
-        self.source_config = source_config
         self.category_config = category_config
         self.db = MonitoringDatabase(db_path)
         self.browser = BrowserManager(headless=headless)
         self.extractor = None
         
-        # 소스 및 카테고리 등록
+        # 로켓직구 소스 등록
         self.source_id = self.db.register_source(
-            source_config['type'],
-            source_config['name'],
-            source_config['base_url']
+            'rocket_direct',
+            '로켓직구',
+            'https://shop.coupang.com/coupangus/74511'
         )
         
+        # 카테고리 등록
         self.category_id = self.db.register_category(
             category_config['name'],
             category_config['url_path']
         )
         
-        print(f"✅ {category_config['name']} 모니터 초기화 완료 ({source_config['type']})")
+        print(f"✅ {category_config['name']} 모니터 초기화 완료 (로켓직구)")
     
     def start_driver(self) -> bool:
         """브라우저 드라이버 시작"""
@@ -404,14 +404,12 @@ class CategoryMonitor:
     def run_monitoring_cycle(self) -> dict:
         """모니터링 사이클 실행"""
         category_name = self.category_config['name']
-        source_name = self.source_config['name']
         
         # 전체 URL 생성
-        page_url = self.source_config['base_url'] + self.category_config['url_path']
+        page_url = 'https://shop.coupang.com/coupangus/74511' + self.category_config['url_path']
         
         print(f"\n{'='*70}")
-        print(f"📊 [{category_name}] 모니터링 시작: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        print(f"📍 소스: {source_name}")
+        print(f"📊 [{category_name}] 로켓직구 모니터링 시작: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         print(f"{'='*70}")
         
         start_time = time.time()
@@ -508,56 +506,29 @@ class CategoryMonitor:
             self.browser.close()
 
 
-class MultiCategoryMonitoringSystem:
-    """다중 카테고리 모니터링 시스템 (최종 개선 버전)"""
+class RocketDirectMonitoringSystem:
+    """로켓직구 다중 카테고리 모니터링 시스템"""
     
-    def __init__(self, sources_config: list, categories_config: list,
+    def __init__(self, categories_config: list,
                  db_path: str = "monitoring.db", headless: bool = True):
         """초기화"""
-        self.sources_config = sources_config
         self.categories_config = categories_config
         self.db_path = db_path
         self.headless = headless
     
-    def interactive_selection(self) -> tuple:
+    def interactive_selection(self) -> list:
         """
-        터미널 콘솔에서 인터랙티브하게 소스와 카테고리 선택
+        터미널 콘솔에서 인터랙티브하게 카테고리 선택
         
         Returns:
-            (selected_sources, selected_categories)
+            selected_categories: 선택된 카테고리 이름 리스트
         """
         print(f"\n{'='*70}")
-        print(f"🎯 크롤링 대상 선택")
+        print(f"🎯 크롤링 대상 선택 (로켓직구)")
         print(f"{'='*70}\n")
         
-        # 1. 소스 선택
-        print("📍 소스 선택:")
-        print("  0. 전체 소스")
-        for i, source in enumerate(self.sources_config, 1):
-            print(f"  {i}. {source['name']} ({source['type']})")
-        
-        while True:
-            source_input = input("\n소스 번호 선택 (쉼표로 구분, 예: 1,2 또는 0): ").strip()
-            
-            if source_input == '0':
-                selected_sources = None
-                print("  ✅ 전체 소스 선택됨")
-                break
-            
-            try:
-                source_indices = [int(x.strip()) for x in source_input.split(',')]
-                selected_sources = [self.sources_config[i-1]['type'] for i in source_indices if 1 <= i <= len(self.sources_config)]
-                
-                if selected_sources:
-                    print(f"  ✅ 선택된 소스: {', '.join(selected_sources)}")
-                    break
-                else:
-                    print(f"  ❌ 유효하지 않은 번호입니다. 다시 선택하세요.")
-            except (ValueError, IndexError):
-                print(f"  ❌ 잘못된 입력입니다. 숫자를 쉼표로 구분해서 입력하세요.")
-        
-        # 2. 카테고리 선택
-        print(f"\n📂 카테고리 선택:")
+        # 카테고리 선택
+        print(f"📂 카테고리 선택:")
         print("  0. 전체 카테고리")
         for i, category in enumerate(self.categories_config, 1):
             print(f"  {i}. {category['name']}")
@@ -584,10 +555,9 @@ class MultiCategoryMonitoringSystem:
         
         print(f"{'='*70}\n")
         
-        return selected_sources, selected_categories
+        return selected_categories
     
     def run_full_monitoring_cycle(self, cycles: int = 1, 
-                                  selected_sources: list = None,
                                   selected_categories: list = None,
                                   interactive: bool = False):
         """
@@ -595,29 +565,23 @@ class MultiCategoryMonitoringSystem:
         
         Args:
             cycles: 반복 횟수
-            selected_sources: 선택한 소스 타입 리스트
             selected_categories: 선택한 카테고리 이름 리스트
             interactive: True이면 터미널에서 인터랙티브하게 선택
         """
         # 인터랙티브 선택
         if interactive:
-            selected_sources, selected_categories = self.interactive_selection()
+            selected_categories = self.interactive_selection()
         
         # 필터링
-        sources_to_run = self.sources_config
-        if selected_sources:
-            sources_to_run = [s for s in self.sources_config if s['type'] in selected_sources]
-        
         categories_to_run = self.categories_config
         if selected_categories:
             categories_to_run = [c for c in self.categories_config if c['name'] in selected_categories]
         
-        total_jobs = len(sources_to_run) * len(categories_to_run)
+        total_jobs = len(categories_to_run)
         
         print(f"\n{'='*70}")
-        print(f"🎯 모니터링 시작")
+        print(f"🎯 로켓직구 모니터링 시작")
         print(f"{'='*70}")
-        print(f"소스: {', '.join([s['name'] for s in sources_to_run])}")
         print(f"카테고리: {', '.join([c['name'] for c in categories_to_run])}")
         print(f"총 작업: {total_jobs}개")
         print(f"사이클: {cycles}회")
@@ -640,66 +604,64 @@ class MultiCategoryMonitoringSystem:
             
             job_num = 1
             
-            for source_config in sources_to_run:
-                for category_config in categories_to_run:
-                    print(f"\n{'='*70}")
-                    print(f"📂 [{job_num}/{total_jobs}] [{source_config['name']}] {category_config['name']}")
-                    print(f"{'='*70}")
-                    
-                    stats['total'] += 1
-                    
-                    monitor = CategoryMonitor(
-                        source_config=source_config,
-                        category_config=category_config,
-                        db_path=self.db_path,
-                        headless=self.headless
-                    )
-                    
-                    try:
-                        if not monitor.start_driver():
-                            print(f"❌ 브라우저 시작 실패\n")
-                            stats['failed'] += 1
-                            job_num += 1
-                            continue
-                        
-                        result = monitor.run_monitoring_cycle()
-                        
-                        # 결과 처리
-                        if result['success']:
-                            stats['success'] += 1
-                            if not result.get('filter_applied', True):
-                                stats['filter_not_applied'] += 1
-                            print(f"✅ 성공: {result['product_count']}개 제품")
-                        else:
-                            # abort 시 전체 중단
-                            if result.get('action') == 'abort':
-                                print(f"\n🛑 사용자 요청으로 전체 크롤링을 중단합니다")
-                                monitor.close()
-                                self._print_final_stats(stats)
-                                return
-                            
-                            # skip/continue 시 다음 작업 진행
-                            stats['skipped'] += 1
-                            print(f"⏭️  건너뜀: {result.get('error_message', '알 수 없는 오류')}")
-                    
-                    except KeyboardInterrupt:
-                        print(f"\n⚠️ 사용자 중단 (Ctrl+C)")
-                        monitor.close()
-                        self._print_final_stats(stats)
-                        return
-                    except Exception as e:
-                        print(f"❌ 오류: {e}")
+            for category_config in categories_to_run:
+                print(f"\n{'='*70}")
+                print(f"📂 [{job_num}/{total_jobs}] {category_config['name']}")
+                print(f"{'='*70}")
+                
+                stats['total'] += 1
+                
+                monitor = RocketDirectMonitor(
+                    category_config=category_config,
+                    db_path=self.db_path,
+                    headless=self.headless
+                )
+                
+                try:
+                    if not monitor.start_driver():
+                        print(f"❌ 브라우저 시작 실패\n")
                         stats['failed'] += 1
-                    finally:
-                        monitor.close()
+                        job_num += 1
+                        continue
                     
-                    job_num += 1
+                    result = monitor.run_monitoring_cycle()
                     
-                    # 작업 간 대기
-                    if job_num <= total_jobs:
-                        wait_time = 30
-                        print(f"\n⏰ 다음 작업까지 {wait_time}초 대기...\n")
-                        time.sleep(wait_time)
+                    # 결과 처리
+                    if result['success']:
+                        stats['success'] += 1
+                        if not result.get('filter_applied', True):
+                            stats['filter_not_applied'] += 1
+                        print(f"✅ 성공: {result['product_count']}개 제품")
+                    else:
+                        # abort 시 전체 중단
+                        if result.get('action') == 'abort':
+                            print(f"\n🛑 사용자 요청으로 전체 크롤링을 중단합니다")
+                            monitor.close()
+                            self._print_final_stats(stats)
+                            return
+                        
+                        # skip/continue 시 다음 작업 진행
+                        stats['skipped'] += 1
+                        print(f"⏭️  건너뜀: {result.get('error_message', '알 수 없는 오류')}")
+                
+                except KeyboardInterrupt:
+                    print(f"\n⚠️ 사용자 중단 (Ctrl+C)")
+                    monitor.close()
+                    self._print_final_stats(stats)
+                    return
+                except Exception as e:
+                    print(f"❌ 오류: {e}")
+                    stats['failed'] += 1
+                finally:
+                    monitor.close()
+                
+                job_num += 1
+                
+                # 작업 간 대기
+                if job_num <= total_jobs:
+                    wait_time = 30
+                    print(f"\n⏰ 다음 작업까지 {wait_time}초 대기...\n")
+                    time.sleep(wait_time)
             
             # 사이클 간 대기
             if cycle < cycles - 1:
@@ -712,7 +674,7 @@ class MultiCategoryMonitoringSystem:
     def _print_final_stats(self, stats: dict):
         """최종 통계 출력"""
         print(f"\n{'='*70}")
-        print(f"🎉 모니터링 완료!")
+        print(f"🎉 로켓직구 모니터링 완료!")
         print(f"{'='*70}")
         print(f"총 작업: {stats['total']}개")
         print(f"  ✅ 성공: {stats['success']}개")
@@ -725,15 +687,6 @@ class MultiCategoryMonitoringSystem:
 
 def main():
     """메인 함수"""
-    
-    # 소스 설정
-    sources = [
-        {
-            'type': 'rocket_direct',
-            'name': '로켓직구',
-            'base_url': 'https://shop.coupang.com/coupangus/74511'
-        }
-    ]
     
     # 카테고리 설정
     categories = [
@@ -752,20 +705,17 @@ def main():
     ]
     
     # 모니터링 시스템 생성
-    monitoring_system = MultiCategoryMonitoringSystem(
-        sources_config=sources,
+    monitoring_system = RocketDirectMonitoringSystem(
         categories_config=categories,
         db_path="monitoring.db",
         headless=False
     )
     
     try:
-        # ===== 사용 방법 =====
-        
-        # 1. 인터랙티브 모드 (터미널에서 선택)
+        # 인터랙티브 모드 (터미널에서 선택)
         monitoring_system.run_full_monitoring_cycle(
             cycles=1,
-            interactive=True  # 이것만 True로 설정하면 됨!
+            interactive=True
         )
         
     except KeyboardInterrupt:

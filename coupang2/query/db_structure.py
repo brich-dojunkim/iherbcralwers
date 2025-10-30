@@ -8,7 +8,7 @@ DB 구조 완전 출력 스크립트
 
 import sqlite3
 
-DB_PATH = "/Users/brich/Desktop/iherb_price/coupang2/monitoring.db"  # 실제 경로
+DB_PATH = "/Users/brich/Desktop/iherb_price/coupang2/data/monitoring.db"  # 실제 경로
 
 
 def print_db_structure():

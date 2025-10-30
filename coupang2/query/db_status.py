@@ -14,7 +14,7 @@ from datetime import datetime
 from pathlib import Path
 
 
-DB_PATH = "/Users/brich/Desktop/iherb_price/coupang2/monitoring.db"
+DB_PATH = "/Users/brich/Desktop/iherb_price/coupang2/data/monitoring.db"
 
 
 class DatabaseSummary:
