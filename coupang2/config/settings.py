@@ -53,9 +53,6 @@ class Config:
     def ensure_directories(cls):
         """필요한 디렉토리 생성"""
         cls.DATA_DIR.mkdir(exist_ok=True)
-        (cls.DATA_DIR / "db").mkdir(exist_ok=True)
-        (cls.DATA_DIR / "matching").mkdir(exist_ok=True)
-        (cls.DATA_DIR / "iherb").mkdir(exist_ok=True)
         cls.OUTPUT_DIR.mkdir(exist_ok=True)
         cls.REPORTS_DIR.mkdir(exist_ok=True)
         cls.LOGS_DIR.mkdir(exist_ok=True)
