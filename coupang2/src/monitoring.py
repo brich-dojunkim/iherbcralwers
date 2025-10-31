@@ -240,47 +240,56 @@ class ScrollExtractor:
         try:
             html = element.get_attribute('outerHTML')
             soup = BeautifulSoup(html, 'html.parser')
-            
+
             name_elem = soup.select_one('div.name')
             if not name_elem:
                 return None
-            
+
             product_name = name_elem.get_text(strip=True)
             if not product_name:
                 return None
-            
-            # 가격 등 파싱
+
+            # ✅ [추가] URL에서 vendorItemId 추출
+            vendor_item_id = None
+            try:
+                m_vid = re.search(r'vendorItemId=(\d+)', product_url)
+                if m_vid:
+                    vendor_item_id = m_vid.group(1)
+            except:
+                vendor_item_id = None
+
+            # (이하 가격/리뷰 등 기존 파싱 그대로)
             current_price = 0
             price_elem = soup.select_one('strong.price-value')
             if price_elem:
                 price_text = price_elem.get_text(strip=True)
                 price_text = re.sub(r'[^\d]', '', price_text)
                 current_price = int(price_text) if price_text else 0
-            
+
             original_price = 0
             original_elem = soup.select_one('del.base-price')
             if original_elem:
                 price_text = original_elem.get_text(strip=True)
                 price_text = re.sub(r'[^\d]', '', price_text)
                 original_price = int(price_text) if price_text else 0
-            
+
             if original_price == 0:
                 original_price = current_price
-            
+
             discount_rate = 0
             discount_elem = soup.select_one('span.discount-percentage')
             if discount_elem:
                 discount_text = discount_elem.get_text(strip=True)
                 discount_text = re.sub(r'[^\d]', '', discount_text)
                 discount_rate = int(discount_text) if discount_text else 0
-            
+
             review_count = 0
             review_elem = soup.select_one('span.rating-total-count')
             if review_elem:
                 review_text = review_elem.get_text(strip=True)
                 review_text = re.sub(r'[^\d]', '', review_text)
                 review_count = int(review_text) if review_text else 0
-            
+
             rating_score = 0.0
             rating_elem = soup.select_one('div.rating-light')
             if rating_elem and rating_elem.has_attr('data-rating'):
@@ -288,9 +297,10 @@ class ScrollExtractor:
                     rating_score = float(rating_elem['data-rating'])
                 except:
                     rating_score = 0.0
-            
+
             return {
-                'product_id': product_id,
+                # ⚠️ 기존 키 유지
+                'product_id': product_id,            # itemId (스크롤 중복제거/순위 산정에 계속 사용)
                 'product_name': product_name,
                 'product_url': product_url,
                 'current_price': current_price,
@@ -298,8 +308,11 @@ class ScrollExtractor:
                 'discount_rate': discount_rate,
                 'review_count': review_count,
                 'rating_score': rating_score,
+
+                # ✅ [추가] 저장 단계에서 DB가 참조할 올바른 키
+                'vendor_item_id': vendor_item_id     # ← 이 값이 있으면 DB에 그대로 들어갑니다
             }
-            
+
         except Exception as e:
             return None
     
