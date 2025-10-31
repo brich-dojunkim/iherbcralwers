@@ -63,6 +63,31 @@ def extract_unit_count(name: str):
     
     return np.nan
 
+def extract_weight(name: str) -> Optional[float]:
+    """
+    상품명에서 용량을 추출하여 g 단위로 반환.
+    예: '1.64kg' → 1640, '907g' → 907, '5lb' → 2267.96
+    """
+    if not isinstance(name, str):
+        return np.nan
+    text = name.replace(',', '')
+    match = re.search(r'(\d+(?:\.\d+)?)\s*(kg|g|lbs?|lb|oz|파운드)', text, flags=re.I)
+    if not match:
+        return np.nan
+
+    value = float(match.group(1))
+    unit = match.group(2).lower()
+
+    if unit == 'kg':
+        return value * 1000
+    if unit == 'g':
+        return value
+    if unit in ('lb', 'lbs', '파운드'):
+        return value * 453.59237
+    if unit == 'oz':
+        return value * 28.3495231
+
+    return np.nan
 
 def normalize_part_number(pn: str):
     """품번 정규화: 대문자, 하이픈/공백 제거"""
@@ -150,16 +175,16 @@ class DataManager:
         
         # 1. 로켓직구 데이터 (DB)
         df_rocket = self._load_rocket_df(target_date)
-        
+
         # 2. 아이허브 가격/재고 (Excel)
         df_price = self._load_price_inventory_df()
-        
+
         # 3. 아이허브 성과 (Excel)
         df_insights = self._load_seller_insights_df()
-        
+
         # 4. 아이허브 통합
         df_iherb = self._integrate_iherb(df_price, df_insights)
-        
+
         # 5. 전체 통합 (Product ID 기반)
         df_final = self._integrate_all_by_product_id(df_rocket, df_iherb)
         
@@ -171,61 +196,59 @@ class DataManager:
         return df_final
     
     def _load_rocket_df(self, target_date: Optional[str]) -> pd.DataFrame:
-        """로켓직구 데이터 로드 (DB) - product_id, item_id 포함"""
-        
+        """로켓직구 데이터 로드 (DB) - 모든 카테고리의 최신 스냅샷을 포함"""
+
         print(f"📥 1. 로켓직구 데이터 (DB)")
-        
+
         conn = sqlite3.connect(self.db_path)
-        
-        # 최신 스냅샷 ID 가져오기
+
         if target_date:
-            snapshot_query = f"""
-            SELECT MAX(id) FROM snapshots 
-            WHERE DATE(snapshot_time) = '{target_date}'
-            AND source_id = (SELECT id FROM sources WHERE source_type = 'rocket_direct')
+            # 특정 날짜에 대해 카테고리별 최신 스냅샷 ID를 구하는 서브쿼리
+            subquery = f"""
+                SELECT category_id, MAX(id) AS latest_id
+                FROM snapshots
+                WHERE DATE(snapshot_time) = '{target_date}'
+                AND source_id = (SELECT id FROM sources WHERE source_type = 'rocket_direct')
+                GROUP BY category_id
             """
         else:
-            snapshot_query = """
-            SELECT MAX(id) FROM snapshots 
-            WHERE source_id = (SELECT id FROM sources WHERE source_type = 'rocket_direct')
+            # 전체 기간에 대해 카테고리별 최신 스냅샷 ID를 구하는 서브쿼리
+            subquery = """
+                SELECT category_id, MAX(id) AS latest_id
+                FROM snapshots
+                WHERE source_id = (SELECT id FROM sources WHERE source_type = 'rocket_direct')
+                GROUP BY category_id
             """
-        
-        latest_snapshot_id = pd.read_sql_query(snapshot_query, conn).iloc[0, 0]
-        
-        if not latest_snapshot_id:
-            print("   ⚠️  스냅샷 없음")
-            conn.close()
-            return pd.DataFrame()
-        
-        # 로켓직구 데이터 로드
+
+        # 각 카테고리의 최신 스냅샷에 속한 상품 상태를 조회
         query = f"""
-        SELECT 
-            ps.vendor_item_id as rocket_vendor_id,
-            ps.product_id as rocket_product_id,
-            ps.item_id as rocket_item_id,
-            ps.product_name as rocket_product_name,
-            ps.product_url as rocket_url,
-            ps.category_rank as rocket_rank,
-            ps.current_price as rocket_price,
-            ps.original_price as rocket_original_price,
-            ps.discount_rate as rocket_discount_rate,
-            ps.review_count as rocket_reviews,
-            ps.rating_score as rocket_rating,
-            c.name as rocket_category
-        FROM product_states ps
-        JOIN snapshots s ON ps.snapshot_id = s.id
-        JOIN categories c ON s.category_id = c.id
-        WHERE s.id = {latest_snapshot_id}
-        AND ps.vendor_item_id IS NOT NULL
-        ORDER BY ps.category_rank
+            SELECT 
+                ps.vendor_item_id  AS rocket_vendor_id,
+                ps.product_id      AS rocket_product_id,
+                ps.item_id         AS rocket_item_id,
+                ps.product_name    AS rocket_product_name,
+                ps.product_url     AS rocket_url,
+                ps.category_rank   AS rocket_rank,
+                ps.current_price   AS rocket_price,
+                ps.original_price  AS rocket_original_price,
+                ps.discount_rate   AS rocket_discount_rate,
+                ps.review_count    AS rocket_reviews,
+                ps.rating_score    AS rocket_rating,
+                c.name             AS rocket_category
+            FROM product_states ps
+            JOIN snapshots s   ON ps.snapshot_id = s.id
+            JOIN categories c  ON s.category_id = c.id
+            JOIN ({subquery}) ls ON s.id = ls.latest_id
+            WHERE ps.vendor_item_id IS NOT NULL
+            ORDER BY c.id, ps.category_rank
         """
-        
+
         df = pd.read_sql_query(query, conn)
         conn.close()
-        
+
         print(f"   ✓ {len(df):,}개 상품")
         print(f"   ✓ Product ID 있음: {df['rocket_product_id'].notna().sum():,}개")
-        
+
         return df
     
     def _load_price_inventory_df(self) -> pd.DataFrame:
@@ -375,17 +398,22 @@ class DataManager:
         return df
     
     def _integrate_all_by_product_id(self, df_rocket: pd.DataFrame, df_iherb: pd.DataFrame) -> pd.DataFrame:
-        """전체 통합 (Product ID 기반 매칭 - Best Match 선택)"""
-        
+        """
+        전체 통합 (Product ID 기반 매칭 - Best Match 선택)
+        팩 수, 단위 수, 용량(무게)까지 비교하여 일치하는 후보를 우선순위로 매칭.
+        """
+
         print(f"\n🔗 5. 전체 통합 (Product ID 기반 매칭)")
-        
-        # 팩 수 및 단위 수 계산
-        df_rocket['rocket_pack'] = df_rocket['rocket_product_name'].apply(extract_pack_count)
-        df_rocket['rocket_unit'] = df_rocket['rocket_product_name'].apply(extract_unit_count)
-        
-        df_iherb['iherb_pack'] = df_iherb['iherb_product_name'].apply(extract_pack_count)
-        df_iherb['iherb_unit'] = df_iherb['iherb_product_name'].apply(extract_unit_count)
-        
+
+        # 팩 수, 단위 수, 용량 계산
+        df_rocket['rocket_pack']   = df_rocket['rocket_product_name'].apply(extract_pack_count)
+        df_rocket['rocket_unit']   = df_rocket['rocket_product_name'].apply(extract_unit_count)
+        df_rocket['rocket_weight'] = df_rocket['rocket_product_name'].apply(extract_weight)
+
+        df_iherb['iherb_pack']   = df_iherb['iherb_product_name'].apply(extract_pack_count)
+        df_iherb['iherb_unit']   = df_iherb['iherb_product_name'].apply(extract_unit_count)
+        df_iherb['iherb_weight'] = df_iherb['iherb_product_name'].apply(extract_weight)
+
         # Product ID로 조인
         df = df_rocket.merge(
             df_iherb,
@@ -394,70 +422,88 @@ class DataManager:
             how='left',
             suffixes=('', '_dup')
         )
-        
+
         print(f"   ✓ Product ID 조인: {df['iherb_vendor_id'].notna().sum():,}개 원시 매칭")
-        
+
         # Best Match 선택 로직
-        # 1) Product ID가 일치하는 후보들 중에서
-        # 2) 팩 수와 단위 수가 모두 일치하는 것을 우선 선택
-        # 3) 없으면 매칭 제거
-        
         matched_rows = []
         unmatched_rows = []
-        
+
         for rocket_vid, group in df.groupby('rocket_vendor_id', dropna=False):
+            # 매칭 없는 경우
             if group['iherb_vendor_id'].isna().all():
-                # 매칭 없음
                 unmatched_rows.append(group.iloc[0])
                 continue
-            
-            # 매칭된 후보들
+
             candidates = group[group['iherb_vendor_id'].notna()].copy()
-            
-            # 로켓직구 정보
-            rocket_pack = group.iloc[0]['rocket_pack']
-            rocket_unit = group.iloc[0]['rocket_unit']
-            
-            # Best match 찾기
-            # 우선순위 1: 팩 수 + 단위 수 모두 일치
+
+            rocket_pack   = group.iloc[0]['rocket_pack']
+            rocket_unit   = group.iloc[0]['rocket_unit']
+            rocket_weight = group.iloc[0]['rocket_weight']
+
+            # 1순위: 팩 수, 단위 수, 용량 모두 일치
+            best = candidates[
+                (candidates['iherb_pack']   == rocket_pack) &
+                (candidates['iherb_unit']   == rocket_unit) &
+                (candidates['iherb_weight'] == rocket_weight)
+            ]
+            if len(best) > 0:
+                matched_rows.append(best.iloc[0])
+                continue
+
+            # 2순위: 팩 수와 용량만 일치 (단위 수 정보 없음)
+            best = candidates[
+                (candidates['iherb_pack']   == rocket_pack) &
+                (candidates['iherb_weight'] == rocket_weight) &
+                (candidates['iherb_unit'].isna() | pd.isna(rocket_unit))
+            ]
+            if len(best) > 0:
+                matched_rows.append(best.iloc[0])
+                continue
+
+            # 3순위: 용량만 일치
+            best = candidates[
+                (candidates['iherb_weight'] == rocket_weight)
+            ]
+            if len(best) > 0:
+                matched_rows.append(best.iloc[0])
+                continue
+
+            # 기존 로직: 팩 수 + 단위 수 일치
             best = candidates[
                 (candidates['iherb_pack'] == rocket_pack) &
                 (candidates['iherb_unit'] == rocket_unit)
             ]
-            
             if len(best) > 0:
                 matched_rows.append(best.iloc[0])
                 continue
-            
-            # 우선순위 2: 팩 수만 일치 (단위 수 정보 없음)
+
+            # 기존 로직: 팩 수만 일치
             best = candidates[
                 (candidates['iherb_pack'] == rocket_pack) &
-                (candidates['iherb_unit'].isna() | candidates['rocket_unit'].isna())
+                (candidates['iherb_unit'].isna() | pd.isna(rocket_unit))
             ]
-            
             if len(best) > 0:
                 matched_rows.append(best.iloc[0])
                 continue
-            
-            # 우선순위 3: 단위 수만 일치 (팩 수 정보 없음)
+
+            # 기존 로직: 단위 수만 일치
             best = candidates[
                 (candidates['iherb_unit'] == rocket_unit) &
-                (candidates['iherb_pack'].isna() | candidates['rocket_pack'].isna())
+                (candidates['iherb_pack'].isna() | pd.isna(rocket_pack))
             ]
-            
             if len(best) > 0:
                 matched_rows.append(best.iloc[0])
                 continue
-            
+
             # 매칭 실패 - 후보는 있지만 조건 불일치
             row = group.iloc[0].copy()
             iherb_cols = [col for col in row.index if col.startswith('iherb_')]
             row[iherb_cols] = pd.NA
             unmatched_rows.append(row)
-        
+
         # 재구성
-        df_final = pd.concat(matched_rows + unmatched_rows, axis=1).T
-        df_final = df_final.reset_index(drop=True)
+        df_final = pd.concat(matched_rows + unmatched_rows, axis=1).T.reset_index(drop=True)
         
         removed_count = len(df) - len(df_final)
         if removed_count > 0:

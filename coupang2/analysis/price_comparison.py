@@ -86,7 +86,7 @@ def extract_price_comparison_data(db_path, excel_dir, target_date=None):
 
 def create_excel_report(date_data_dict, output_path):
     """Excel 리포트 생성"""
-    
+
     if not date_data_dict:
         print("❌ 데이터가 없어 엑셀 생성을 건너뜁니다.")
         return
@@ -100,73 +100,82 @@ def create_excel_report(date_data_dict, output_path):
             if df.empty:
                 continue
 
-            # 컬럼 재구성 및 이름 변경
+            # 1. 컬럼 재구성 및 이름 변경
             output_df = pd.DataFrame()
 
-            # === 기본 정보 ===
-            output_df['카테고리'] = df['rocket_category']
-            output_df['로켓_순위'] = df['rocket_rank']
-            output_df['로켓_상품ID'] = df['rocket_vendor_id']
-            output_df['로켓_Product_ID'] = df['rocket_product_id']
-            output_df['로켓_Item_ID'] = df['rocket_item_id']
+            # === (1) 성과 지표 ===
+            # 로켓 평점/리뷰수/순위, 판매량, 매출(원)
+            # 일부 값이 없을 수 있으므로 get() 사용해 NaN 대체
+            output_df['로켓_평점'] = df.get('rocket_rating', np.nan)
+            output_df['로켓_리뷰수'] = df.get('rocket_reviews', np.nan)
+            output_df['로켓_순위'] = df.get('rocket_rank', np.nan)
+            output_df['판매량'] = df.get('iherb_sales_quantity', np.nan)
+            output_df['매출(원)'] = df.get('iherb_revenue', np.nan)
 
-            # === 로켓직구 정보 ===
-            output_df['로켓_제품명'] = df['rocket_product_name']
-            output_df['로켓_가격'] = df['rocket_price']
-            output_df['로켓_정가'] = df['rocket_original_price']
-            output_df['로켓_할인율(%)'] = df['rocket_discount_rate']
-            output_df['로켓_평점'] = df['rocket_rating']
-            output_df['로켓_리뷰수'] = df['rocket_reviews']
-            output_df['로켓_링크'] = df['rocket_url']
+            # === (2) 제품 정보 ===
+            # 카테고리, 제품명, 링크, ID 등
+            output_df['카테고리'] = df.get('rocket_category', np.nan)
+            output_df['아이허브_카테고리'] = df.get('iherb_category', np.nan)
 
-            # === 매칭 정보 ===
-            output_df['매칭_방식'] = df['matching_method']
-            output_df['매칭_신뢰도'] = df['matching_confidence']
+            output_df['로켓_제품명'] = df.get('rocket_product_name', np.nan)
+            output_df['아이허브_제품명'] = df.get('iherb_product_name', np.nan)
 
-            # === 아이허브 기본 ===
-            output_df['아이허브_상품ID'] = df['iherb_vendor_id']
-            output_df['아이허브_Product_ID'] = df['iherb_product_id']
-            output_df['아이허브_Item_ID'] = df['iherb_item_id']
-            output_df['아이허브_제품명'] = df['iherb_product_name']
-            output_df['아이허브_품번'] = df['iherb_part_number']
-            output_df['아이허브_가격'] = df['iherb_price']
-            output_df['아이허브_재고'] = df['iherb_stock']
-            output_df['아이허브_판매상태'] = df['iherb_stock_status']
-            output_df['아이허브_링크'] = df['iherb_url']
+            output_df['로켓_링크'] = df.get('rocket_url', np.nan)
+            output_df['아이허브_링크'] = df.get('iherb_url', np.nan)
 
-            # === 가격 비교 ===
-            output_df['가격차이(원)'] = df['price_diff']
-            output_df['가격차이(%)'] = df['price_diff_pct']
-            output_df['더_저렴한_곳'] = df['cheaper_source']
+            output_df['로켓_상품ID'] = df.get('rocket_vendor_id', np.nan)
+            output_df['로켓_Product_ID'] = df.get('rocket_product_id', np.nan)
+            output_df['로켓_Item_ID'] = df.get('rocket_item_id', np.nan)
 
-            # === 판매 성과 ===
-            output_df['아이허브_카테고리'] = df['iherb_category']
-            output_df['매출(원)'] = df['iherb_revenue']
+            output_df['아이허브_상품ID'] = df.get('iherb_vendor_id', np.nan)
+            output_df['아이허브_Product_ID'] = df.get('iherb_product_id', np.nan)
+            output_df['아이허브_Item_ID'] = df.get('iherb_item_id', np.nan)
+
+            output_df['아이허브_품번'] = df.get('iherb_part_number', np.nan)
+
+            # === (3) 가격 비교 ===
+            # 요청한 순서대로 컬럼 재배치
+            output_df['로켓_정가'] = df.get('rocket_original_price', np.nan)
+            output_df['로켓_할인율(%)'] = df.get('rocket_discount_rate', np.nan)
+            output_df['로켓_가격'] = df.get('rocket_price', np.nan)
+            output_df['아이허브_가격'] = df.get('iherb_price', np.nan)
+            output_df['가격차이(원)'] = df.get('price_diff', np.nan)
+            output_df['가격차이(%)'] = df.get('price_diff_pct', np.nan)
+            output_df['더_저렴한_곳'] = df.get('cheaper_source', np.nan)
+
+            # === (4) 재고·매칭 및 판매 성과 ===
+            output_df['아이허브_재고'] = df.get('iherb_stock', np.nan)
+            # 아이허브 판매상태 컬럼명은 기존 코드에서 iherb_stock_status를 사용하고 있어 그에 맞춤
+            output_df['아이허브_판매상태'] = df.get('iherb_stock_status', np.nan)
+            output_df['매칭_방식'] = df.get('matching_method', np.nan)
+            output_df['매칭_신뢰도'] = df.get('matching_confidence', np.nan)
+
+            # 판매 성과 관련 컬럼 (필요 시 포함)
             output_df['매출비중(%)'] = df.get('매출비중(%)', np.nan)
-            output_df['주문'] = df['iherb_orders']
+            output_df['주문'] = df.get('iherb_orders', np.nan)
             output_df['주문비중(%)'] = df.get('주문비중(%)', np.nan)
-            output_df['판매량'] = df['iherb_sales_quantity']
             output_df['판매량비중(%)'] = df.get('판매량비중(%)', np.nan)
-            output_df['방문자'] = df['iherb_visitors']
-            output_df['조회'] = df['iherb_views']
+            output_df['방문자'] = df.get('iherb_visitors', np.nan)
+            output_df['조회'] = df.get('iherb_views', np.nan)
             output_df['조회비중(%)'] = df.get('조회비중(%)', np.nan)
-            output_df['장바구니'] = df['iherb_cart_adds']
-            output_df['구매전환율(%)'] = df['iherb_conversion_rate']
-            output_df['총_매출(원)'] = df['iherb_total_revenue']
-            output_df['총_취소금액'] = df['iherb_total_cancel_amount']
-            output_df['총_취소수량'] = df['iherb_total_cancel_quantity']
-            output_df['취소율(%)'] = df['iherb_cancel_rate']
+            output_df['장바구니'] = df.get('iherb_cart_adds', np.nan)
+            output_df['구매전환율(%)'] = df.get('iherb_conversion_rate', np.nan)
+            output_df['총_매출(원)'] = df.get('iherb_total_revenue', np.nan)
+            output_df['총_취소금액'] = df.get('iherb_total_cancel_amount', np.nan)
+            output_df['총_취소수량'] = df.get('iherb_total_cancel_quantity', np.nan)
+            output_df['취소율(%)'] = df.get('iherb_cancel_rate', np.nan)
 
-            # 시트명
-            sheet_name = date_str.replace('-', '')[:10]  # YYYY-MM-DD -> YYYYMMDD
+            # 2. 시트명 생성 후 쓰기
+            sheet_name = date_str.replace('-', '')[:10]  # YYYYMMDD
             output_df.to_excel(writer, sheet_name=sheet_name, index=False)
-            
+
             print(f"   ✓ 시트 '{sheet_name}' 작성 완료 ({len(output_df):,}개)")
 
-    # 스타일 적용
+    # 3. 스타일 적용 (헤더 병합 등은 apply_excel_styles()에서 처리한다고 가정)
     apply_excel_styles(output_path)
-    
+
     print(f"\n✅ Excel 리포트 생성 완료: {output_path}")
+
 
 
 def apply_excel_styles(output_path):
