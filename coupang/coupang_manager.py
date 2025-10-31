@@ -1,7 +1,14 @@
 # coupang_manager.py
+import os
+import sys
 import undetected_chromedriver as uc
 import time
 from typing import Optional
+
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.insert(0, current_dir)
+
 from coupang_config import CoupangConfig
 
 COUPANG_DOMAINS = ("coupang.com",)

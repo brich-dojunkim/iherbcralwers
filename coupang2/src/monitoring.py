@@ -15,17 +15,41 @@ import random
 from datetime import datetime
 from bs4 import BeautifulSoup
 
-# 프로젝트 루트 추가
-project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, project_root)
+# 절대 경로 기반 import
+COUPANG2_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+IHERB_PRICE_ROOT = os.path.dirname(COUPANG2_ROOT)
+
+# 경로 추가
+sys.path.insert(0, IHERB_PRICE_ROOT)
+sys.path.insert(0, COUPANG2_ROOT)
+sys.path.insert(0, os.path.join(COUPANG2_ROOT, 'config'))
+sys.path.insert(0, os.path.join(COUPANG2_ROOT, 'src'))
 
 # 쿠팡 크롤러
 from coupang.coupang_manager import BrowserManager
 from selenium.webdriver.common.by import By
 
-# 프로젝트 모듈
-from config.settings import Config
-from src.database import MonitoringDatabase
+# 직접 파일 import
+settings_path = os.path.join(COUPANG2_ROOT, 'config', 'settings.py')
+database_path = os.path.join(COUPANG2_ROOT, 'src', 'database.py')
+
+# settings.py 로드
+import importlib.util
+
+spec_settings = importlib.util.spec_from_file_location("settings", settings_path)
+settings_module = importlib.util.module_from_spec(spec_settings)
+spec_settings.loader.exec_module(settings_module)
+Config = settings_module.Config
+
+# database.py 로드
+spec_database = importlib.util.spec_from_file_location("database", database_path)
+database_module = importlib.util.module_from_spec(spec_database)
+spec_database.loader.exec_module(database_module)
+MonitoringDatabase = database_module.MonitoringDatabase
+
+
+COUPANG_DOMAINS = ("coupang.com",)
+COUPANG_DEEPLINK_HINTS = ("/np/search", "/vp/product", "/vp/products", "/shop.coupang.com")
 
 
 class ScrollExtractor:
