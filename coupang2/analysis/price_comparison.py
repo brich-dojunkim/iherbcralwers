@@ -179,45 +179,75 @@ def create_excel_report(date_data_dict, output_path):
 
 
 def apply_excel_styles(output_path):
-    """Excel 스타일 적용"""
-    
+    """Excel 스타일 적용 및 상위 헤더 병합"""
+
     wb = load_workbook(output_path)
-    
-    # 스타일 정의
+
+    # 기본 스타일 정의
+    group_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
     header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
     header_font = Font(color="FFFFFF", bold=True, size=11)
-    
-    green_fill = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")
-    red_fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
+
+    green_fill  = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")
+    red_fill    = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
     yellow_fill = PatternFill(start_color="FFEB9C", end_color="FFEB9C", fill_type="solid")
-    
+
     thin_border = Border(
         left=Side(style='thin'),
         right=Side(style='thin'),
         top=Side(style='thin'),
         bottom=Side(style='thin')
     )
-    
+
+    # 그룹별 열 이름 목록 (필요에 따라 수정)
+    group_defs = [
+        ('성과 지표', [
+            '로켓_평점','로켓_리뷰수','로켓_순위','판매량','매출(원)'
+        ]),
+        ('제품 정보', [
+            '카테고리','아이허브_카테고리','로켓_제품명','아이허브_제품명',
+            '로켓_링크','아이허브_링크','로켓_상품ID','로켓_Product_ID','로켓_Item_ID',
+            '아이허브_상품ID','아이허브_Product_ID','아이허브_Item_ID','아이허브_품번'
+        ]),
+        ('가격 비교', [
+            '로켓_정가','로켓_할인율(%)','로켓_가격','아이허브_가격',
+            '가격차이(원)','가격차이(%)','더_저렴한_곳'
+        ]),
+        ('재고·매칭 정보', [
+            '아이허브_재고','아이허브_판매상태','매칭_방식','매칭_신뢰도',
+            '매출비중(%)','주문','주문비중(%)','판매량비중(%)',
+            '방문자','조회','조회비중(%)','장바구니','구매전환율(%)',
+            '총_매출(원)','총_취소금액','총_취소수량','취소율(%)'
+        ])
+    ]
+
     for sheet_name in wb.sheetnames:
         ws = wb[sheet_name]
-        
-        # 헤더 스타일
-        for cell in ws[1]:
+
+        # 1. 그룹 헤더를 위한 행 추가
+        ws.insert_rows(1)
+
+        # 2. 각 그룹명을 병합하여 작성
+        col_pos = 1
+        for group_name, cols in group_defs:
+            span = len(cols)
+            ws.merge_cells(start_row=1, start_column=col_pos,
+                           end_row=1, end_column=col_pos + span - 1)
+            cell = ws.cell(row=1, column=col_pos)
+            cell.value = group_name
+            cell.fill = group_fill
+            cell.font = header_font
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+            col_pos += span
+
+        # 3. 2행(기존 헤더)의 스타일 적용
+        for cell in ws[2]:
             cell.fill = header_fill
             cell.font = header_font
             cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
             cell.border = thin_border
-        
-        # 헤더 이름으로 컬럼 인덱스 찾기
-        header_values = [cell.value for cell in ws[1]]
-        
-        def col_idx_of(name):
-            try:
-                return header_values.index(name) + 1
-            except ValueError:
-                return None
-        
-        # 컬럼 너비 조정
+
+        # 4. 컬럼 너비 설정 (필요 시 수정)
         column_widths = {
             '카테고리': 15,
             '로켓_순위': 10,
@@ -246,36 +276,43 @@ def apply_excel_styles(output_path):
             '가격차이(%)': 12,
             '더_저렴한_곳': 12,
         }
-        
+        # 헤더 이름 목록 (2행)
+        header_names = [cell.value for cell in ws[2]]
+
+        def col_idx_of(name):
+            try:
+                return header_names.index(name) + 1
+            except ValueError:
+                return None
+
         for col_name, width in column_widths.items():
-            col_idx = col_idx_of(col_name)
-            if col_idx:
-                ws.column_dimensions[get_column_letter(col_idx)].width = width
-        
-        # 데이터 스타일
+            idx = col_idx_of(col_name)
+            if idx:
+                ws.column_dimensions[get_column_letter(idx)].width = width
+
+        # 5. 데이터 셀 스타일 (3행 이후)
         max_col = ws.max_column
-        for row_idx in range(2, ws.max_row + 1):
+        for row_idx in range(3, ws.max_row + 1):
             for col_idx in range(1, max_col + 1):
                 cell = ws.cell(row=row_idx, column=col_idx)
                 cell.border = thin_border
                 cell.alignment = Alignment(vertical='center', wrap_text=False)
-        
-        # 가격 차이 색상
+
+        # 6. 가격 차이 색상
         price_diff_col = col_idx_of('가격차이(원)')
         cheaper_col = col_idx_of('더_저렴한_곳')
-        
         if price_diff_col and cheaper_col:
-            for row_idx in range(2, ws.max_row + 1):
+            for row_idx in range(3, ws.max_row + 1):
                 cheaper_value = ws.cell(row=row_idx, column=cheaper_col).value
                 if cheaper_value == '아이허브':
                     ws.cell(row=row_idx, column=price_diff_col).fill = green_fill
                 elif cheaper_value == '로켓직구':
                     ws.cell(row=row_idx, column=price_diff_col).fill = red_fill
-        
-        # 매칭 신뢰도 색상
+
+        # 7. 매칭 신뢰도 색상
         conf_col = col_idx_of('매칭_신뢰도')
         if conf_col:
-            for row_idx in range(2, ws.max_row + 1):
+            for row_idx in range(3, ws.max_row + 1):
                 conf_value = ws.cell(row=row_idx, column=conf_col).value
                 cell = ws.cell(row=row_idx, column=conf_col)
                 if conf_value == 'High':
@@ -284,11 +321,11 @@ def apply_excel_styles(output_path):
                     cell.fill = yellow_fill
                 elif conf_value == 'Low':
                     cell.fill = red_fill
-        
-        # 하이퍼링크
+
+        # 8. 하이퍼링크 처리 (3행부터)
         rocket_url_col = col_idx_of('로켓_링크')
         if rocket_url_col:
-            for row_idx in range(2, ws.max_row + 1):
+            for row_idx in range(3, ws.max_row + 1):
                 cell = ws.cell(row=row_idx, column=rocket_url_col)
                 url = cell.value
                 if url and str(url).strip():
@@ -296,10 +333,10 @@ def apply_excel_styles(output_path):
                     cell.hyperlink = str(url)
                     cell.font = Font(color="0563C1", underline="single")
                     cell.alignment = Alignment(horizontal='center', vertical='center')
-        
+
         iherb_url_col = col_idx_of('아이허브_링크')
         if iherb_url_col:
-            for row_idx in range(2, ws.max_row + 1):
+            for row_idx in range(3, ws.max_row + 1):
                 cell = ws.cell(row=row_idx, column=iherb_url_col)
                 url = cell.value
                 if url and str(url).strip():
@@ -307,12 +344,13 @@ def apply_excel_styles(output_path):
                     cell.hyperlink = str(url)
                     cell.font = Font(color="0563C1", underline="single")
                     cell.alignment = Alignment(horizontal='center', vertical='center')
-        
-        # Freeze panes (로켓_링크까지 고정)
-        freeze_col = col_idx_of('로켓_링크')
+
+        # 9. Freeze panes: 두 줄 헤더 뒤로 고정
+        freeze_col = col_idx_of('매출(원)')
         if freeze_col:
-            ws.freeze_panes = ws.cell(row=2, column=freeze_col + 1)
-    
+            # 2행 헤더 아래, 링크 컬럼 다음 칸에서 고정
+            ws.freeze_panes = ws.cell(row=3, column=freeze_col + 1)
+
     wb.save(output_path)
 
 

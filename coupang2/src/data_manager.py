@@ -429,7 +429,7 @@ class DataManager:
         matched_rows = []
         unmatched_rows = []
 
-        for rocket_vid, group in df.groupby('rocket_vendor_id', dropna=False):
+        for (rocket_vid, rocket_cat), group in df.groupby(['rocket_vendor_id', 'rocket_category'], dropna=False):
             # 매칭 없는 경우
             if group['iherb_vendor_id'].isna().all():
                 unmatched_rows.append(group.iloc[0])
