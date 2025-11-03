@@ -24,8 +24,6 @@ class Config:
     
     # 출력 경로
     OUTPUT_DIR = PROJECT_ROOT / "output"
-    REPORTS_DIR = OUTPUT_DIR / "reports"
-    LOGS_DIR = OUTPUT_DIR / "logs"
     
     # 로켓직구 카테고리 설정
     ROCKET_CATEGORIES = [
@@ -54,8 +52,6 @@ class Config:
         """필요한 디렉토리 생성"""
         cls.DATA_DIR.mkdir(exist_ok=True)
         cls.OUTPUT_DIR.mkdir(exist_ok=True)
-        cls.REPORTS_DIR.mkdir(exist_ok=True)
-        cls.LOGS_DIR.mkdir(exist_ok=True)
     
     @classmethod
     def get_category_by_name(cls, name: str):

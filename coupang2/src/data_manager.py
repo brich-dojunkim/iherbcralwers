@@ -8,6 +8,8 @@
 - 품번 매칭 → Product ID 기반 매칭으로 전환
 - Product ID 중복 시 팩 수 일치 조건으로 필터링
 - 매칭 방식 및 신뢰도 기록
+- 손익분기 할인율 계산 추가
+- 아이템위너 비율 추가
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 """
 
@@ -122,17 +124,14 @@ class DataManager:
     """통합 데이터 관리 - Product ID 기반 매칭"""
     
     def __init__(self, 
-                 db_path: str = "monitoring.db", 
-                 rocket_csv_path: str = "data/rocket/rocket.csv",
-                 excel_dir: str = "data/iherb"):
+                 db_path: str = "/Users/brich/Desktop/iherb_price/coupang2/data/rocket/monitoring.db", 
+                 excel_dir: str = "/Users/brich/Desktop/iherb_price/coupang2/data/iherb"):
         """
         Args:
             db_path: 로켓직구 모니터링 DB 경로
-            rocket_csv_path: 매칭 CSV 경로 (참고용, 사용 안 함)
             excel_dir: 아이허브 Excel 파일 디렉토리
         """
         self.db_path = db_path
-        self.rocket_csv_path = rocket_csv_path
         self.excel_dir = Path(excel_dir)
     
     def get_integrated_df(self, target_date: Optional[str] = None) -> pd.DataFrame:
@@ -161,12 +160,14 @@ class DataManager:
             - iherb_cart_adds, iherb_conversion_rate
             - iherb_total_revenue, iherb_total_cancel_amount
             - iherb_total_cancel_quantity, iherb_cancel_rate
+            - iherb_item_winner_ratio
             
             [매칭 정보]
             - matching_method, matching_confidence
             
             [가격 비교]
             - price_diff, price_diff_pct, cheaper_source
+            - breakeven_discount_rate
         """
         
         print(f"\n{'='*80}")
@@ -224,8 +225,6 @@ class DataManager:
         query = f"""
             SELECT 
                 ps.vendor_item_id  AS rocket_vendor_id,
-                ps.product_id      AS rocket_product_id,
-                ps.item_id         AS rocket_item_id,
                 ps.product_name    AS rocket_product_name,
                 ps.product_url     AS rocket_url,
                 ps.category_rank   AS rocket_rank,
@@ -245,6 +244,30 @@ class DataManager:
 
         df = pd.read_sql_query(query, conn)
         conn.close()
+        
+        # URL에서 Product ID, Item ID 추출
+        def extract_ids_from_url(url):
+            if not isinstance(url, str):
+                return pd.Series({'rocket_product_id': None, 'rocket_item_id': None})
+            
+            import re
+            product_id = None
+            item_id = None
+            
+            # /products/숫자
+            m_product = re.search(r'/products/(\d+)', url)
+            if m_product:
+                product_id = m_product.group(1)
+            
+            # itemId=숫자
+            m_item = re.search(r'itemId=(\d+)', url)
+            if m_item:
+                item_id = m_item.group(1)
+            
+            return pd.Series({'rocket_product_id': product_id, 'rocket_item_id': item_id})
+        
+        # URL에서 ID 추출
+        df[['rocket_product_id', 'rocket_item_id']] = df['rocket_url'].apply(extract_ids_from_url)
 
         print(f"   ✓ {len(df):,}개 상품")
         print(f"   ✓ Product ID 있음: {df['rocket_product_id'].notna().sum():,}개")
@@ -365,6 +388,7 @@ class DataManager:
             'iherb_views': to_int_series(df.get('조회', 0)),
             'iherb_cart_adds': to_int_series(df.get('장바구니', 0)),
             'iherb_conversion_rate': to_percent_series(df.get('구매전환율', 0)),
+            'iherb_item_winner_ratio': to_percent_series(df.get('아이템위너 비율(%)', 0)),
             'iherb_total_revenue': to_int_series(df.get('총 매출(원)', 0)),
             'iherb_total_cancel_amount': to_int_series(df.get('총 취소 금액', 0)),
             'iherb_total_cancel_quantity': to_int_series(df.get('총 취소된 상품수', 0)),
@@ -399,11 +423,11 @@ class DataManager:
     
     def _integrate_all_by_product_id(self, df_rocket: pd.DataFrame, df_iherb: pd.DataFrame) -> pd.DataFrame:
         """
-        전체 통합 (Product ID 기반 매칭 - Best Match 선택)
+        전체 통합 (Product ID 기반 매칭 - 1:1 Best Match)
         팩 수, 단위 수, 용량(무게)까지 비교하여 일치하는 후보를 우선순위로 매칭.
         """
 
-        print(f"\n🔗 5. 전체 통합 (Product ID 기반 매칭)")
+        print(f"\n🔗 5. 전체 통합 (Product ID 기반 1:1 매칭)")
 
         # 팩 수, 단위 수, 용량 계산
         df_rocket['rocket_pack']   = df_rocket['rocket_product_name'].apply(extract_pack_count)
@@ -414,100 +438,109 @@ class DataManager:
         df_iherb['iherb_unit']   = df_iherb['iherb_product_name'].apply(extract_unit_count)
         df_iherb['iherb_weight'] = df_iherb['iherb_product_name'].apply(extract_weight)
 
-        # Product ID로 조인
-        df = df_rocket.merge(
-            df_iherb,
-            left_on='rocket_product_id',
-            right_on='iherb_product_id',
-            how='left',
-            suffixes=('', '_dup')
-        )
-
-        print(f"   ✓ Product ID 조인: {df['iherb_vendor_id'].notna().sum():,}개 원시 매칭")
-
-        # Best Match 선택 로직
-        matched_rows = []
-        unmatched_rows = []
-
-        for (rocket_vid, rocket_cat), group in df.groupby(['rocket_vendor_id', 'rocket_category'], dropna=False):
-            # 매칭 없는 경우
-            if group['iherb_vendor_id'].isna().all():
-                unmatched_rows.append(group.iloc[0])
+        # 각 로켓 상품에 대해 최적의 아이허브 상품 찾기
+        matched_pairs = []
+        
+        for rocket_idx, rocket_row in df_rocket.iterrows():
+            rocket_pid = rocket_row['rocket_product_id']
+            
+            # 같은 Product ID를 가진 아이허브 후보들
+            candidates = df_iherb[df_iherb['iherb_product_id'] == rocket_pid].copy()
+            
+            if candidates.empty:
+                # 매칭 없음
+                matched_pairs.append({
+                    **rocket_row.to_dict(),
+                    'matched_iherb_idx': None
+                })
                 continue
-
-            candidates = group[group['iherb_vendor_id'].notna()].copy()
-
-            rocket_pack   = group.iloc[0]['rocket_pack']
-            rocket_unit   = group.iloc[0]['rocket_unit']
-            rocket_weight = group.iloc[0]['rocket_weight']
-
-            # 1순위: 팩 수, 단위 수, 용량 모두 일치
+            
+            rocket_pack   = rocket_row['rocket_pack']
+            rocket_unit   = rocket_row['rocket_unit']
+            rocket_weight = rocket_row['rocket_weight']
+            
+            best_idx = None
+            
+            # 1순위: 팩 수, 단위 수, 용량 모두 일치 (완벽 매칭)
             best = candidates[
                 (candidates['iherb_pack']   == rocket_pack) &
                 (candidates['iherb_unit']   == rocket_unit) &
                 (candidates['iherb_weight'] == rocket_weight)
             ]
             if len(best) > 0:
-                matched_rows.append(best.iloc[0])
-                continue
-
-            # 2순위: 팩 수와 용량만 일치 (단위 수 정보 없음)
-            best = candidates[
-                (candidates['iherb_pack']   == rocket_pack) &
-                (candidates['iherb_weight'] == rocket_weight) &
-                (candidates['iherb_unit'].isna() | pd.isna(rocket_unit))
-            ]
-            if len(best) > 0:
-                matched_rows.append(best.iloc[0])
-                continue
-
-            # 3순위: 용량만 일치
-            best = candidates[
-                (candidates['iherb_weight'] == rocket_weight)
-            ]
-            if len(best) > 0:
-                matched_rows.append(best.iloc[0])
-                continue
-
-            # 기존 로직: 팩 수 + 단위 수 일치
-            best = candidates[
-                (candidates['iherb_pack'] == rocket_pack) &
-                (candidates['iherb_unit'] == rocket_unit)
-            ]
-            if len(best) > 0:
-                matched_rows.append(best.iloc[0])
-                continue
-
-            # 기존 로직: 팩 수만 일치
-            best = candidates[
-                (candidates['iherb_pack'] == rocket_pack) &
-                (candidates['iherb_unit'].isna() | pd.isna(rocket_unit))
-            ]
-            if len(best) > 0:
-                matched_rows.append(best.iloc[0])
-                continue
-
-            # 기존 로직: 단위 수만 일치
-            best = candidates[
-                (candidates['iherb_unit'] == rocket_unit) &
-                (candidates['iherb_pack'].isna() | pd.isna(rocket_pack))
-            ]
-            if len(best) > 0:
-                matched_rows.append(best.iloc[0])
-                continue
-
-            # 매칭 실패 - 후보는 있지만 조건 불일치
-            row = group.iloc[0].copy()
-            iherb_cols = [col for col in row.index if col.startswith('iherb_')]
-            row[iherb_cols] = pd.NA
-            unmatched_rows.append(row)
-
-        # 재구성
-        df_final = pd.concat(matched_rows + unmatched_rows, axis=1).T.reset_index(drop=True)
+                best_idx = best.index[0]
+            
+            # 2순위: 팩 수 + 단위 수 일치
+            if best_idx is None:
+                best = candidates[
+                    (candidates['iherb_pack'] == rocket_pack) &
+                    (candidates['iherb_unit'] == rocket_unit)
+                ]
+                if len(best) > 0:
+                    best_idx = best.index[0]
+            
+            # 3순위: 팩 수 + 용량 일치
+            if best_idx is None:
+                best = candidates[
+                    (candidates['iherb_pack']   == rocket_pack) &
+                    (candidates['iherb_weight'] == rocket_weight)
+                ]
+                if len(best) > 0:
+                    best_idx = best.index[0]
+            
+            # 4순위: 팩 수만 일치 (단위/용량 정보 없음)
+            if best_idx is None:
+                best = candidates[
+                    (candidates['iherb_pack'] == rocket_pack)
+                ]
+                if len(best) > 0:
+                    best_idx = best.index[0]
+            
+            # 5순위: 용량만 일치 (팩 수 정보 없음)
+            if best_idx is None:
+                best = candidates[
+                    (candidates['iherb_weight'] == rocket_weight) &
+                    (candidates['iherb_pack'].isna() | pd.isna(rocket_pack))
+                ]
+                if len(best) > 0:
+                    best_idx = best.index[0]
+            
+            # 6순위: 단위 수만 일치 (팩 수 정보 없음)
+            if best_idx is None:
+                best = candidates[
+                    (candidates['iherb_unit'] == rocket_unit) &
+                    (candidates['iherb_pack'].isna() | pd.isna(rocket_pack))
+                ]
+                if len(best) > 0:
+                    best_idx = best.index[0]
+            
+            # Fallback 제거 - 조건 불일치 시 매칭하지 않음
+            # if best_idx is None:
+            #     if len(candidates) > 0:
+            #         best_idx = candidates.index[0]
+            
+            matched_pairs.append({
+                **rocket_row.to_dict(),
+                'matched_iherb_idx': best_idx
+            })
         
-        removed_count = len(df) - len(df_final)
-        if removed_count > 0:
-            print(f"   ⚠️  중복 제거: {removed_count:,}개")
+        # DataFrame 생성
+        df_final = pd.DataFrame(matched_pairs)
+        
+        # 아이허브 데이터 병합
+        for idx, row in df_final.iterrows():
+            iherb_idx = row['matched_iherb_idx']
+            if iherb_idx is not None and not pd.isna(iherb_idx):
+                try:
+                    iherb_row = df_iherb.loc[iherb_idx]
+                    for col in df_iherb.columns:
+                        df_final.at[idx, col] = iherb_row[col]
+                except KeyError:
+                    # iherb_idx가 유효하지 않은 경우 스킵
+                    pass
+        
+        # matched_iherb_idx 컬럼 제거
+        df_final = df_final.drop(columns=['matched_iherb_idx'])
         
         # 매칭 방식 및 신뢰도 기록
         df_final['matching_method'] = '미매칭'
@@ -549,12 +582,20 @@ class DataManager:
         df_final['price_diff'] = pd.NA
         df_final['price_diff_pct'] = pd.NA
         df_final['cheaper_source'] = pd.NA
+        df_final['breakeven_discount_rate'] = pd.NA
         
         diff = (ip - rp).where(valid).astype('float')
         pct = (diff / rp * 100).where(valid).replace([np.inf, -np.inf], np.nan).round(1)
         
+        # 손익분기 할인율 계산
+        # 손익분기 할인율 = (로켓 판매가 - 아이허브 판매가) / 아이허브 판매가 × 100
+        # 음수: 아이허브가 더 비쌈 (아이허브가 할인해야 함)
+        # 양수: 로켓이 더 비쌈 (아이허브가 이미 저렴함)
+        breakeven = ((rp - ip) / ip * 100).where(valid).replace([np.inf, -np.inf], np.nan).round(1)
+        
         df_final.loc[valid, 'price_diff'] = diff[valid]
         df_final.loc[valid, 'price_diff_pct'] = pct[valid]
+        df_final.loc[valid, 'breakeven_discount_rate'] = breakeven[valid]
         df_final.loc[valid, 'cheaper_source'] = np.where(
             df_final.loc[valid, 'price_diff'] > 0, '로켓직구',
             np.where(df_final.loc[valid, 'price_diff'] < 0, '아이허브', '동일')
