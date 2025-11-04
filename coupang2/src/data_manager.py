@@ -10,6 +10,7 @@
 - 매칭 방식 및 신뢰도 기록
 - 손익분기 할인율 계산 추가
 - 아이템위너 비율 추가
+- 쿠팡 추천가 및 추천 할인율 추가
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 """
 
@@ -153,6 +154,7 @@ class DataManager:
             - iherb_product_name
             - iherb_price, iherb_stock, iherb_stock_status
             - iherb_part_number
+            - iherb_recommended_price
             
             [아이허브 판매 성과]
             - iherb_category, iherb_revenue, iherb_orders
@@ -168,6 +170,7 @@ class DataManager:
             [가격 비교]
             - price_diff, price_diff_pct, cheaper_source
             - breakeven_discount_rate
+            - recommended_discount_rate
         """
         
         print(f"\n{'='*80}")
@@ -183,10 +186,13 @@ class DataManager:
         # 3. 아이허브 성과 (Excel)
         df_insights = self._load_seller_insights_df()
 
-        # 4. 아이허브 통합
-        df_iherb = self._integrate_iherb(df_price, df_insights)
+        # 4. 쿠팡 추천가 (Excel)
+        df_recommended = self._load_coupang_recommended_price_df()
 
-        # 5. 전체 통합 (Product ID 기반)
+        # 5. 아이허브 통합
+        df_iherb = self._integrate_iherb(df_price, df_insights, df_recommended)
+
+        # 6. 전체 통합 (Product ID 기반)
         df_final = self._integrate_all_by_product_id(df_rocket, df_iherb)
         
         print(f"\n✅ 통합 완료: {len(df_final):,}개 레코드")
@@ -405,19 +411,54 @@ class DataManager:
         
         return result
     
-    def _integrate_iherb(self, df_price: pd.DataFrame, df_insights: pd.DataFrame) -> pd.DataFrame:
-        """아이허브 가격 + 성과 통합"""
+    def _load_coupang_recommended_price_df(self) -> pd.DataFrame:
+        """쿠팡 추천가 로드 (Excel)"""
         
-        print(f"\n🔗 4. 아이허브 데이터 통합")
+        print(f"\n📥 4. 쿠팡 추천가 (Excel)")
         
+        files = list(self.excel_dir.glob("Coupang_Price_*.xlsx"))
+        if not files:
+            print(f"   ⚠️  Coupang_Price 파일 없음")
+            return pd.DataFrame()
+        
+        latest = sorted(files, key=lambda x: x.stat().st_mtime, reverse=True)[0]
+        print(f"   파일: {latest.name}")
+        
+        df = pd.read_excel(latest, header=1)
+        
+        result = pd.DataFrame({
+            'iherb_product_id': df['노출상품ID'].astype(str).str.replace(r'\.0$', '', regex=True),
+            'iherb_vendor_id': df['옵션ID'].astype(str).str.replace(r'\.0$', '', regex=True),
+            'iherb_recommended_price': pd.to_numeric(df['쿠팡추천가 (원)'], errors='coerce').fillna(0).astype(int)
+        })
+        
+        print(f"   ✓ {len(result):,}개 상품")
+        
+        return result
+    
+    def _integrate_iherb(self, df_price: pd.DataFrame, df_insights: pd.DataFrame, 
+                         df_recommended: pd.DataFrame) -> pd.DataFrame:
+        """아이허브 가격 + 성과 + 추천가 통합"""
+        
+        print(f"\n🔗 5. 아이허브 데이터 통합")
+        
+        # 가격 + 성과
         if df_insights.empty:
+            df = df_price
             print(f"   ⚠️  성과 데이터 없음")
-            return df_price
+        else:
+            df = df_price.merge(df_insights, on='iherb_vendor_id', how='left')
+            print(f"   ✓ 성과 데이터 병합: {df['iherb_revenue'].notna().sum():,}개")
         
-        df = df_price.merge(df_insights, on='iherb_vendor_id', how='left')
+        # 추천가 추가
+        if df_recommended.empty:
+            print(f"   ⚠️  추천가 데이터 없음")
+        else:
+            df = df.merge(df_recommended[['iherb_vendor_id', 'iherb_recommended_price']], 
+                         on='iherb_vendor_id', how='left')
+            print(f"   ✓ 추천가 데이터 병합: {df['iherb_recommended_price'].notna().sum():,}개")
         
         print(f"   ✓ 통합 완료: {len(df):,}개")
-        print(f"   ✓ 성과 데이터 있음: {df['iherb_revenue'].notna().sum():,}개")
         
         return df
     
@@ -427,7 +468,7 @@ class DataManager:
         팩 수, 단위 수, 용량(무게)까지 비교하여 일치하는 후보를 우선순위로 매칭.
         """
 
-        print(f"\n🔗 5. 전체 통합 (Product ID 기반 1:1 매칭)")
+        print(f"\n🔗 6. 전체 통합 (Product ID 기반 1:1 매칭)")
 
         # 팩 수, 단위 수, 용량 계산
         df_rocket['rocket_pack']   = df_rocket['rocket_product_name'].apply(extract_pack_count)
@@ -577,25 +618,34 @@ class DataManager:
         # 가격 비교 계산
         rp = pd.to_numeric(df_final['rocket_price'], errors='coerce')
         ip = pd.to_numeric(df_final['iherb_price'], errors='coerce')
+        rec_p = pd.to_numeric(df_final.get('iherb_recommended_price', 0), errors='coerce')
+        
         valid = rp.gt(0) & ip.gt(0)
+        valid_rec = ip.gt(0) & rec_p.gt(0)
         
         df_final['price_diff'] = pd.NA
         df_final['price_diff_pct'] = pd.NA
         df_final['cheaper_source'] = pd.NA
         df_final['breakeven_discount_rate'] = pd.NA
+        df_final['recommended_discount_rate'] = pd.NA
         
         diff = (ip - rp).where(valid).astype('float')
         pct = (diff / rp * 100).where(valid).replace([np.inf, -np.inf], np.nan).round(1)
         
-        # 손익분기 할인율 계산
-        # 손익분기 할인율 = (로켓 판매가 - 아이허브 판매가) / 아이허브 판매가 × 100
-        # 음수: 아이허브가 더 비쌈 (아이허브가 할인해야 함)
-        # 양수: 로켓이 더 비쌈 (아이허브가 이미 저렴함)
-        breakeven = ((rp - ip) / ip * 100).where(valid).replace([np.inf, -np.inf], np.nan).round(1)
+        # 손익분기 할인율 = (아이허브 판매가 - 로켓 판매가) / 아이허브 판매가 × 100
+        # 양수: 아이허브가 할인해야 함 (빨강)
+        # 음수/0: 이미 경쟁력 있음
+        breakeven = ((ip - rp) / ip * 100).where(valid).replace([np.inf, -np.inf], np.nan).round(1)
+        
+        # 추천 할인율 = (아이허브 판매가 - 쿠팡추천가) / 아이허브 판매가 × 100
+        # 양수: 아이허브가 할인해야 함 (빨강)
+        # 음수/0: 이미 경쟁력 있음
+        recommended = ((ip - rec_p) / ip * 100).where(valid_rec).replace([np.inf, -np.inf], np.nan).round(1)
         
         df_final.loc[valid, 'price_diff'] = diff[valid]
         df_final.loc[valid, 'price_diff_pct'] = pct[valid]
         df_final.loc[valid, 'breakeven_discount_rate'] = breakeven[valid]
+        df_final.loc[valid_rec, 'recommended_discount_rate'] = recommended[valid_rec]
         df_final.loc[valid, 'cheaper_source'] = np.where(
             df_final.loc[valid, 'price_diff'] > 0, '로켓직구',
             np.where(df_final.loc[valid, 'price_diff'] < 0, '아이허브', '동일')

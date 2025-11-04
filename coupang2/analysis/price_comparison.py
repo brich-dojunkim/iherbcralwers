@@ -95,14 +95,14 @@ def extract_price_comparison_data(db_path, excel_dir, target_date=None):
 
 
 def create_excel_report(date_data_dict, output_path):
-    """Excel 리포트 생성 - 37개 컬럼 구조 (3단 헤더)"""
+    """Excel 리포트 생성 - 39개 컬럼 구조 (3단 헤더)"""
 
     if not date_data_dict:
         print("❌ 데이터가 없어 엑셀 생성을 건너뜁니다.")
         return
 
     print(f"\n{'='*80}")
-    print(f"📊 Excel 리포트 생성 (37개 컬럼, 3단 헤더)")
+    print(f"📊 Excel 리포트 생성 (39개 컬럼, 3단 헤더)")
     print(f"{'='*80}")
 
     with pd.ExcelWriter(output_path, engine='openpyxl') as writer:
@@ -114,7 +114,7 @@ def create_excel_report(date_data_dict, output_path):
             output_df = pd.DataFrame()
 
             # ========================================
-            # 1️⃣ 핵심 지표 (7개)
+            # 1️⃣ 핵심 지표 (8개)
             # ========================================
             # 로켓 (1개)
             output_df['순위'] = df.get('rocket_rank', np.nan)
@@ -124,9 +124,10 @@ def create_excel_report(date_data_dict, output_path):
             output_df['매출(원)'] = df.get('iherb_revenue', np.nan)
             output_df['아이템위너비율'] = df.get('iherb_item_winner_ratio', np.nan)
             
-            # 종합 (3개)
+            # 종합 (4개) - 추천 할인율 추가
             output_df['가격격차(원)'] = df.get('price_diff', np.nan)
             output_df['손익분기할인율'] = df.get('breakeven_discount_rate', np.nan)
+            output_df['추천할인율'] = df.get('recommended_discount_rate', np.nan)
             output_df['유리한곳'] = df.get('cheaper_source', np.nan)
 
             # ========================================
@@ -144,8 +145,8 @@ def create_excel_report(date_data_dict, output_path):
             output_df['로켓_링크'] = df.get('rocket_url', np.nan)
             output_df['아이허브_링크'] = df.get('iherb_url', np.nan)
             
-            # 2-4. 상품 ID (5개) - Product ID 공통, Vendor/Item만 분리
-            output_df['Product_ID'] = df.get('rocket_product_id', np.nan)  # 동일하므로 하나만
+            # 2-4. 상품 ID (6개) - Product ID 공통, Vendor/Item만 분리
+            output_df['Product_ID'] = df.get('rocket_product_id', np.nan)
             output_df['로켓_Vendor'] = df.get('rocket_vendor_id', np.nan)
             output_df['로켓_Item'] = df.get('rocket_item_id', np.nan)
             output_df['아이허브_Vendor'] = df.get('iherb_vendor_id', np.nan)
@@ -157,15 +158,16 @@ def create_excel_report(date_data_dict, output_path):
             output_df['신뢰도'] = df.get('matching_confidence', np.nan)
 
             # ========================================
-            # 3️⃣ 가격 정보 (6개)
+            # 3️⃣ 가격 정보 (7개) - 쿠팡추천가 추가
             # ========================================
             # 3-1. 로켓직구 (3개)
             output_df['정가'] = df.get('rocket_original_price', np.nan)
             output_df['할인율'] = df.get('rocket_discount_rate', np.nan)
             output_df['로켓가격'] = df.get('rocket_price', np.nan)
             
-            # 3-2. 아이허브 (3개)
+            # 3-2. 아이허브 (4개) - 쿠팡추천가 추가
             output_df['아이허브가격'] = df.get('iherb_price', np.nan)
+            output_df['쿠팡추천가'] = df.get('iherb_recommended_price', np.nan)
             output_df['재고'] = df.get('iherb_stock', np.nan)
             output_df['판매상태'] = df.get('iherb_stock_status', np.nan)
 
@@ -239,10 +241,10 @@ def apply_excel_styles(output_path):
     )
 
     # ========================================
-    # 컬럼 그룹 정의 (35개) - 3단 헤더
+    # 컬럼 그룹 정의 (39개) - 3단 헤더
     # ========================================
     column_groups = [
-        # 1️⃣ 핵심 지표 (7개)
+        # 1️⃣ 핵심 지표 (8개)
         {
             'name': '핵심 지표',
             'color_top': PRIMARY_DARK,
@@ -251,10 +253,10 @@ def apply_excel_styles(output_path):
             'sub_groups': [
                 {'name': '로켓', 'cols': ['순위']},
                 {'name': '아이허브', 'cols': ['판매량', '매출(원)', '아이템위너비율']},
-                {'name': '종합', 'cols': ['가격격차(원)', '손익분기할인율', '유리한곳']}
+                {'name': '종합', 'cols': ['가격격차(원)', '손익분기할인율', '추천할인율', '유리한곳']}
             ]
         },
-        # 2️⃣ 제품 정보 (15개)
+        # 2️⃣ 제품 정보 (17개)
         {
             'name': '제품 정보',
             'color_top': SECONDARY_DARK,
@@ -271,7 +273,7 @@ def apply_excel_styles(output_path):
                 {'name': '매칭 정보', 'cols': ['방식', '신뢰도']}
             ]
         },
-        # 3️⃣ 가격 정보 (6개)
+        # 3️⃣ 가격 정보 (7개)
         {
             'name': '가격 정보',
             'color_top': TERTIARY_DARK,
@@ -279,7 +281,7 @@ def apply_excel_styles(output_path):
             'color_bottom': TERTIARY_LIGHT,
             'sub_groups': [
                 {'name': '로켓직구', 'cols': ['정가', '할인율', '로켓가격']},
-                {'name': '아이허브', 'cols': ['아이허브가격', '재고', '판매상태']}
+                {'name': '아이허브', 'cols': ['아이허브가격', '쿠팡추천가', '재고', '판매상태']}
             ]
         },
         # 4️⃣ 판매 성과 (7개)
@@ -290,7 +292,7 @@ def apply_excel_styles(output_path):
             'color_bottom': SUCCESS_LIGHT,
             'sub_groups': [
                 {'name': '로켓', 'cols': ['평점', '리뷰수']},
-                {'name': '아이허브', 'cols': ['매출비중(%)', '주문', '판매량비중(%)', '구매전환율(%)', '취소율(%)']}
+                {'name': '아이허브', 'cols': ['매출비중', '주문', '판매량비중', '구매전환율', '취소율']}
             ]
         }
     ]
@@ -349,13 +351,9 @@ def apply_excel_styles(output_path):
                     cell_bottom = ws.cell(row=3, column=col_pos + i)
                     cell_bottom.value = col_name
                     cell_bottom.fill = PatternFill(start_color=color_bottom, end_color=color_bottom, fill_type="solid")
-
-                    # 항상 검정
                     cell_bottom.font = header_font_dark
-
                     cell_bottom.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
                     cell_bottom.border = thin_border
-
                 
                 col_pos += sub_span
 
@@ -383,13 +381,13 @@ def apply_excel_styles(output_path):
                 ws.column_dimensions[get_column_letter(col_idx)].width = 8
             elif bottom_header in ['판매량', '주문']:
                 ws.column_dimensions[get_column_letter(col_idx)].width = 10
-            elif bottom_header in ['매출(원)', '가격격차(원)', '정가', '로켓_판매가', '아이허브_판매가']:
+            elif bottom_header in ['매출(원)', '가격격차(원)', '정가', '로켓가격', '아이허브가격', '쿠팡추천가']:
                 ws.column_dimensions[get_column_letter(col_idx)].width = 12
-            elif bottom_header in ['아이템위너비율', '재고', '평점', '리뷰수', '매출비중(%)', '판매량비중(%)', '구매전환율(%)', '취소율(%)']:
+            elif bottom_header in ['아이템위너비율', '재고', '평점', '리뷰수', '매출비중', '판매량비중', '구매전환율', '취소율']:
                 ws.column_dimensions[get_column_letter(col_idx)].width = 10
-            elif bottom_header in ['손익분기할인율']:
+            elif bottom_header in ['손익분기할인율', '추천할인율']:
                 ws.column_dimensions[get_column_letter(col_idx)].width = 14
-            elif bottom_header in ['유리한곳', '방식', '신뢰도', '할인율(%)']:
+            elif bottom_header in ['유리한곳', '방식', '신뢰도', '할인율']:
                 ws.column_dimensions[get_column_letter(col_idx)].width = 10
             elif mid_header in ['카테고리', '링크']:
                 ws.column_dimensions[get_column_letter(col_idx)].width = 15
@@ -426,21 +424,31 @@ def apply_excel_styles(output_path):
                 except:
                     pass
         
-        # 6-2. 손익분기할인율 (음수=빨강, 양수=초록)
+        # 6-2. 손익분기할인율 (양수=빨강만)
         breakeven_col = col_idx_of('손익분기할인율')
         if breakeven_col:
             for row_idx in range(data_actual_start, ws.max_row + 1):
                 cell = ws.cell(row=row_idx, column=breakeven_col)
                 try:
                     val = float(cell.value) if cell.value else 0
-                    if val < 0:
+                    if val > 0:
                         cell.fill = PatternFill(start_color=HIGHLIGHT_RED, end_color=HIGHLIGHT_RED, fill_type="solid")
-                    elif val > 0:
-                        cell.fill = PatternFill(start_color=HIGHLIGHT_GREEN, end_color=HIGHLIGHT_GREEN, fill_type="solid")
                 except:
                     pass
         
-        # 6-3. 가격격차 (유리한 곳 기준)
+        # 6-3. 추천할인율 (양수=빨강만)
+        recommended_col = col_idx_of('추천할인율')
+        if recommended_col:
+            for row_idx in range(data_actual_start, ws.max_row + 1):
+                cell = ws.cell(row=row_idx, column=recommended_col)
+                try:
+                    val = float(cell.value) if cell.value else 0
+                    if val > 0:
+                        cell.fill = PatternFill(start_color=HIGHLIGHT_RED, end_color=HIGHLIGHT_RED, fill_type="solid")
+                except:
+                    pass
+        
+        # 6-4. 가격격차 (유리한 곳 기준)
         price_diff_col = col_idx_of('가격격차(원)')
         cheaper_col = col_idx_of('유리한곳')
         if price_diff_col and cheaper_col:
@@ -451,7 +459,7 @@ def apply_excel_styles(output_path):
                 elif cheaper_value == '로켓직구':
                     ws.cell(row=row_idx, column=price_diff_col).fill = PatternFill(start_color=HIGHLIGHT_RED, end_color=HIGHLIGHT_RED, fill_type="solid")
         
-        # 6-4. 매칭신뢰도
+        # 6-5. 매칭신뢰도
         conf_col = col_idx_of('신뢰도')
         if conf_col:
             for row_idx in range(data_actual_start, ws.max_row + 1):
@@ -464,8 +472,8 @@ def apply_excel_styles(output_path):
                 elif conf_value == 'Low':
                     cell.fill = PatternFill(start_color=HIGHLIGHT_RED, end_color=HIGHLIGHT_RED, fill_type="solid")
         
-        # 6-5. 구매전환율 (10% 이상 초록)
-        conversion_col = col_idx_of('구매전환율(%)')
+        # 6-6. 구매전환율 (10% 이상 초록)
+        conversion_col = col_idx_of('구매전환율')
         if conversion_col:
             for row_idx in range(data_actual_start, ws.max_row + 1):
                 cell = ws.cell(row=row_idx, column=conversion_col)
@@ -476,8 +484,8 @@ def apply_excel_styles(output_path):
                 except:
                     pass
         
-        # 6-6. 취소율 (5% 이상 빨강)
-        cancel_col = col_idx_of('취소율(%)')
+        # 6-7. 취소율 (5% 이상 빨강)
+        cancel_col = col_idx_of('취소율')
         if cancel_col:
             for row_idx in range(data_actual_start, ws.max_row + 1):
                 cell = ws.cell(row=row_idx, column=cancel_col)
@@ -518,15 +526,15 @@ def apply_excel_styles(output_path):
                     cell.alignment = Alignment(horizontal='center', vertical='center')
 
         # ========================================
-        # 8. Freeze Panes (핵심 지표 7개 이후)
+        # 8. Freeze Panes (핵심 지표 8개 이후)
         # ========================================
-        freeze_col = 8  # 8번째 컬럼
+        freeze_col = 9  # 9번째 컬럼
         ws.freeze_panes = ws.cell(row=4, column=freeze_col)
 
         # ========================================
         # 9. 데이터바 (비중 컬럼)
         # ========================================
-        share_cols = ['매출비중(%)', '판매량비중(%)']
+        share_cols = ['매출비중', '판매량비중']
         for share_col_name in share_cols:
             share_col_idx = col_idx_of(share_col_name)
             if share_col_idx:
@@ -566,7 +574,7 @@ def main():
     for i, date in enumerate(dates[:5], 1):
         print(f"  {i}. {date}")
     
-    # 최신 3개 날짜 처리
+    # 최신 1개 날짜 처리
     process_dates = dates[:1]
     
     date_data_dict = {}
