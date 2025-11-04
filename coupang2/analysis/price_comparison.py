@@ -95,14 +95,14 @@ def extract_price_comparison_data(db_path, excel_dir, target_date=None):
 
 
 def create_excel_report(date_data_dict, output_path):
-    """Excel 리포트 생성 - 39개 컬럼 구조 (3단 헤더)"""
+    """Excel 리포트 생성 - 40개 컬럼 구조 (3단 헤더)"""
 
     if not date_data_dict:
         print("❌ 데이터가 없어 엑셀 생성을 건너뜁니다.")
         return
 
     print(f"\n{'='*80}")
-    print(f"📊 Excel 리포트 생성 (39개 컬럼, 3단 헤더)")
+    print(f"📊 Excel 리포트 생성 (40개 컬럼, 3단 헤더)")
     print(f"{'='*80}")
 
     with pd.ExcelWriter(output_path, engine='openpyxl') as writer:
@@ -114,7 +114,25 @@ def create_excel_report(date_data_dict, output_path):
             output_df = pd.DataFrame()
 
             # ========================================
-            # 1️⃣ 핵심 지표 (8개)
+            # 1️⃣ 기본 정보 (7개) - 새로 추가
+            # ========================================
+            # 1-1. 카테고리 (2개)
+            output_df['로켓'] = df.get('rocket_category', np.nan)
+            output_df['아이허브'] = df.get('iherb_category', np.nan)
+            
+            # 1-2. 링크 (2개)
+            output_df['로켓_링크'] = df.get('rocket_url', np.nan)
+            output_df['아이허브_링크'] = df.get('iherb_url', np.nan)
+            
+            # 1-3. 상품 번호 (2개)
+            output_df['품번'] = df.get('iherb_part_number', np.nan)
+            output_df['UPC'] = pd.to_numeric(df.get('iherb_upc', np.nan), errors='coerce').astype('Int64')
+            
+            # 1-4. 매칭 (1개) - 방식 제거
+            output_df['신뢰도'] = df.get('matching_confidence', np.nan)
+
+            # ========================================
+            # 2️⃣ 핵심 지표 (8개)
             # ========================================
             # 로켓 (1개)
             output_df['순위'] = df.get('rocket_rank', np.nan)
@@ -124,55 +142,42 @@ def create_excel_report(date_data_dict, output_path):
             output_df['매출(원)'] = df.get('iherb_revenue', np.nan)
             output_df['아이템위너비율'] = df.get('iherb_item_winner_ratio', np.nan)
             
-            # 종합 (4개) - 추천 할인율 추가
+            # 종합 (4개)
             output_df['가격격차(원)'] = df.get('price_diff', np.nan)
             output_df['손익분기할인율'] = df.get('breakeven_discount_rate', np.nan)
             output_df['추천할인율'] = df.get('recommended_discount_rate', np.nan)
             output_df['유리한곳'] = df.get('cheaper_source', np.nan)
 
             # ========================================
-            # 2️⃣ 제품 정보 (17개)
+            # 3️⃣ 제품 정보 (8개) - 카테고리/링크/매칭 제외
             # ========================================
-            # 2-1. 카테고리 (2개)
-            output_df['로켓_카테고리'] = df.get('rocket_category', np.nan)
-            output_df['아이허브_카테고리'] = df.get('iherb_category', np.nan)
-            
-            # 2-2. 제품명 (2개)
+            # 3-1. 제품명 (2개)
             output_df['로켓_제품명'] = df.get('rocket_product_name', np.nan)
             output_df['아이허브_제품명'] = df.get('iherb_product_name', np.nan)
             
-            # 2-3. 링크 (2개)
-            output_df['로켓_링크'] = df.get('rocket_url', np.nan)
-            output_df['아이허브_링크'] = df.get('iherb_url', np.nan)
-            
-            # 2-4. 상품 ID (6개) - Product ID 공통, Vendor/Item만 분리
+            # 3-2. 상품 ID (6개)
             output_df['Product_ID'] = df.get('rocket_product_id', np.nan)
             output_df['로켓_Vendor'] = df.get('rocket_vendor_id', np.nan)
             output_df['로켓_Item'] = df.get('rocket_item_id', np.nan)
             output_df['아이허브_Vendor'] = df.get('iherb_vendor_id', np.nan)
             output_df['아이허브_Item'] = df.get('iherb_item_id', np.nan)
-            output_df['품번'] = df.get('iherb_part_number', np.nan)
-            
-            # 2-5. 매칭 정보 (2개)
-            output_df['방식'] = df.get('matching_method', np.nan)
-            output_df['신뢰도'] = df.get('matching_confidence', np.nan)
 
             # ========================================
-            # 3️⃣ 가격 정보 (7개) - 쿠팡추천가 추가
+            # 4️⃣ 가격 정보 (7개)
             # ========================================
-            # 3-1. 로켓직구 (3개)
+            # 4-1. 로켓직구 (3개)
             output_df['정가'] = df.get('rocket_original_price', np.nan)
             output_df['할인율'] = df.get('rocket_discount_rate', np.nan)
             output_df['로켓가격'] = df.get('rocket_price', np.nan)
             
-            # 3-2. 아이허브 (4개) - 쿠팡추천가 추가
+            # 4-2. 아이허브 (4개)
             output_df['아이허브가격'] = df.get('iherb_price', np.nan)
             output_df['쿠팡추천가'] = df.get('iherb_recommended_price', np.nan)
             output_df['재고'] = df.get('iherb_stock', np.nan)
             output_df['판매상태'] = df.get('iherb_stock_status', np.nan)
 
             # ========================================
-            # 4️⃣ 판매 성과 (7개)
+            # 5️⃣ 판매 성과 (7개)
             # ========================================
             # 로켓 (2개)
             output_df['평점'] = df.get('rocket_rating', np.nan)
@@ -205,6 +210,11 @@ def apply_excel_styles(output_path):
     # ========================================
     # 색상 팔레트 (그라데이션)
     # ========================================
+    # 기본 정보 (새로 추가)
+    INFO_DARK  = "0F172A"   # 상위 헤더
+    INFO_MID   = "475569"   # 중간 헤더
+    INFO_LIGHT = "E2E8F0"   # 하위 헤더
+
     # 핵심 지표
     PRIMARY_DARK = "5E2A8A"   # 상위 헤더 (진한 보라)
     PRIMARY_MID  = "7A3EB1"   # 중간 헤더
@@ -241,10 +251,23 @@ def apply_excel_styles(output_path):
     )
 
     # ========================================
-    # 컬럼 그룹 정의 (39개) - 3단 헤더
+    # 컬럼 그룹 정의 (40개) - 3단 헤더
     # ========================================
     column_groups = [
-        # 1️⃣ 핵심 지표 (8개)
+        # 1️⃣ 기본 정보 (7개) - 새로 추가
+        {
+            'name': '기본 정보',
+            'color_top': INFO_DARK,
+            'color_mid': INFO_MID,
+            'color_bottom': INFO_LIGHT,
+            'sub_groups': [
+                {'name': '카테고리', 'cols': ['로켓', '아이허브']},
+                {'name': '링크', 'cols': ['로켓', '아이허브']},
+                {'name': '상품 번호', 'cols': ['품번', 'UPC']},
+                {'name': '매칭', 'cols': ['신뢰도']}
+            ]
+        },
+        # 2️⃣ 핵심 지표 (8개)
         {
             'name': '핵심 지표',
             'color_top': PRIMARY_DARK,
@@ -256,24 +279,21 @@ def apply_excel_styles(output_path):
                 {'name': '종합', 'cols': ['가격격차(원)', '손익분기할인율', '추천할인율', '유리한곳']}
             ]
         },
-        # 2️⃣ 제품 정보 (17개)
+        # 3️⃣ 제품 정보 (8개) - 카테고리/링크/매칭 제외
         {
             'name': '제품 정보',
             'color_top': SECONDARY_DARK,
             'color_mid': SECONDARY_MID,
             'color_bottom': SECONDARY_LIGHT,
             'sub_groups': [
-                {'name': '카테고리', 'cols': ['로켓', '아이허브']},
                 {'name': '제품명', 'cols': ['로켓', '아이허브']},
-                {'name': '링크', 'cols': ['로켓', '아이허브']},
                 {
                     'name': '상품 ID', 
-                    'cols': ['Product_ID', '로켓_Vendor', '로켓_Item', '아이허브_Vendor', '아이허브_Item', '품번']
-                },
-                {'name': '매칭 정보', 'cols': ['방식', '신뢰도']}
+                    'cols': ['Product_ID', '로켓_Vendor', '로켓_Item', '아이허브_Vendor', '아이허브_Item']
+                }
             ]
         },
-        # 3️⃣ 가격 정보 (7개)
+        # 4️⃣ 가격 정보 (7개)
         {
             'name': '가격 정보',
             'color_top': TERTIARY_DARK,
@@ -284,7 +304,7 @@ def apply_excel_styles(output_path):
                 {'name': '아이허브', 'cols': ['아이허브가격', '쿠팡추천가', '재고', '판매상태']}
             ]
         },
-        # 4️⃣ 판매 성과 (7개)
+        # 5️⃣ 판매 성과 (7개)
         {
             'name': '판매 성과',
             'color_top': SUCCESS_DARK,
@@ -377,6 +397,11 @@ def apply_excel_styles(output_path):
                 ws.column_dimensions[get_column_letter(col_idx)].width = 50
             elif mid_header == '상품 ID':
                 ws.column_dimensions[get_column_letter(col_idx)].width = 13
+            elif mid_header == '상품 번호':
+                if bottom_header == 'UPC':
+                    ws.column_dimensions[get_column_letter(col_idx)].width = 15
+                else:
+                    ws.column_dimensions[get_column_letter(col_idx)].width = 13
             elif bottom_header in ['순위']:
                 ws.column_dimensions[get_column_letter(col_idx)].width = 8
             elif bottom_header in ['판매량', '주문']:
@@ -387,7 +412,7 @@ def apply_excel_styles(output_path):
                 ws.column_dimensions[get_column_letter(col_idx)].width = 10
             elif bottom_header in ['손익분기할인율', '추천할인율']:
                 ws.column_dimensions[get_column_letter(col_idx)].width = 14
-            elif bottom_header in ['유리한곳', '방식', '신뢰도', '할인율']:
+            elif bottom_header in ['유리한곳', '신뢰도', '할인율']:
                 ws.column_dimensions[get_column_letter(col_idx)].width = 10
             elif mid_header in ['카테고리', '링크']:
                 ws.column_dimensions[get_column_letter(col_idx)].width = 15
@@ -526,9 +551,9 @@ def apply_excel_styles(output_path):
                     cell.alignment = Alignment(horizontal='center', vertical='center')
 
         # ========================================
-        # 8. Freeze Panes (핵심 지표 8개 이후)
+        # 8. Freeze Panes (핵심 지표 15개 이후)
         # ========================================
-        freeze_col = 9  # 9번째 컬럼
+        freeze_col = 16  # 16번째 컬럼
         ws.freeze_panes = ws.cell(row=4, column=freeze_col)
 
         # ========================================

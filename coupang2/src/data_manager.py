@@ -11,6 +11,7 @@
 - 손익분기 할인율 계산 추가
 - 아이템위너 비율 추가
 - 쿠팡 추천가 및 추천 할인율 추가
+- UPC 데이터 추가
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 """
 
@@ -155,6 +156,7 @@ class DataManager:
             - iherb_price, iherb_stock, iherb_stock_status
             - iherb_part_number
             - iherb_recommended_price
+            - iherb_upc
             
             [아이허브 판매 성과]
             - iherb_category, iherb_revenue, iherb_orders
@@ -189,10 +191,13 @@ class DataManager:
         # 4. 쿠팡 추천가 (Excel)
         df_recommended = self._load_coupang_recommended_price_df()
 
-        # 5. 아이허브 통합
-        df_iherb = self._integrate_iherb(df_price, df_insights, df_recommended)
+        # 5. UPC 데이터 (Excel)
+        df_upc = self._load_upc_df()
 
-        # 6. 전체 통합 (Product ID 기반)
+        # 6. 아이허브 통합
+        df_iherb = self._integrate_iherb(df_price, df_insights, df_recommended, df_upc)
+
+        # 7. 전체 통합 (Product ID 기반)
         df_final = self._integrate_all_by_product_id(df_rocket, df_iherb)
         
         print(f"\n✅ 통합 완료: {len(df_final):,}개 레코드")
@@ -436,11 +441,52 @@ class DataManager:
         
         return result
     
-    def _integrate_iherb(self, df_price: pd.DataFrame, df_insights: pd.DataFrame, 
-                         df_recommended: pd.DataFrame) -> pd.DataFrame:
-        """아이허브 가격 + 성과 + 추천가 통합"""
+    def _load_upc_df(self) -> pd.DataFrame:
+        """UPC 데이터 로드 (Excel)"""
         
-        print(f"\n🔗 5. 아이허브 데이터 통합")
+        print(f"\n📥 5. UPC 데이터 (Excel)")
+        
+        files = list(self.excel_dir.glob("20251024_*.xlsx"))
+        if not files:
+            print(f"   ⚠️  UPC 파일 없음")
+            return pd.DataFrame()
+        
+        latest = sorted(files, key=lambda x: x.stat().st_mtime, reverse=True)[0]
+        print(f"   파일: {latest.name}")
+        
+        df = pd.read_excel(latest)
+        
+        # 컬럼명 확인 후 매핑
+        col_item_id = None
+        col_upc = None
+        
+        for col in df.columns:
+            if '쿠팡 상품번호' in str(col) or '상품번호' in str(col):
+                col_item_id = col
+            if 'UPC' in str(col).upper():
+                col_upc = col
+        
+        if col_item_id is None or col_upc is None:
+            print(f"   ⚠️  필수 컬럼 없음 (쿠팡 상품번호, UPC)")
+            return pd.DataFrame()
+        
+        result = pd.DataFrame({
+            'iherb_item_id': df[col_item_id].astype(str).str.replace(r'\.0$', '', regex=True),
+            'iherb_upc': df[col_upc].astype(str).str.strip()
+        })
+        
+        # 중복 제거 (item_id 기준)
+        result = result.drop_duplicates(subset=['iherb_item_id'], keep='first')
+        
+        print(f"   ✓ {len(result):,}개 상품")
+        
+        return result
+    
+    def _integrate_iherb(self, df_price: pd.DataFrame, df_insights: pd.DataFrame, 
+                         df_recommended: pd.DataFrame, df_upc: pd.DataFrame) -> pd.DataFrame:
+        """아이허브 가격 + 성과 + 추천가 + UPC 통합"""
+        
+        print(f"\n🔗 6. 아이허브 데이터 통합")
         
         # 가격 + 성과
         if df_insights.empty:
@@ -458,6 +504,14 @@ class DataManager:
                          on='iherb_vendor_id', how='left')
             print(f"   ✓ 추천가 데이터 병합: {df['iherb_recommended_price'].notna().sum():,}개")
         
+        # UPC 추가
+        if df_upc.empty:
+            print(f"   ⚠️  UPC 데이터 없음")
+        else:
+            df = df.merge(df_upc[['iherb_item_id', 'iherb_upc']], 
+                         on='iherb_item_id', how='left')
+            print(f"   ✓ UPC 데이터 병합: {df['iherb_upc'].notna().sum():,}개")
+        
         print(f"   ✓ 통합 완료: {len(df):,}개")
         
         return df
@@ -468,7 +522,7 @@ class DataManager:
         팩 수, 단위 수, 용량(무게)까지 비교하여 일치하는 후보를 우선순위로 매칭.
         """
 
-        print(f"\n🔗 6. 전체 통합 (Product ID 기반 1:1 매칭)")
+        print(f"\n🔗 7. 전체 통합 (Product ID 기반 1:1 매칭)")
 
         # 팩 수, 단위 수, 용량 계산
         df_rocket['rocket_pack']   = df_rocket['rocket_product_name'].apply(extract_pack_count)
