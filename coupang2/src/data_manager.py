@@ -8,6 +8,8 @@
 - 동적 필터링 기준 계산 추가 (80 백분위수)
 - 매칭되지 않은 우수 아이허브 상품 자동 포함
 - 단일 데이터프레임으로 통합 (매칭 + 미매칭)
+- 할인율기준가(아이허브 정가) 추가
+- 요청할인율 추가 (정가 기준)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 """
 
@@ -153,7 +155,8 @@ class DataManager:
             [아이허브 가격/재고]
             - iherb_vendor_id, iherb_product_id, iherb_item_id
             - iherb_product_name
-            - iherb_price, iherb_stock, iherb_stock_status
+            - iherb_price (판매가), iherb_original_price (정가)
+            - iherb_stock, iherb_stock_status
             - iherb_part_number
             - iherb_recommended_price
             - iherb_upc
@@ -169,7 +172,8 @@ class DataManager:
             [가격 비교]
             - price_diff, price_diff_pct, cheaper_source
             - breakeven_discount_rate
-            - recommended_discount_rate
+            - recommended_discount_rate (판매가 기준)
+            - requested_discount_rate (정가 기준)
         """
         
         print(f"\n{'='*80}")
@@ -314,16 +318,25 @@ class DataManager:
             if col not in good_unmatched.columns:
                 good_unmatched[col] = np.nan
         
-        # 손익분기/추천 할인율은 계산 가능
+        # 할인율 계산
         ip = pd.to_numeric(good_unmatched['iherb_price'], errors='coerce')
+        op = pd.to_numeric(good_unmatched['iherb_original_price'], errors='coerce')
         rec_p = pd.to_numeric(good_unmatched.get('iherb_recommended_price', 0), errors='coerce')
         
-        # 추천 할인율만 계산 (로켓 가격 없음)
         good_unmatched['breakeven_discount_rate'] = np.nan
+        
+        # 추천할인율 (판매가 기준)
         valid_rec = ip.gt(0) & rec_p.gt(0)
         good_unmatched['recommended_discount_rate'] = np.nan
         good_unmatched.loc[valid_rec, 'recommended_discount_rate'] = (
             ((ip - rec_p) / ip * 100).replace([np.inf, -np.inf], np.nan).round(1)
+        )
+        
+        # 요청할인율 (정가 기준)
+        valid_req = op.gt(0) & rec_p.gt(0)
+        good_unmatched['requested_discount_rate'] = np.nan
+        good_unmatched.loc[valid_req, 'requested_discount_rate'] = (
+            ((op - rec_p) / op * 100).replace([np.inf, -np.inf], np.nan).round(1)
         )
         
         # 매칭 상품에 status 추가
@@ -344,7 +357,7 @@ class DataManager:
         return df_final
     
     # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    # 기존 메서드들 (변경 없음)
+    # 기존 메서드들
     # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     
     def _load_rocket_df(self, target_date: Optional[str]) -> pd.DataFrame:
@@ -418,7 +431,7 @@ class DataManager:
         return df
     
     def _load_price_inventory_df(self) -> pd.DataFrame:
-        """아이허브 가격/재고 로드 (Excel)"""
+        """아이허브 가격/재고 로드 (Excel) - 할인율기준가(정가) 포함"""
         
         print(f"\n📥 2. 아이허브 가격/재고 (Excel)")
         
@@ -441,6 +454,7 @@ class DataManager:
         col_pname = _pick_col(df, ['쿠팡 노출 상품명', '상품명'])
         col_pn = _pick_col(df, ['업체상품코드'])
         col_price = _pick_col(df, ['판매가격', '판매가격.1'])
+        col_original_price = _pick_col(df, ['할인율기준가'])
         col_stock = _pick_col(df, ['잔여수량(재고)', '잔여수량'])
         col_state = _pick_col(df, ['판매상태', '판매상태.1'])
         
@@ -450,6 +464,7 @@ class DataManager:
         if col_pname is None: df['쿠팡 노출 상품명'] = None;      col_pname = '쿠팡 노출 상품명'
         if col_pn is None:    df['업체상품코드'] = None;          col_pn = '업체상품코드'
         if col_price is None: df['판매가격'] = 0;                 col_price = '판매가격'
+        if col_original_price is None: df['할인율기준가'] = 0;    col_original_price = '할인율기준가'
         if col_stock is None: df['잔여수량(재고)'] = 0;           col_stock = '잔여수량(재고)'
         if col_state is None: df['판매상태'] = None;              col_state = '판매상태'
         
@@ -460,6 +475,7 @@ class DataManager:
             'iherb_product_name': df[col_pname],
             'iherb_part_number': df[col_pn].astype(str).str.strip(),
             'iherb_price': pd.to_numeric(df[col_price], errors='coerce').fillna(0).astype(int),
+            'iherb_original_price': pd.to_numeric(df[col_original_price], errors='coerce').fillna(0).astype(int),
             'iherb_stock': pd.to_numeric(df[col_stock], errors='coerce').fillna(0).astype(int),
             'iherb_stock_status': df[col_state],
         })
@@ -490,6 +506,7 @@ class DataManager:
         
         print(f"   ✓ {len(result):,}개 상품")
         print(f"   ✓ Product ID 있음: {(result['iherb_product_id'] != '').sum():,}개")
+        print(f"   ✓ 정가(할인율기준가) 있음: {(result['iherb_original_price'] > 0).sum():,}개")
         
         return result
     
@@ -766,26 +783,31 @@ class DataManager:
         # 가격 비교 계산
         rp = pd.to_numeric(df_final['rocket_price'], errors='coerce')
         ip = pd.to_numeric(df_final['iherb_price'], errors='coerce')
+        op = pd.to_numeric(df_final['iherb_original_price'], errors='coerce')
         rec_p = pd.to_numeric(df_final.get('iherb_recommended_price', 0), errors='coerce')
         
         valid = rp.gt(0) & ip.gt(0)
         valid_rec = ip.gt(0) & rec_p.gt(0)
+        valid_req = op.gt(0) & rec_p.gt(0)
         
         df_final['price_diff'] = pd.NA
         df_final['price_diff_pct'] = pd.NA
         df_final['cheaper_source'] = pd.NA
         df_final['breakeven_discount_rate'] = pd.NA
         df_final['recommended_discount_rate'] = pd.NA
+        df_final['requested_discount_rate'] = pd.NA
         
         diff = (ip - rp).where(valid).astype('float')
         pct = (diff / rp * 100).where(valid).replace([np.inf, -np.inf], np.nan).round(1)
         breakeven = ((ip - rp) / ip * 100).where(valid).replace([np.inf, -np.inf], np.nan).round(1)
         recommended = ((ip - rec_p) / ip * 100).where(valid_rec).replace([np.inf, -np.inf], np.nan).round(1)
+        requested = ((op - rec_p) / op * 100).where(valid_req).replace([np.inf, -np.inf], np.nan).round(1)
         
         df_final.loc[valid, 'price_diff'] = diff[valid]
         df_final.loc[valid, 'price_diff_pct'] = pct[valid]
         df_final.loc[valid, 'breakeven_discount_rate'] = breakeven[valid]
         df_final.loc[valid_rec, 'recommended_discount_rate'] = recommended[valid_rec]
+        df_final.loc[valid_req, 'requested_discount_rate'] = requested[valid_req]
         df_final.loc[valid, 'cheaper_source'] = np.where(
             df_final.loc[valid, 'price_diff'] > 0, '로켓직구',
             np.where(df_final.loc[valid, 'price_diff'] < 0, '아이허브', '동일')
