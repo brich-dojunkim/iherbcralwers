@@ -41,4 +41,5 @@ updater/temp_images
 EOF
 
 keys
-log
+loginner-sale-*.json
+*.secrets.json
