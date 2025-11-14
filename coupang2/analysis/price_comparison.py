@@ -1,3 +1,12 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+"""
+가격 비교 리포트 생성 (통합 DB 버전)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+통합 DB에서 데이터를 읽어 Excel 리포트 생성
+"""
+
 import pandas as pd
 import numpy as np
 from openpyxl import load_workbook
@@ -13,14 +22,15 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from src.data_manager import DataManager
+# 통합 모듈 import
+from data_manager import DataManager
 
 
 def get_available_dates(db_path):
     """사용 가능한 날짜 목록"""
     conn = sqlite3.connect(db_path)
     query = """
-    SELECT DISTINCT DATE(snapshot_time) as date
+    SELECT DISTINCT snapshot_date as date
     FROM snapshots
     ORDER BY date DESC
     """
@@ -29,20 +39,24 @@ def get_available_dates(db_path):
     return df['date'].tolist()
 
 
-def extract_price_comparison_data(db_path, excel_dir, target_date=None):
-    """
-    가격 비교 데이터 추출 (매칭 + 미매칭 통합)
+def extract_price_comparison_data(db_path, target_date=None):
+    """가격 비교 데이터 추출 (통합 DB 버전)
+    
+    Args:
+        db_path: 통합 DB 경로
+        target_date: 대상 날짜 (None이면 최신)
+    
+    Returns:
+        DataFrame
     """
     
     print(f"\n{'='*80}")
-    print(f"📅 가격 비교 데이터 추출 (통합 버전)")
+    print(f"📅 가격 비교 데이터 추출 (통합 DB)")
     print(f"{'='*80}")
     print(f"처리 날짜: {target_date or '최신'}")
 
-    manager = DataManager(
-        db_path=db_path,
-        excel_dir=excel_dir
-    )
+    # DataManager 사용
+    manager = DataManager(db_path=db_path)
     
     # 미매칭 우수 상품 포함
     df = manager.get_integrated_df(target_date=target_date, include_unmatched=True)
@@ -72,12 +86,6 @@ def extract_price_comparison_data(db_path, excel_dir, target_date=None):
     # 정수 변환
     if 'iherb_item_winner_ratio' in df.columns:
         df['iherb_item_winner_ratio'] = pd.to_numeric(df['iherb_item_winner_ratio'], errors='coerce').fillna(0).round(0).astype('Int64')
-    
-    if 'iherb_conversion_rate' in df.columns:
-        df['iherb_conversion_rate'] = pd.to_numeric(df['iherb_conversion_rate'], errors='coerce').fillna(0).round(0).astype('Int64')
-    
-    if 'iherb_cancel_rate' in df.columns:
-        df['iherb_cancel_rate'] = pd.to_numeric(df['iherb_cancel_rate'], errors='coerce').fillna(0).round(0).astype('Int64')
 
     print(f"\n✅ 총 {len(df):,}개 상품")
     print(f"   - 로켓 매칭: {(df['matching_status'] == '로켓매칭').sum():,}개")
@@ -96,9 +104,11 @@ def extract_price_comparison_data(db_path, excel_dir, target_date=None):
 
 
 def create_excel_report(date_data_dict, output_path):
-    """
-    Excel 리포트 생성 - 단일 시트 (매칭 + 미매칭 통합)
-    판매가/정가 분리 및 요청할인율 추가
+    """Excel 리포트 생성 - 단일 시트 (매칭 + 미매칭 통합)
+    
+    Args:
+        date_data_dict: {날짜: DataFrame}
+        output_path: 출력 파일 경로
     """
 
     if not date_data_dict:
@@ -114,7 +124,7 @@ def create_excel_report(date_data_dict, output_path):
             if df.empty:
                 continue
 
-            # 컬럼 재구성 (41개 - 요청할인율 추가)
+            # 컬럼 재구성 (41개)
             output_df = pd.DataFrame()
 
             # ========================================
@@ -132,7 +142,7 @@ def create_excel_report(date_data_dict, output_path):
             output_df['UPC'] = pd.to_numeric(df.get('iherb_upc', np.nan), errors='coerce').astype('Int64')
 
             # ========================================
-            # 2️⃣ 핵심 지표 (9개) - 요청할인율 추가
+            # 2️⃣ 핵심 지표 (9개)
             # ========================================
             output_df['순위'] = df.get('rocket_rank', np.nan)
             output_df['판매량'] = df.get('iherb_sales_quantity', np.nan)
@@ -156,7 +166,7 @@ def create_excel_report(date_data_dict, output_path):
             output_df['아이허브_Item'] = df.get('iherb_item_id', np.nan)
 
             # ========================================
-            # 4️⃣ 가격 정보 (8개) - 판매가/정가 분리
+            # 4️⃣ 가격 정보 (8개)
             # ========================================
             output_df['정가'] = df.get('rocket_original_price', np.nan)
             output_df['할인율'] = df.get('rocket_discount_rate', np.nan)
@@ -168,15 +178,15 @@ def create_excel_report(date_data_dict, output_path):
             output_df['판매상태'] = df.get('iherb_stock_status', np.nan)
 
             # ========================================
-            # 5️⃣ 판매 성과 (7개)
+            # 5️⃣ 판매 성과 (7개) - 간소화
             # ========================================
             output_df['평점'] = df.get('rocket_rating', np.nan)
             output_df['리뷰수'] = df.get('rocket_reviews', np.nan)
             output_df['매출비중'] = df.get('매출비중', np.nan)
-            output_df['주문'] = df.get('iherb_orders', np.nan)
+            output_df['주문'] = np.nan  # 통합 DB에 없음
             output_df['판매량비중'] = df.get('판매량비중', np.nan)
-            output_df['구매전환율'] = df.get('iherb_conversion_rate', np.nan)
-            output_df['취소율'] = df.get('iherb_cancel_rate', np.nan)
+            output_df['구매전환율'] = np.nan  # 통합 DB에 없음
+            output_df['취소율'] = np.nan  # 통합 DB에 없음
 
             # 시트 작성 (헤더 없이)
             sheet_name = date_str.replace('-', '')[:10]  # YYYYMMDD
@@ -191,7 +201,7 @@ def create_excel_report(date_data_dict, output_path):
 
 
 def apply_excel_styles(output_path):
-    """Excel 스타일 적용 - 3단 헤더 + 매칭상태 구분 + 판매가/정가 분리"""
+    """Excel 스타일 적용 - 3단 헤더 + 매칭상태 구분"""
 
     wb = load_workbook(output_path)
 
@@ -226,9 +236,9 @@ def apply_excel_styles(output_path):
         bottom=Side(style='thin')
     )
 
-    # 컬럼 그룹 정의 (41개)
+    # 컬럼 그룹 정의 (39개)
     column_groups = [
-        # 1️⃣ 기본 정보 (8개) - 매칭 포함
+        # 1️⃣ 기본 정보 (8개)
         {
             'name': '기본 정보',
             'color_top': INFO_DARK,
@@ -241,7 +251,7 @@ def apply_excel_styles(output_path):
                 {'name': '상품번호', 'cols': ['품번', 'UPC']}
             ]
         },
-        # 2️⃣ 핵심 지표 (9개) - 요청할인율 추가
+        # 2️⃣ 핵심 지표 (9개)
         {
             'name': '핵심 지표',
             'color_top': PRIMARY_DARK,
@@ -267,7 +277,7 @@ def apply_excel_styles(output_path):
                 }
             ]
         },
-        # 4️⃣ 가격 정보 (8개) - 판매가/정가 분리
+        # 4️⃣ 가격 정보 (8개)
         {
             'name': '가격 정보',
             'color_top': TERTIARY_DARK,
@@ -345,7 +355,7 @@ def apply_excel_styles(output_path):
                 
                 col_pos += sub_span
 
-        # 컬럼 너비 설정 (정밀 조정)
+        # 컬럼 너비 설정
         header_names = [cell.value for cell in ws[3]]
         
         def col_idx_of(name):
@@ -354,9 +364,7 @@ def apply_excel_styles(output_path):
             except ValueError:
                 return None
         
-        # 하위 헤더별 실제 너비 값
         column_widths = {
-            # 기본 정보 / 핵심 지표
             '상태': 7.9,
             '신뢰도': 9.71,
             '로켓': 12.86,
@@ -372,15 +380,11 @@ def apply_excel_styles(output_path):
             '추천할인율': 12.29,
             '요청할인율': 12.29,
             '유리한곳': 10.57,
-
-            # 제품 정보
             'Product_ID': 14.14,
             '로켓_Vendor': 17.29,
             '로켓_Item': 15.14,
             '아이허브_Vendor': 17.29,
             '아이허브_Item': 15.14,
-
-            # 가격 정보
             '정가': 8.86,
             '할인율': 9.00,
             '로켓가격': 10.57,
@@ -388,8 +392,6 @@ def apply_excel_styles(output_path):
             '쿠팡추천가': 12.29,
             '재고': 7.29,
             '판매상태': 10.57,
-
-            # 판매 성과
             '평점': 8.86,
             '리뷰수': 9.00,
             '매출비중': 10.57,
@@ -405,24 +407,18 @@ def apply_excel_styles(output_path):
         for col_idx in range(1, ws.max_column + 1):
             col_letter = get_column_letter(col_idx)
             
-            # 병합된 중간 헤더 보정
             mid_header = ws.cell(row=2, column=col_idx).value
             if mid_header is None and col_idx > 1:
                 mid_header = ws.cell(row=2, column=col_idx - 1).value
 
             bottom_header = ws.cell(row=3, column=col_idx).value
 
-            # 1) 제품명 → 60으로 고정
             if mid_header == '제품명':
                 width = PRODUCT_NAME_WIDTH
-
-            # 2) 링크 특수 처리
             elif mid_header == '링크' and bottom_header == '로켓':
                 width = 7.29
             elif mid_header == '링크' and bottom_header == '아이허브':
                 width = 10.57
-
-            # 3) 그 외는 하위 헤더 기준 매핑
             elif bottom_header in column_widths:
                 width = column_widths[bottom_header]
             else:
@@ -430,11 +426,6 @@ def apply_excel_styles(output_path):
 
             ws.column_dimensions[col_letter].width = width
         
-        # 하위 헤더 줄바꿈 방지
-        for col_idx in range(1, ws.max_column + 1):
-            cell = ws.cell(row=3, column=col_idx)
-            cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=False)
-
         # 데이터 셀 기본 스타일
         data_actual_start = 4
         max_col = ws.max_column
@@ -446,8 +437,6 @@ def apply_excel_styles(output_path):
                 cell.alignment = Alignment(vertical='center', wrap_text=False)
 
         # 조건부 서식
-        
-        # 아이템위너비율 (30% 이상 초록)
         winner_col = col_idx_of('아이템위너비율')
         if winner_col:
             for row_idx in range(data_actual_start, ws.max_row + 1):
@@ -459,7 +448,6 @@ def apply_excel_styles(output_path):
                 except:
                     pass
         
-        # 손익분기할인율 (양수=빨강)
         breakeven_col = col_idx_of('손익분기할인율')
         if breakeven_col:
             for row_idx in range(data_actual_start, ws.max_row + 1):
@@ -471,7 +459,6 @@ def apply_excel_styles(output_path):
                 except:
                     pass
         
-        # 추천할인율 (양수=빨강)
         recommended_col = col_idx_of('추천할인율')
         if recommended_col:
             for row_idx in range(data_actual_start, ws.max_row + 1):
@@ -483,7 +470,6 @@ def apply_excel_styles(output_path):
                 except:
                     pass
         
-        # 요청할인율 (양수=빨강)
         requested_col = col_idx_of('요청할인율')
         if requested_col:
             for row_idx in range(data_actual_start, ws.max_row + 1):
@@ -495,7 +481,6 @@ def apply_excel_styles(output_path):
                 except:
                     pass
         
-        # 가격격차
         price_diff_col = col_idx_of('가격격차(원)')
         cheaper_col = col_idx_of('유리한곳')
         if price_diff_col and cheaper_col:
@@ -506,7 +491,6 @@ def apply_excel_styles(output_path):
                 elif cheaper_value == '로켓직구':
                     ws.cell(row=row_idx, column=price_diff_col).fill = PatternFill(start_color=HIGHLIGHT_RED, end_color=HIGHLIGHT_RED, fill_type="solid")
         
-        # 매칭신뢰도
         conf_col = col_idx_of('신뢰도')
         if conf_col:
             for row_idx in range(data_actual_start, ws.max_row + 1):
@@ -518,30 +502,6 @@ def apply_excel_styles(output_path):
                     cell.fill = PatternFill(start_color=HIGHLIGHT_YELLOW, end_color=HIGHLIGHT_YELLOW, fill_type="solid")
                 elif conf_value == 'Low':
                     cell.fill = PatternFill(start_color=HIGHLIGHT_RED, end_color=HIGHLIGHT_RED, fill_type="solid")
-        
-        # 구매전환율 (10% 이상 초록)
-        conversion_col = col_idx_of('구매전환율')
-        if conversion_col:
-            for row_idx in range(data_actual_start, ws.max_row + 1):
-                cell = ws.cell(row=row_idx, column=conversion_col)
-                try:
-                    val = float(cell.value) if cell.value else 0
-                    if val >= 10:
-                        cell.fill = PatternFill(start_color=HIGHLIGHT_GREEN, end_color=HIGHLIGHT_GREEN, fill_type="solid")
-                except:
-                    pass
-        
-        # 취소율 (5% 이상 빨강)
-        cancel_col = col_idx_of('취소율')
-        if cancel_col:
-            for row_idx in range(data_actual_start, ws.max_row + 1):
-                cell = ws.cell(row=row_idx, column=cancel_col)
-                try:
-                    val = float(cell.value) if cell.value else 0
-                    if val >= 5:
-                        cell.fill = PatternFill(start_color=HIGHLIGHT_RED, end_color=HIGHLIGHT_RED, fill_type="solid")
-                except:
-                    pass
 
         # 하이퍼링크
         link_columns = []
@@ -565,7 +525,7 @@ def apply_excel_styles(output_path):
                     cell.font = Font(color="0563C1", underline="single")
                     cell.alignment = Alignment(horizontal='center', vertical='center')
 
-        # Freeze Panes (기본정보 16개 이후)
+        # Freeze Panes
         freeze_col = 17
         ws.freeze_panes = ws.cell(row=4, column=freeze_col)
 
@@ -585,15 +545,10 @@ def apply_excel_styles(output_path):
                     rule
                 )
         
-        # 자동 필터 설정
-        header_row = 3
-        first_col = 1
-        last_col = ws.max_column
-        last_row = ws.max_row
-
+        # 자동 필터
         ws.auto_filter.ref = (
-            f"{get_column_letter(first_col)}{header_row}:"
-            f"{get_column_letter(last_col)}{last_row}"
+            f"{get_column_letter(1)}{3}:"
+            f"{get_column_letter(ws.max_column)}{ws.max_row}"
         )
 
     wb.save(output_path)
@@ -602,11 +557,14 @@ def apply_excel_styles(output_path):
 def main():
     """메인 함수"""
     
-    DB_PATH = "/Users/brich/Desktop/iherb_price/coupang2/data/rocket/monitoring.db"
-    EXCEL_DIR = "/Users/brich/Desktop/iherb_price/coupang2/data/iherb"
-    OUTPUT_DIR = "output"
+    # Config import
+    sys.path.insert(0, str(Path(__file__).parent.parent))
+    from config_settings import Config
     
-    Path(OUTPUT_DIR).mkdir(exist_ok=True)
+    DB_PATH = Config.INTEGRATED_DB_PATH
+    OUTPUT_DIR = Config.OUTPUT_DIR
+    
+    OUTPUT_DIR.mkdir(exist_ok=True)
     
     dates = get_available_dates(DB_PATH)
     
@@ -622,12 +580,12 @@ def main():
     
     date_data_dict = {}
     for date_str in process_dates:
-        df = extract_price_comparison_data(DB_PATH, EXCEL_DIR, target_date=date_str)
+        df = extract_price_comparison_data(DB_PATH, target_date=date_str)
         if not df.empty:
             date_data_dict[date_str] = df
     
     if date_data_dict:
-        output_file = Path(OUTPUT_DIR) / f"rocket_vs_iherb_{datetime.now().strftime('%Y%m%d')}.xlsx"
+        output_file = OUTPUT_DIR / f"rocket_vs_iherb_{datetime.now().strftime('%Y%m%d')}.xlsx"
         create_excel_report(date_data_dict, str(output_file))
     else:
         print("\n❌ 생성할 데이터가 없습니다.")

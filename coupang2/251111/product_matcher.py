@@ -1,6 +1,8 @@
 """
-쿠팡 제품 자동 매칭 시스템
-CSV 데이터 기반으로 쿠팡 검색 후 가장 유사한 제품 매칭
+쿠팡 제품 자동 매칭 시스템 (개선 버전)
+- 실시간 저장 강화
+- 이어서 실행 로직 개선
+- utils.py 모듈 통합
 """
 
 import sys
@@ -12,8 +14,15 @@ from typing import List, Dict, Optional, Tuple
 from dataclasses import dataclass
 import json
 
-# 프로젝트 루트를 sys.path에 추가
+# 현재 디렉토리를 sys.path에 추가
 current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.insert(0, current_dir)
+
+# utils 모듈 import
+from utils import ColumnManager, ResultSaver, ProgressTracker, StageManager
+
+# 프로젝트 루트를 sys.path에 추가 (coupang 모듈 import용)
 project_root = os.path.dirname(os.path.dirname(current_dir))  # iherb_price 디렉토리
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
@@ -22,11 +31,11 @@ if project_root not in sys.path:
 class ProductInfo:
     """제품 정보 데이터 클래스"""
     name: str
-    count: Optional[int] = None  # 정수 (60정, 100캡슐 등)
-    quantity: Optional[int] = None  # 개수 (1개, 2개 등)
+    count: Optional[int] = None
+    quantity: Optional[int] = None
     brand: Optional[str] = None
-    product_type: Optional[str] = None  # 캡슐, 소프트젤, 베지캡 등
-    original_name: str = ""  # 원본 제품명
+    product_type: Optional[str] = None
+    original_name: str = ""
     
 
 @dataclass
@@ -35,16 +44,16 @@ class CoupangProduct:
     rank: int
     name: str
     count: Optional[int]
-    quantity: Optional[int]  # 개수 (1개, 2개 등)
-    price: int  # 할인가
-    shipping_fee: int  # 배송비
-    final_price: int  # 최종 가격 (할인가 + 배송비)
-    unit_price: Optional[float]  # 1정당 가격
+    quantity: Optional[int]
+    price: int
+    shipping_fee: int
+    final_price: int
+    unit_price: Optional[float]
     url: str
     brand: Optional[str] = None
     rating: Optional[float] = None
     review_count: Optional[int] = None
-    seller_type: str = "3P"  # 판매 유형: "로켓직구" 또는 "3P"
+    seller_type: str = "3P"
 
 
 @dataclass
@@ -52,8 +61,8 @@ class MatchResult:
     """매칭 결과"""
     original_product: ProductInfo
     matched_product: Optional[CoupangProduct]
-    confidence_level: str  # "확신" 또는 "검토필요"
-    reason: str  # 매칭/미매칭 사유
+    confidence_level: str
+    reason: str
 
 
 class ProductParser:
@@ -430,28 +439,6 @@ class ProductParser:
         r'(\d+)팩',
     ]
     
-    # 개수 추출 패턴
-    QUANTITY_PATTERNS = [
-        r'(\d+)개',
-        r'(\d+)병',
-        r'(\d+)팩',
-    ]
-    
-    # 제품 타입 패턴
-    TYPE_PATTERNS = [
-        '캡슐', '베지캡', '베지 캡', '베지테리안 캡슐',
-        '소프트젤', '소프트겔', '타블렛', '정', '알',
-        'capsule', 'softgel', 'tablet', 'veggie cap'
-    ]
-    
-    # 브랜드 추출 (주요 건강식품 브랜드)
-    KNOWN_BRANDS = [
-        '쏜리서치', '나우푸드', '닥터스베스트', '라이프익스텐션',
-        '재로우', '가든오브라이프', '스포츠리서치', '솔가',
-        'thorne', 'now', 'doctors best', 'life extension',
-        'jarrow', 'garden of life', 'sports research', 'solgar'
-    ]
-    
     @staticmethod
     def extract_count(text: str) -> Optional[int]:
         """텍스트에서 정수 추출"""
@@ -464,7 +451,6 @@ class ProductParser:
             if match:
                 try:
                     count = int(match.group(1))
-                    # 상식적인 범위 체크 (10~1000정)
                     if 10 <= count <= 1000:
                         return count
                 except (ValueError, IndexError):
@@ -473,7 +459,7 @@ class ProductParser:
     
     @staticmethod
     def extract_quantity(text: str) -> Optional[int]:
-        """텍스트에서 개수 추출 (1개, 2개 등)"""
+        """텍스트에서 개수 추출"""
         if not text:
             return None
         
@@ -483,7 +469,6 @@ class ProductParser:
             if match:
                 try:
                     quantity = int(match.group(1))
-                    # 상식적인 범위 체크 (1~20개)
                     if 1 <= quantity <= 20:
                         return quantity
                 except (ValueError, IndexError):
@@ -491,42 +476,22 @@ class ProductParser:
         return None
     
     @staticmethod
-    def extract_quantity(text: str) -> Optional[int]:
-        """텍스트에서 개수 추출 (1개, 2개 등)"""
-        if not text:
-            return None
-        
-        for pattern in ProductParser.QUANTITY_PATTERNS:
-            match = re.search(pattern, text, re.IGNORECASE)
-            if match:
-                try:
-                    quantity = int(match.group(1))
-                    # 1~10개 범위
-                    if 1 <= quantity <= 10:
-                        return quantity
-                except (ValueError, IndexError):
-                    continue
-        return 1  # 기본값 1개
-    
-    @staticmethod
     def extract_brand_from_partnumber(part_number: str) -> Optional[str]:
         """Part Number에서 브랜드 추출"""
         if not part_number:
             return None
         
-        # 접두사 3자리 추출 (예: DRB00087 -> DRB)
         prefix = part_number[:3].upper()
         return ProductParser.PART_NUMBER_BRAND_MAP.get(prefix)
     
     @staticmethod
     def extract_brand(text: str) -> Optional[str]:
-        """텍스트에서 브랜드명 추출 (영문/한글 자동 정규화)"""
+        """텍스트에서 브랜드명 추출"""
         if not text:
             return None
         
         text_lower = text.lower()
         
-        # BRAND_NAME_MAP에서 매칭 (정규화된 브랜드명 반환)
         for key, normalized_brand in ProductParser.BRAND_NAME_MAP.items():
             if key in text_lower:
                 return normalized_brand
@@ -534,24 +499,10 @@ class ProductParser:
         return None
     
     @staticmethod
-    def extract_type(text: str) -> Optional[str]:
-        """텍스트에서 제품 타입 추출"""
-        if not text:
-            return None
-        
-        text_lower = text.lower()
-        for ptype in ProductParser.TYPE_PATTERNS:
-            if ptype.lower() in text_lower:
-                return ptype
-        return None
-    
-    @staticmethod
     def parse_product_name(name: str, part_number: str = None) -> ProductInfo:
         """제품명 전체 파싱"""
-        # Part Number로 브랜드 우선 추출
         brand = ProductParser.extract_brand_from_partnumber(part_number) if part_number else None
         
-        # Part Number로 브랜드를 찾지 못하면 제품명에서 추출
         if not brand:
             brand = ProductParser.extract_brand(name)
         
@@ -560,18 +511,12 @@ class ProductParser:
             count=ProductParser.extract_count(name),
             quantity=ProductParser.extract_quantity(name),
             brand=brand,
-            product_type=ProductParser.extract_type(name),
             original_name=name
         )
     
     @staticmethod
     def clean_url(url: str) -> str:
-        """
-        쿠팡 URL을 필수 파라미터만 남기고 정리
-        
-        기본: https://www.coupang.com/vp/products/{product_id}?itemId={item_id}&vendorItemId={vendor_id}
-        vendorItemId 없을 때: https://www.coupang.com/vp/products/{product_id}?itemId={item_id}&lptag={lptag}
-        """
+        """쿠팡 URL 정리"""
         if not url:
             return url
         
@@ -581,18 +526,15 @@ class ProductParser:
             parsed = urlparse(url)
             params = parse_qs(parsed.query)
             
-            # 필수 파라미터만 추출
             essential_params = {}
             if 'itemId' in params:
                 essential_params['itemId'] = params['itemId'][0]
             
-            # vendorItemId 우선, 없으면 lptag
             if 'vendorItemId' in params:
                 essential_params['vendorItemId'] = params['vendorItemId'][0]
             elif 'lptag' in params:
                 essential_params['lptag'] = params['lptag'][0]
             
-            # URL 재구성
             new_query = urlencode(essential_params)
             clean_url = urlunparse((
                 parsed.scheme,
@@ -605,67 +547,36 @@ class ProductParser:
             
             return clean_url
         except:
-            # 파싱 실패 시 원본 반환
             return url
-    
-    @staticmethod
-    def parse_unit_price(text: str) -> Optional[float]:
-        """단위당 가격 추출 (예: '1정당 836원')"""
-        if not text:
-            return None
-        
-        # "1정당 836원" 형식
-        match = re.search(r'1[^\d]*?(\d{1,5})원', text)
-        if match:
-            try:
-                return float(match.group(1))
-            except (ValueError, IndexError):
-                pass
-        return None
 
 
 class CoupangSearcher:
-    """쿠팡 검색 및 파싱 담당"""
+    """쿠팡 검색 및 파싱"""
     
     def __init__(self, browser_manager=None):
-        """
-        browser_manager: coupang_manager.BrowserManager 인스턴스
-        """
         self.browser = browser_manager
     
     def search_and_get_top_products(self, query: str, top_n: int = 4) -> List[CoupangProduct]:
-        """
-        쿠팡에서 검색하고 상위 N개 제품 반환
-        
-        Args:
-            query: 검색 키워드
-            top_n: 가져올 제품 수 (기본 4개)
-        
-        Returns:
-            CoupangProduct 리스트
-        """
+        """쿠팡에서 검색하고 상위 N개 제품 반환"""
         if not self.browser:
             raise ValueError("Browser manager is not initialized")
         
         products = []
         
         try:
-            # 1. 검색창에 키워드 입력 및 검색
             search_url = f"https://www.coupang.com/np/search?q={query}"
             
-            print(f"검색 URL: {search_url}")
+            print(f"  검색 URL: {search_url}")
             self.browser.get_with_coupang_referrer(search_url)
-            time.sleep(3)  # 페이지 로드 대기
+            time.sleep(3)
             
-            # 2. 낱개상품 필터 적용
             self._apply_single_item_filter()
-            time.sleep(2)  # 필터 적용 후 대기
+            time.sleep(2)
             
-            # 3. 상위 N개 제품 파싱
             products = self._parse_search_results(top_n)
             
         except Exception as e:
-            print(f"검색 중 오류: {e}")
+            print(f"  ✗ 검색 중 오류: {e}")
         
         return products
     
@@ -674,10 +585,7 @@ class CoupangSearcher:
         try:
             driver = self.browser.driver
             
-            # JavaScript로 필터 클릭
-            # 실제 HTML 구조에 맞게 셀렉터 조정 필요
             filter_script = """
-            // 낱개상품 필터 찾기
             const filterLabels = document.querySelectorAll('label');
             for (let label of filterLabels) {
                 const text = label.textContent.trim();
@@ -691,12 +599,12 @@ class CoupangSearcher:
             
             result = driver.execute_script(filter_script)
             if result:
-                print("✓ 낱개상품 필터 적용 완료")
+                print("  ✓ 낱개상품 필터 적용")
             else:
-                print("⚠ 낱개상품 필터를 찾을 수 없습니다")
+                print("  ⚠ 낱개상품 필터 없음")
                 
         except Exception as e:
-            print(f"필터 적용 실패: {e}")
+            print(f"  ✗ 필터 적용 실패: {e}")
     
     def _parse_search_results(self, top_n: int) -> List[CoupangProduct]:
         """검색 결과 파싱"""
@@ -704,22 +612,17 @@ class CoupangSearcher:
         
         try:
             driver = self.browser.driver
-            
-            # 제품 리스트 찾기
             product_items = driver.find_elements("css selector", "li.ProductUnit_productUnit__Qd6sv")
             
             for idx, item in enumerate(product_items[:top_n]):
                 try:
-                    # 제품명
                     name_elem = item.find_element("css selector", "div.ProductUnit_productNameV2__cV9cw")
                     name = name_elem.text.strip()
                     
-                    # URL
                     link_elem = item.find_element("css selector", "a")
                     raw_url = link_elem.get_attribute("href")
-                    url = ProductParser.clean_url(raw_url)  # URL 정리
+                    url = ProductParser.clean_url(raw_url)
                     
-                    # 가격 (할인가 우선, 없으면 정가)
                     try:
                         price_elem = item.find_element("css selector", "div.custom-oos.fw-text-\\[20px\\]\\/\\[24px\\]")
                         price_text = price_elem.text.strip().replace(",", "").replace("원", "")
@@ -727,65 +630,29 @@ class CoupangSearcher:
                     except:
                         price = 0
                     
-                    # 배송비 추출
                     shipping_fee = 0
                     try:
-                        # 배송비 정보: data-badge-type="feePrice"
                         fee_elem = item.find_element("css selector", "div.TextBadge_feePrice__n_gta")
                         fee_text = fee_elem.text.strip()
                         
-                        # "배송비 15,000원" 또는 "배송비 2,500원 조건부 무료배송" 형태
                         if "무료배송" in fee_text and "조건부" not in fee_text:
                             shipping_fee = 0
                         else:
-                            # "배송비 15,000원" 에서 숫자 추출
                             import re
                             match = re.search(r'배송비\s*([\d,]+)원', fee_text)
                             if match:
                                 shipping_fee = int(match.group(1).replace(",", ""))
                     except:
-                        # 배송비 정보 없으면 0 (무료배송으로 간주)
                         shipping_fee = 0
                     
-                    # 최종 가격 = 할인가 + 배송비
                     final_price = price + shipping_fee
                     
-                    # 단위당 가격
-                    try:
-                        unit_price_elem = item.find_element("css selector", "span.custom-oos.fw-text-\\[12px\\]\\/\\[15px\\]")
-                        unit_price = ProductParser.parse_unit_price(unit_price_elem.text)
-                    except:
-                        unit_price = None
-                    
-                    # 정수 추출
                     count = ProductParser.extract_count(name)
-                    
-                    # 개수 추출
                     quantity = ProductParser.extract_quantity(name)
-                    
-                    # 브랜드 추출
                     brand = ProductParser.extract_brand(name)
                     
-                    # 평점
-                    try:
-                        rating_elem = item.find_element("css selector", "span.ProductRating_rating__lMxS9")
-                        # 별점 계산 (width 스타일에서)
-                        rating = 5.0  # 간단히 5점으로 가정
-                    except:
-                        rating = None
-                    
-                    # 리뷰 수
-                    try:
-                        review_elem = item.find_element("css selector", "span.ProductRating_ratingCount__R0Vhz")
-                        review_text = review_elem.text.strip().replace("(", "").replace(")", "").replace(",", "")
-                        review_count = int(review_text)
-                    except:
-                        review_count = None
-                    
-                    # 판매 유형 감지 (로켓직구 vs 3P)
                     seller_type = "3P"
                     try:
-                        # 로켓직구 라벨 찾기
                         item.find_element("css selector", "img[src*='logo_jikgu']")
                         seller_type = "로켓직구"
                     except:
@@ -799,28 +666,27 @@ class CoupangSearcher:
                         price=price,
                         shipping_fee=shipping_fee,
                         final_price=final_price,
-                        unit_price=unit_price,
+                        unit_price=None,
                         url=url,
                         brand=brand,
-                        rating=rating,
-                        review_count=review_count,
+                        rating=None,
+                        review_count=None,
                         seller_type=seller_type
                     )
                     
                     products.append(product)
                     
-                    # 출력 메시지
                     if shipping_fee > 0:
-                        print(f"✓ [{idx+1}] {name[:50]}... (정수: {count}, 개수: {quantity}개, 가격: {price:,}원, 배송비: {shipping_fee:,}원, 최종: {final_price:,}원)")
+                        print(f"  ✓ [{idx+1}] {name[:50]}... ({count}정 x {quantity}개, {final_price:,}원)")
                     else:
-                        print(f"✓ [{idx+1}] {name[:50]}... (정수: {count}, 개수: {quantity}개, 최종: {final_price:,}원)")
+                        print(f"  ✓ [{idx+1}] {name[:50]}... ({count}정 x {quantity}개, {final_price:,}원)")
                     
                 except Exception as e:
-                    print(f"제품 파싱 실패 [{idx+1}]: {e}")
+                    print(f"  ✗ 제품 파싱 실패 [{idx+1}]: {e}")
                     continue
             
         except Exception as e:
-            print(f"검색 결과 파싱 실패: {e}")
+            print(f"  ✗ 검색 결과 파싱 실패: {e}")
         
         return products
 
@@ -833,12 +699,7 @@ class SimpleMatcher:
         original: ProductInfo, 
         candidates: List[CoupangProduct]
     ) -> MatchResult:
-        """
-        정수와 개수가 모두 일치하는 제품 중 최저가 선택
-        
-        Returns:
-            MatchResult with confidence level (확신/검토필요)
-        """
+        """정수와 개수가 모두 일치하는 제품 중 최저가 선택"""
         if not candidates:
             return MatchResult(
                 original_product=original,
@@ -847,8 +708,6 @@ class SimpleMatcher:
                 reason="검색 결과 없음"
             )
         
-        # 1. 정수와 개수 모두 일치하는 제품 필터링 (필수)
-        # 개수가 None이면 1개로 간주
         original_qty = original.quantity if original.quantity else 1
         
         matched = [
@@ -857,7 +716,6 @@ class SimpleMatcher:
         ]
         
         if not matched:
-            # 정수+개수 일치하는 제품 없음
             return MatchResult(
                 original_product=original,
                 matched_product=None,
@@ -865,7 +723,6 @@ class SimpleMatcher:
                 reason=f"정수·개수 일치하는 제품 없음 (원본: {original.count}정 x {original_qty}개)"
             )
         
-        # 2. 브랜드 일치 제품 필터링
         brand_matched = []
         if original.brand:
             for product in matched:
@@ -873,23 +730,19 @@ class SimpleMatcher:
                 if product_brand and original.brand == product_brand:
                     brand_matched.append(product)
         
-        # 3. 최저가 선택 및 신뢰도 판정
         if brand_matched:
-            # 브랜드 일치하는 제품 중 최저가 선택 → 확신
             selected = min(brand_matched, key=lambda x: x.final_price if x.final_price > 0 else float('inf'))
             confidence = "확신"
             brand_match = True
         else:
-            # 브랜드 일치 없으면 전체 중 최저가 선택 → 검토필요
             selected = min(matched, key=lambda x: x.final_price if x.final_price > 0 else float('inf'))
             confidence = "검토필요"
             brand_match = False
         
-        # 4. 이유 설명
         if selected.shipping_fee > 0:
-            reason = f"정수·개수 일치({original.count}정 x {original_qty}개), 최저가 {selected.final_price:,}원 (상품가: {selected.price:,}원 + 배송비: {selected.shipping_fee:,}원)"
+            reason = f"정수·개수 일치({original.count}정 x {original_qty}개), 가격 {selected.final_price:,}원 (상품: {selected.price:,}원 + 배송비: {selected.shipping_fee:,}원)"
         else:
-            reason = f"정수·개수 일치({original.count}정 x {original_qty}개), 최저가 {selected.final_price:,}원"
+            reason = f"정수·개수 일치({original.count}정 x {original_qty}개), 가격 {selected.final_price:,}원"
         
         if brand_match:
             reason += f", 브랜드 일치({original.brand})"
@@ -903,189 +756,186 @@ class SimpleMatcher:
 
 
 class ProductMatchingSystem:
-    """전체 제품 매칭 시스템"""
+    """전체 제품 매칭 시스템 (개선 버전)"""
     
-    def __init__(self, csv_path: str, gemini_api_key: str = None, browser_manager=None, output_path: str = None):
+    def __init__(self, csv_path: str, browser_manager=None, output_path: str = None):
         """
         Args:
-            csv_path: CSV 파일 경로
-            gemini_api_key: 사용하지 않음 (하위 호환성)
-            browser_manager: CoupangBrowserManager 인스턴스
-            output_path: 결과 저장 경로 (기본: ./outputs/matching_results.csv)
+            csv_path: 입력 CSV 파일 경로
+            browser_manager: BrowserManager 인스턴스
+            output_path: 출력 CSV 경로
         """
         self.csv_path = csv_path
+        
         if output_path is None:
-            # 현재 스크립트 위치의 outputs 디렉토리
             current_dir = os.path.dirname(os.path.abspath(__file__))
             output_dir = os.path.join(current_dir, 'outputs')
             os.makedirs(output_dir, exist_ok=True)
             output_path = os.path.join(output_dir, 'matching_results.csv')
+        
         self.output_path = output_path
         self.df = None
         self.searcher = CoupangSearcher(browser_manager)
-        self.matcher = SimpleMatcher()  # Gemini 대신 SimpleMatcher 사용
-        self.results = []
-        self.processed_ids = set()  # 이미 처리된 Part Number 추적
+        self.matcher = SimpleMatcher()
+        self.saver = ResultSaver(output_path)
     
-    def load_data(self):
-        """CSV 데이터 로드"""
-        try:
-            self.df = pd.read_csv(self.csv_path, encoding='utf-8')
-            # 한글 제품명이 있는 행만 필터링
-            self.df = self.df[self.df['상품명_20251024'].notna()]
-            print(f"✓ 데이터 로드 완료: {len(self.df)}개 제품")
-            return True
-        except Exception as e:
-            print(f"✗ 데이터 로드 실패: {e}")
-            return False
-    
-    def load_existing_results(self):
-        """기존 결과 파일 로드 (이어서 진행용)"""
-        try:
-            if os.path.exists(self.output_path):
-                existing_df = pd.read_csv(self.output_path, encoding='utf-8-sig')
-                self.results = existing_df.to_dict('records')
-                self.processed_ids = set(existing_df['Part Number'].astype(str))
-                print(f"✓ 기존 결과 로드: {len(self.processed_ids)}개 처리 완료")
-                return True
-            else:
-                print("  새로운 작업 시작")
-                return False
-        except Exception as e:
-            print(f"✗ 기존 결과 로드 실패: {e}")
-            return False
-    
-    def save_results(self, output_path: str = None):
-        """결과 저장"""
-        save_path = output_path or self.output_path
-        try:
-            results_df = pd.DataFrame(self.results)
-            results_df.to_csv(save_path, index=False, encoding='utf-8-sig')
-            print(f"✓ 결과 저장: {save_path} ({len(self.results)}개)")
-            return True
-        except Exception as e:
-            print(f"✗ 결과 저장 실패: {e}")
-            return False
-    
-    def _save_single_result(self, result: dict):
-        """단일 결과 실시간 저장"""
-        self.results.append(result)
-        self.save_results()
-    
-    def process_all(self, start_idx: int = 0, end_idx: Optional[int] = None):
-        """전체 제품 처리"""
-        
-        if self.df is None:
-            if not self.load_data():
-                return
-        
-        # 기존 결과 로드
-        self.load_existing_results()
-        
-        end_idx = end_idx or len(self.df)
-        
+    def initialize(self):
+        """
+        초기화 및 컬럼 준비
+        - CSV 로드
+        - 기존 결과 확인
+        - 필요한 컬럼 생성
+        """
         print(f"\n{'='*60}")
-        print(f"제품 매칭 시작: {start_idx} ~ {end_idx}")
-        print(f"이미 처리 완료: {len(self.processed_ids)}개")
+        print(f"초기화 및 컬럼 준비")
         print(f"{'='*60}\n")
         
-        for idx in range(start_idx, min(end_idx, len(self.df))):
-            row = self.df.iloc[idx]
+        # CSV 로드
+        if os.path.exists(self.output_path):
+            print(f"✓ 기존 결과 파일 로드: {self.output_path}")
+            self.df = pd.read_csv(self.output_path, encoding='utf-8-sig')
+        else:
+            print(f"✓ 새 작업 시작: {self.csv_path}")
+            self.df = pd.read_csv(self.csv_path, encoding='utf-8')
+            self.df = self.df[self.df['상품명_20251024'].notna()]
+            
+            # 원본제품명 컬럼 생성
+            if '원본제품명' not in self.df.columns:
+                self.df['원본제품명'] = self.df['상품명_20251024']
+        
+        # 모든 컬럼 생성
+        self.df = ColumnManager.ensure_columns(self.df)
+        
+        # 사유 컬럼 파싱
+        self.df = ColumnManager.parse_reason_column(self.df)
+        
+        # 저장
+        self.saver.save(self.df, "초기화 완료")
+        
+        print(f"✓ 전체 데이터: {len(self.df)}개")
+        print(f"{'='*60}\n")
+        
+        return True
+    
+    def process_matching(self, start_idx: int = 0, end_idx: Optional[int] = None):
+        """
+        제품 매칭 단계
+        """
+        StageManager.print_stage_header('matching')
+        
+        # 이미 처리된 제품 확인
+        processed_ids = self.saver.get_processed_ids(self.df, 'matching')
+        print(f"✓ 이미 처리 완료: {len(processed_ids)}개\n")
+        
+        # 처리할 제품 필터링
+        end_idx = end_idx or len(self.df)
+        to_process = self.df.iloc[start_idx:end_idx]
+        to_process = to_process[~to_process['Part Number'].astype(str).isin(processed_ids)]
+        
+        if len(to_process) == 0:
+            print("✓ 매칭할 제품이 없습니다\n")
+            return
+        
+        print(f"✓ 매칭 대상: {len(to_process)}개\n")
+        
+        # 진행 상황 추적
+        tracker = ProgressTracker(len(to_process), "제품 매칭")
+        
+        for idx, row in to_process.iterrows():
             part_number = str(row['Part Number'])
+            original_name = row['원본제품명']
             
-            # 이미 처리된 제품 스킵
-            if part_number in self.processed_ids:
-                print(f"[{idx+1}/{len(self.df)}] 스킵 (이미 처리됨): {part_number}")
-                continue
-            
-            print(f"\n[{idx+1}/{len(self.df)}] 처리 중...")
-            print(f"Part Number: {part_number}")
-            print(f"원본: {row['상품명_20251024']}")
+            tracker.print_progress(part_number)
+            print(f"  원본: {original_name}")
             
             # 1. 제품 정보 파싱
-            original = ProductParser.parse_product_name(row['상품명_20251024'], part_number)
-            print(f"  - 정수: {original.count}, 개수: {original.quantity}개, 브랜드: {original.brand}")
+            original = ProductParser.parse_product_name(original_name, part_number)
+            print(f"  정수: {original.count}, 개수: {original.quantity}개, 브랜드: {original.brand}")
             
-            # 2. 쿠팡 검색 (브랜드 포함)
-            print(f"  - 쿠팡 검색 중...")
-            search_query = row['상품명_20251024']
+            # 2. 쿠팡 검색
+            print(f"  쿠팡 검색 중...")
+            search_query = original_name
             
-            # 브랜드가 있고, 제품명에 브랜드가 없으면 검색어에 브랜드 추가
             if original.brand:
                 product_name_normalized = search_query.lower().replace(" ", "")
                 brand_normalized = original.brand.lower().replace(" ", "")
                 
                 if brand_normalized not in product_name_normalized:
                     search_query = f"{original.brand} {search_query}"
-                    print(f"  - 브랜드 추가: {original.brand}")
+                    print(f"  브랜드 추가: {original.brand}")
             
             candidates = self.searcher.search_and_get_top_products(search_query, top_n=4)
             
             if not candidates:
                 print(f"  ✗ 검색 결과 없음")
-                result = {
-                    'Part Number': part_number,
-                    '원본제품명': row['상품명_20251024'],
-                    '매칭제품명': None,
-                    '매칭URL': None,
-                    '가격': None,
-                    '판매유형': None,
-                    '신뢰도': '검토필요',
-                    '사유': '검색 결과 없음'
-                }
-                self._save_single_result(result)
+                self.df.at[idx, '사유'] = '검색 결과 없음'
+                self.df.at[idx, '정수개수일치'] = False
+                self.df.at[idx, '브랜드일치'] = False
+                self.df.at[idx, '정수개수일치_상세'] = ''
+                self.df.at[idx, '브랜드일치_상세'] = ''
+                self.saver.save(self.df, f"저장 ({tracker.current}/{tracker.total})")
+                tracker.update(success=False)
+                time.sleep(2)
                 continue
             
-            # 3. 매칭 (정수 기반)
-            print(f"  - 정수 기반 매칭 중...")
+            # 3. 매칭
+            print(f"  매칭 중...")
             match_result = self.matcher.match_products(original, candidates)
             
-            # 4. 결과 출력 및 저장
+            # 4. 결과 저장
             if match_result.matched_product:
-                print(f"  ✓ 매칭 완료: {match_result.matched_product.name[:50]}...")
+                print(f"  ✓ 매칭: {match_result.matched_product.name[:50]}...")
                 print(f"    신뢰도: {match_result.confidence_level}")
+                
+                self.df.at[idx, '매칭제품명'] = match_result.matched_product.name
+                self.df.at[idx, '매칭URL'] = match_result.matched_product.url
+                self.df.at[idx, '가격'] = match_result.matched_product.final_price
+                self.df.at[idx, '판매유형'] = match_result.matched_product.seller_type
+                
+                tracker.update(success=True)
             else:
                 print(f"  ✗ 매칭 실패: {match_result.reason}")
+                tracker.update(success=False)
             
-            result = {
-                'Part Number': part_number,
-                '원본제품명': row['상품명_20251024'],
-                '매칭제품명': match_result.matched_product.name if match_result.matched_product else None,
-                '매칭URL': match_result.matched_product.url if match_result.matched_product else None,
-                '가격': match_result.matched_product.final_price if match_result.matched_product else None,
-                '판매유형': match_result.matched_product.seller_type if match_result.matched_product else None,
-                '신뢰도': match_result.confidence_level,
-                '사유': match_result.reason
-            }
+            # 사유 저장
+            self.df.at[idx, '사유'] = match_result.reason
+            
+            # 사유에서 4개 컬럼 추출
+            import re
+            reason = match_result.reason
+            
+            # 정수·개수 일치 파싱
+            count_pattern = r'정수[^(]*\(([^)]+)\)'
+            count_match = re.search(count_pattern, reason)
+            if count_match:
+                self.df.at[idx, '정수개수일치'] = True
+                self.df.at[idx, '정수개수일치_상세'] = count_match.group(1)
+            else:
+                self.df.at[idx, '정수개수일치'] = False
+                self.df.at[idx, '정수개수일치_상세'] = ''
+            
+            # 브랜드 일치 파싱
+            brand_pattern = r'브랜드[^(]*\(([^)]+)\)'
+            brand_match = re.search(brand_pattern, reason)
+            if brand_match:
+                self.df.at[idx, '브랜드일치'] = True
+                self.df.at[idx, '브랜드일치_상세'] = brand_match.group(1)
+            else:
+                self.df.at[idx, '브랜드일치'] = False
+                self.df.at[idx, '브랜드일치_상세'] = ''
             
             # 실시간 저장
-            self._save_single_result(result)
-            self.processed_ids.add(part_number)
+            self.saver.save(self.df, f"저장 ({tracker.current}/{tracker.total})")
             
-            # 속도 조절 (쿠팡 차단 방지)
             time.sleep(2)
+        
+        # 최종 컬럼 순서 정렬
+        self.df = ColumnManager.reorder_columns(self.df)
+        self.saver.save(self.df, "최종 저장 (컬럼 순서 정렬)")
+        
+        tracker.print_summary()
 
 
 # 사용 예시
 if __name__ == "__main__":
-    # 설정
-    CSV_PATH = "/mnt/project/iHerb_쿠팡_추가_가격조사_대조결과_20251112.csv"
-    GEMINI_API_KEY = "your-api-key-here"
-    
-    # 브라우저 매니저 초기화 필요
-    # from coupang_manager import BrowserManager
-    # browser = BrowserManager(headless=False)
-    # browser.start_driver()
-    
-    # 시스템 초기화
-    # system = ProductMatchingSystem(CSV_PATH, GEMINI_API_KEY, browser)
-    
-    # 처리 (첫 10개만 테스트)
-    # system.process_all(start_idx=0, end_idx=10)
-    
-    # 결과 저장
-    # system.save_results()
-    
-    # browser.close()
-    
-    print("product_matcher.py 모듈 로드 완료")
+    print("product_matcher.py 모듈 로드 완료 (개선 버전)")

@@ -2,9 +2,9 @@
 # -*- coding: utf-8 -*-
 
 """
-로켓직구 모니터링 시스템 (수정됨)
-- Config 기반 경로 관리
-- 카테고리 중복 방지
+로켓직구 모니터링 시스템 (통합 버전)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+크롤링 + 엑셀 업로드 통합
 """
 
 import sys
@@ -13,6 +13,7 @@ import time
 import re
 import random
 from datetime import datetime
+from pathlib import Path
 from bs4 import BeautifulSoup
 
 # 절대 경로 기반 import
@@ -22,34 +23,10 @@ IHERB_PRICE_ROOT = os.path.dirname(COUPANG2_ROOT)
 # 경로 추가
 sys.path.insert(0, IHERB_PRICE_ROOT)
 sys.path.insert(0, COUPANG2_ROOT)
-sys.path.insert(0, os.path.join(COUPANG2_ROOT, 'config'))
-sys.path.insert(0, os.path.join(COUPANG2_ROOT, 'src'))
 
 # 쿠팡 크롤러
 from coupang.coupang_manager import BrowserManager
 from selenium.webdriver.common.by import By
-
-# 직접 파일 import
-settings_path = os.path.join(COUPANG2_ROOT, 'config', 'settings.py')
-database_path = os.path.join(COUPANG2_ROOT, 'src', 'database.py')
-
-# settings.py 로드
-import importlib.util
-
-spec_settings = importlib.util.spec_from_file_location("settings", settings_path)
-settings_module = importlib.util.module_from_spec(spec_settings)
-spec_settings.loader.exec_module(settings_module)
-Config = settings_module.Config
-
-# database.py 로드
-spec_database = importlib.util.spec_from_file_location("database", database_path)
-database_module = importlib.util.module_from_spec(spec_database)
-spec_database.loader.exec_module(database_module)
-MonitoringDatabase = database_module.MonitoringDatabase
-
-
-COUPANG_DOMAINS = ("coupang.com",)
-COUPANG_DEEPLINK_HINTS = ("/np/search", "/vp/product", "/vp/products", "/shop.coupang.com")
 
 
 class ScrollExtractor:
@@ -273,7 +250,7 @@ class ScrollExtractor:
             if not product_name:
                 return None
 
-            # ✅ [추가] URL에서 vendorItemId 추출
+            # URL에서 vendorItemId 추출
             vendor_item_id = None
             try:
                 m_vid = re.search(r'vendorItemId=(\d+)', product_url)
@@ -282,7 +259,7 @@ class ScrollExtractor:
             except:
                 vendor_item_id = None
 
-            # (이하 가격/리뷰 등 기존 파싱 그대로)
+            # 가격/리뷰 등 파싱
             current_price = 0
             price_elem = soup.select_one('strong.price-value')
             if price_elem:
@@ -323,8 +300,7 @@ class ScrollExtractor:
                     rating_score = 0.0
 
             return {
-                # ⚠️ 기존 키 유지
-                'product_id': product_id,            # itemId (스크롤 중복제거/순위 산정에 계속 사용)
+                'product_id': product_id,
                 'product_name': product_name,
                 'product_url': product_url,
                 'current_price': current_price,
@@ -332,9 +308,7 @@ class ScrollExtractor:
                 'discount_rate': discount_rate,
                 'review_count': review_count,
                 'rating_score': rating_score,
-
-                # ✅ [추가] 저장 단계에서 DB가 참조할 올바른 키
-                'vendor_item_id': vendor_item_id     # ← 이 값이 있으면 DB에 그대로 들어갑니다
+                'vendor_item_id': vendor_item_id
             }
 
         except Exception as e:
@@ -364,32 +338,20 @@ class ScrollExtractor:
             return False
 
 
-class RocketDirectMonitor:
-    """로켓직구 카테고리 모니터"""
+class RocketDirectMonitorIntegrated:
+    """로켓직구 모니터 (통합 DB 버전)"""
     
-    def __init__(self, category_config: dict, headless: bool = True):
+    def __init__(self, integrated_db, category_config: dict, headless: bool = True):
         """
         Args:
+            integrated_db: IntegratedDatabase 인스턴스
             category_config: Config.ROCKET_CATEGORIES의 항목
             headless: 헤드리스 모드
         """
         self.category_config = category_config
-        self.db = MonitoringDatabase(Config.DB_PATH)
+        self.integrated_db = integrated_db
         self.browser = BrowserManager(headless=headless)
         self.extractor = None
-        
-        # 로켓직구 소스 등록
-        self.source_id = self.db.register_source(
-            'rocket_direct',
-            '로켓직구',
-            Config.ROCKET_BASE_URL
-        )
-        
-        # 카테고리 등록 (중복 방지: category_id만 사용)
-        self.category_id = self.db.register_category(
-            category_config['name'],
-            category_config['category_id']  # URL 파라미터 제외한 숫자만
-        )
         
         print(f"✅ {category_config['name']} 모니터 초기화 완료")
     
@@ -403,10 +365,18 @@ class RocketDirectMonitor:
         print("❌ Chrome 드라이버 시작 실패")
         return False
     
-    def run_monitoring_cycle(self) -> dict:
-        """모니터링 사이클 실행"""
+    def run_monitoring_cycle(self, snapshot_id: int, base_url: str) -> dict:
+        """모니터링 사이클 실행
+        
+        Args:
+            snapshot_id: 통합 DB의 snapshot ID
+            base_url: 로켓직구 기본 URL
+        
+        Returns:
+            결과 딕셔너리
+        """
         category_name = self.category_config['name']
-        page_url = Config.ROCKET_BASE_URL + self.category_config['url_path']
+        page_url = base_url + self.category_config['url_path']
         
         print(f"\n{'='*70}")
         print(f"📊 [{category_name}] 로켓직구 모니터링 시작: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
@@ -446,22 +416,17 @@ class RocketDirectMonitor:
             if not filter_applied:
                 print(f"\n⚠️⚠️⚠️  주의: 판매량순 필터가 적용되지 않았습니다!")
             
-            print(f"\n[2/2] 💾 스냅샷 저장 중...")
+            print(f"\n[2/2] 💾 통합 DB에 저장 중...")
             crawl_duration = time.time() - start_time
             
             try:
-                snapshot_id = self.db.save_snapshot(
-                    self.source_id, self.category_id, page_url, 
-                    current_products, crawl_duration, 
-                    snapshot_time=datetime.now(),
-                    error_message=None if filter_applied else "판매량순 필터 미적용"
-                )
-                print(f"✅ 스냅샷 저장 완료: ID {snapshot_id}")
+                self._save_to_integrated_db(snapshot_id, current_products)
+                print(f"✅ 통합 DB 저장 완료")
                 
             except ValueError as e:
                 return {
                     'success': False,
-                    'error_message': f'스냅샷 저장 실패: {e}',
+                    'error_message': f'DB 저장 실패: {e}',
                     'action': 'continue'
                 }
             
@@ -489,190 +454,142 @@ class RocketDirectMonitor:
                 'action': 'continue'
             }
     
+    def _save_to_integrated_db(self, snapshot_id: int, products: list):
+        """통합 DB에 저장"""
+        
+        # URL에서 product_id, item_id 추출
+        products_data = []
+        prices_data = []
+        features_data = []
+        
+        for p in products:
+            vendor_id = p.get('vendor_item_id')
+            if not vendor_id:
+                continue
+            
+            url = p['product_url']
+            product_id = None
+            item_id = None
+            
+            if url:
+                m_product = re.search(r'/products/(\d+)', url)
+                if m_product:
+                    product_id = m_product.group(1)
+                
+                m_item = re.search(r'itemId=(\d+)', url)
+                if m_item:
+                    item_id = m_item.group(1)
+            
+            # products
+            products_data.append({
+                'vendor_item_id': vendor_id,
+                'product_id': product_id,
+                'item_id': item_id,
+                'part_number': None,
+                'upc': None,
+                'name': p['product_name']
+            })
+            
+            # product_price
+            prices_data.append({
+                'vendor_item_id': vendor_id,
+                'rocket_price': p['current_price'],
+                'rocket_original_price': p['original_price'],
+                'iherb_price': None,
+                'iherb_original_price': None,
+                'iherb_recommended_price': None
+            })
+            
+            # product_features
+            features_data.append({
+                'vendor_item_id': vendor_id,
+                'rocket_rank': p['rank'],
+                'rocket_rating': p['rating_score'],
+                'rocket_reviews': p['review_count'],
+                'iherb_stock': None,
+                'iherb_stock_status': None,
+                'iherb_revenue': None,
+                'iherb_sales_quantity': None,
+                'iherb_item_winner_ratio': None
+            })
+        
+        # 일괄 저장
+        if products_data:
+            self.integrated_db.batch_upsert_products(products_data)
+        
+        if prices_data:
+            self.integrated_db.batch_save_product_prices(snapshot_id, prices_data)
+        
+        if features_data:
+            self.integrated_db.batch_save_product_features(snapshot_id, features_data)
+    
     def close(self):
         """리소스 정리"""
         if self.browser:
             self.browser.close()
 
 
-class RocketDirectMonitoringSystem:
-    """로켓직구 다중 카테고리 모니터링 시스템"""
-    
-    def __init__(self, headless: bool = True):
-        """
-        Args:
-            headless: 헤드리스 모드
-        """
-        self.headless = headless
-    
-    def interactive_selection(self) -> list:
-        """터미널에서 카테고리 선택"""
-        print(f"\n{'='*70}")
-        print(f"🎯 크롤링 대상 선택")
-        print(f"{'='*70}\n")
-        
-        print(f"📂 카테고리:")
-        print("  0. 전체")
-        for i, category in enumerate(Config.ROCKET_CATEGORIES, 1):
-            print(f"  {i}. {category['name']}")
-        
-        while True:
-            category_input = input("\n번호 선택 (쉼표 구분, 예: 1,2 또는 0): ").strip()
-            
-            if category_input == '0':
-                selected = None
-                print("  ✅ 전체 선택")
-                break
-            
-            try:
-                indices = [int(x.strip()) for x in category_input.split(',')]
-                selected = [Config.ROCKET_CATEGORIES[i-1]['name'] for i in indices if 1 <= i <= len(Config.ROCKET_CATEGORIES)]
-                
-                if selected:
-                    print(f"  ✅ 선택: {', '.join(selected)}")
-                    break
-                else:
-                    print(f"  ❌ 유효하지 않은 번호")
-            except (ValueError, IndexError):
-                print(f"  ❌ 잘못된 입력")
-        
-        print(f"{'='*70}\n")
-        return selected
-    
-    def run_full_monitoring_cycle(self, cycles: int = 1, 
-                                  selected_categories: list = None,
-                                  interactive: bool = False):
-        """전체 카테고리 모니터링"""
-        
-        if interactive:
-            selected_categories = self.interactive_selection()
-        
-        categories_to_run = Config.ROCKET_CATEGORIES
-        if selected_categories:
-            categories_to_run = [c for c in Config.ROCKET_CATEGORIES if c['name'] in selected_categories]
-        
-        total_jobs = len(categories_to_run)
-        
-        print(f"\n{'='*70}")
-        print(f"🎯 로켓직구 모니터링 시작")
-        print(f"{'='*70}")
-        print(f"카테고리: {', '.join([c['name'] for c in categories_to_run])}")
-        print(f"총 작업: {total_jobs}개")
-        print(f"사이클: {cycles}회")
-        print(f"{'='*70}\n")
-        
-        stats = {
-            'total': 0,
-            'success': 0,
-            'failed': 0,
-            'skipped': 0,
-            'filter_not_applied': 0
-        }
-        
-        for cycle in range(cycles):
-            if cycles > 1:
-                print(f"\n{'='*70}")
-                print(f"🔄 사이클 [{cycle + 1}/{cycles}]")
-                print(f"{'='*70}\n")
-            
-            job_num = 1
-            
-            for category_config in categories_to_run:
-                print(f"\n{'='*70}")
-                print(f"📂 [{job_num}/{total_jobs}] {category_config['name']}")
-                print(f"{'='*70}")
-                
-                stats['total'] += 1
-                
-                monitor = RocketDirectMonitor(
-                    category_config=category_config,
-                    headless=self.headless
-                )
-                
-                try:
-                    if not monitor.start_driver():
-                        print(f"❌ 브라우저 시작 실패\n")
-                        stats['failed'] += 1
-                        job_num += 1
-                        continue
-                    
-                    result = monitor.run_monitoring_cycle()
-                    
-                    if result['success']:
-                        stats['success'] += 1
-                        if not result.get('filter_applied', True):
-                            stats['filter_not_applied'] += 1
-                        print(f"✅ 성공: {result['product_count']}개")
-                    else:
-                        if result.get('action') == 'abort':
-                            print(f"\n🛑 전체 중단")
-                            monitor.close()
-                            self._print_final_stats(stats)
-                            return
-                        
-                        stats['skipped'] += 1
-                        print(f"⏭️  건너뜀")
-                
-                except KeyboardInterrupt:
-                    print(f"\n⚠️ 사용자 중단")
-                    monitor.close()
-                    self._print_final_stats(stats)
-                    return
-                except Exception as e:
-                    print(f"❌ 오류: {e}")
-                    stats['failed'] += 1
-                finally:
-                    monitor.close()
-                
-                job_num += 1
-                
-                if job_num <= total_jobs:
-                    wait_time = 30
-                    print(f"\n⏰ 다음 작업까지 {wait_time}초 대기...\n")
-                    time.sleep(wait_time)
-            
-            if cycle < cycles - 1:
-                print(f"\n⏰ 다음 사이클까지 10분 대기...\n")
-                time.sleep(600)
-        
-        self._print_final_stats(stats)
-    
-    def _print_final_stats(self, stats: dict):
-        """최종 통계"""
-        print(f"\n{'='*70}")
-        print(f"🎉 완료!")
-        print(f"{'='*70}")
-        print(f"총 작업: {stats['total']}개")
-        print(f"  ✅ 성공: {stats['success']}개")
-        print(f"  ❌ 실패: {stats['failed']}개")
-        print(f"  ⏭️  건너뜀: {stats['skipped']}개")
-        if stats['filter_not_applied'] > 0:
-            print(f"  ⚠️  필터 미적용: {stats['filter_not_applied']}개")
-        print(f"{'='*70}\n")
-
-
 def main():
-    """메인"""
+    """메인 (통합 버전)"""
+    # Config와 통합 DB import
+    sys.path.insert(0, str(Path(__file__).parent.parent))
+    from config.settings import Config
+    from database import IntegratedDatabase
+    from excel_loader import ExcelLoader
     
     # 디렉토리 생성
     Config.ensure_directories()
     
-    # DB 초기화
-    db = MonitoringDatabase(Config.DB_PATH)
-    db.init_database()
-    db.cleanup_duplicate_categories()
+    # 통합 DB 초기화
+    integrated_db = IntegratedDatabase(Config.INTEGRATED_DB_PATH)
+    integrated_db.init_database()
     
-    # 모니터링 시스템
-    system = RocketDirectMonitoringSystem(headless=False)
+    # Snapshot 생성
+    today = datetime.now().strftime('%Y-%m-%d')
+    snapshot_id = integrated_db.create_snapshot(snapshot_date=today)
+    
+    print(f"\n✅ Snapshot 생성: ID={snapshot_id}, 날짜={today}")
+    
+    # 크롤링 실행 (예시: 첫 번째 카테고리만)
+    category_config = Config.ROCKET_CATEGORIES[0]
+    
+    monitor = RocketDirectMonitorIntegrated(
+        integrated_db=integrated_db,
+        category_config=category_config,
+        headless=False
+    )
     
     try:
-        system.run_full_monitoring_cycle(cycles=1, interactive=True)
+        if not monitor.start_driver():
+            print("❌ 브라우저 시작 실패")
+            return
+        
+        result = monitor.run_monitoring_cycle(snapshot_id, Config.ROCKET_BASE_URL)
+        
+        if result['success']:
+            print(f"\n✅ 크롤링 완료")
+            
+            # 엑셀 업로드
+            print(f"\n{'='*80}")
+            print(f"📥 엑셀 파일 업로드 시작")
+            print(f"{'='*80}")
+            
+            loader = ExcelLoader(integrated_db)
+            loader.load_all_excel_files(
+                snapshot_id=snapshot_id,
+                excel_dir=Config.IHERB_EXCEL_DIR
+            )
+            
+            print(f"\n🎉 모든 작업 완료!")
+        
     except KeyboardInterrupt:
         print("\n⚠️ 중단됨")
     except Exception as e:
         print(f"❌ 오류: {e}")
         import traceback
         traceback.print_exc()
+    finally:
+        monitor.close()
 
 
 if __name__ == "__main__":
