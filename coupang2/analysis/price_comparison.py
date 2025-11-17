@@ -559,7 +559,7 @@ def main():
     
     # Config import
     sys.path.insert(0, str(Path(__file__).parent.parent))
-    from config import Config
+    from config.settings import Config
     
     DB_PATH = Config.INTEGRATED_DB_PATH
     OUTPUT_DIR = Config.OUTPUT_DIR

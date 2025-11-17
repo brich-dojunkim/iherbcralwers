@@ -213,14 +213,16 @@ class IntegratedDatabase:
         
         for p in products:
             conn.execute(
-                """INSERT INTO products (vendor_item_id, product_id, item_id, part_number, upc, name)
-                   VALUES (?, ?, ?, ?, ?, ?)
-                   ON CONFLICT(vendor_item_id) DO UPDATE SET
-                       product_id = COALESCE(excluded.product_id, product_id),
-                       item_id = COALESCE(excluded.item_id, item_id),
-                       part_number = COALESCE(excluded.part_number, part_number),
-                       upc = COALESCE(excluded.upc, upc),
-                       name = COALESCE(excluded.name, name)""",
+                """
+                INSERT INTO products (vendor_item_id, product_id, item_id, part_number, upc, name)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(vendor_item_id) DO UPDATE SET
+                    product_id  = COALESCE(EXCLUDED.product_id,  products.product_id),
+                    item_id     = COALESCE(EXCLUDED.item_id,     products.item_id),
+                    part_number = COALESCE(EXCLUDED.part_number, products.part_number),
+                    upc         = COALESCE(EXCLUDED.upc,         products.upc),
+                    name        = COALESCE(EXCLUDED.name,        products.name)
+                """,
                 (
                     p.get('vendor_item_id'),
                     p.get('product_id'),
@@ -274,10 +276,18 @@ class IntegratedDatabase:
         
         for p in prices:
             conn.execute(
-                """INSERT OR REPLACE INTO product_price 
-                   (snapshot_id, vendor_item_id, rocket_price, rocket_original_price,
-                    iherb_price, iherb_original_price, iherb_recommended_price)
-                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                """
+                INSERT INTO product_price
+                  (snapshot_id, vendor_item_id, rocket_price, rocket_original_price,
+                   iherb_price, iherb_original_price, iherb_recommended_price)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(snapshot_id, vendor_item_id) DO UPDATE SET
+                    rocket_price             = COALESCE(EXCLUDED.rocket_price,            product_price.rocket_price),
+                    rocket_original_price    = COALESCE(EXCLUDED.rocket_original_price,   product_price.rocket_original_price),
+                    iherb_price              = COALESCE(EXCLUDED.iherb_price,             product_price.iherb_price),
+                    iherb_original_price     = COALESCE(EXCLUDED.iherb_original_price,    product_price.iherb_original_price),
+                    iherb_recommended_price = COALESCE(EXCLUDED.iherb_recommended_price, product_price.iherb_recommended_price)
+                """,
                 (
                     snapshot_id,
                     p.get('vendor_item_id'),
@@ -337,11 +347,24 @@ class IntegratedDatabase:
         
         for f in features:
             conn.execute(
-                '''INSERT OR REPLACE INTO product_features 
-                   (snapshot_id, vendor_item_id, rocket_rank, rocket_rating, rocket_reviews,
-                    rocket_category, iherb_stock, iherb_stock_status, iherb_revenue, 
-                    iherb_sales_quantity, iherb_item_winner_ratio, iherb_category)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                '''
+                INSERT INTO product_features
+                  (snapshot_id, vendor_item_id, rocket_rank, rocket_rating, rocket_reviews,
+                   rocket_category, iherb_stock, iherb_stock_status, iherb_revenue,
+                   iherb_sales_quantity, iherb_item_winner_ratio, iherb_category)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(snapshot_id, vendor_item_id) DO UPDATE SET
+                    rocket_rank            = COALESCE(EXCLUDED.rocket_rank,            product_features.rocket_rank),
+                    rocket_rating          = COALESCE(EXCLUDED.rocket_rating,          product_features.rocket_rating),
+                    rocket_reviews         = COALESCE(EXCLUDED.rocket_reviews,         product_features.rocket_reviews),
+                    rocket_category        = COALESCE(EXCLUDED.rocket_category,        product_features.rocket_category),
+                    iherb_stock            = COALESCE(EXCLUDED.iherb_stock,            product_features.iherb_stock),
+                    iherb_stock_status     = COALESCE(EXCLUDED.iherb_stock_status,     product_features.iherb_stock_status),
+                    iherb_revenue          = COALESCE(EXCLUDED.iherb_revenue,          product_features.iherb_revenue),
+                    iherb_sales_quantity   = COALESCE(EXCLUDED.iherb_sales_quantity,   product_features.iherb_sales_quantity),
+                    iherb_item_winner_ratio= COALESCE(EXCLUDED.iherb_item_winner_ratio,product_features.iherb_item_winner_ratio),
+                    iherb_category         = COALESCE(EXCLUDED.iherb_category,         product_features.iherb_category)
+                ''',
                 (
                     snapshot_id,
                     f.get('vendor_item_id'),
