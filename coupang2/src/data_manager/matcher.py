@@ -49,7 +49,6 @@ class ProductMatcher:
             candidates = df_iherb[df_iherb['iherb_product_id'] == rocket_pid].copy()
             
             if candidates.empty:
-                # 매칭 없음
                 matched_pairs.append({
                     **rocket_row.to_dict(),
                     'matched_iherb_idx': None
@@ -62,7 +61,6 @@ class ProductMatcher:
             
             best_idx = None
             
-            # 우선순위별 매칭 (기존 로직 그대로)
             # 1순위: pack + unit + weight 모두 일치
             best = candidates[
                 (candidates['iherb_pack'] == rocket_pack) &
@@ -90,10 +88,11 @@ class ProductMatcher:
                 if len(best) > 0:
                     best_idx = best.index[0]
             
-            # 4순위: pack만 일치
+            # 4순위: unit + weight 일치
             if best_idx is None:
                 best = candidates[
-                    (candidates['iherb_pack'] == rocket_pack)
+                    (candidates['iherb_unit'] == rocket_unit) &
+                    (candidates['iherb_weight'] == rocket_weight)
                 ]
                 if len(best) > 0:
                     best_idx = best.index[0]
@@ -124,14 +123,39 @@ class ProductMatcher:
         # DataFrame 생성
         df_final = pd.DataFrame(matched_pairs)
         
-        # 아이허브 데이터 병합
+        # 🔥 핵심 수정: 로켓직구 고유 컬럼 보호 목록
+        ROCKET_PROTECTED_COLUMNS = [
+            'rocket_category',      # 카테고리
+            'rocket_rank',          # 순위
+            'rocket_rating',        # 평점
+            'rocket_reviews',       # 리뷰수
+            'rocket_vendor_id',     # Vendor ID
+            'rocket_product_id',    # Product ID
+            'rocket_item_id',       # Item ID
+            'rocket_product_name',  # 제품명
+            'rocket_url',           # URL
+            'rocket_price',         # 가격
+            'rocket_original_price', # 정가
+            'rocket_discount_rate'  # 할인율
+        ]
+        
+        # 아이허브 데이터 병합 (dtype 경고 해결)
         for idx, row in df_final.iterrows():
             iherb_idx = row['matched_iherb_idx']
             if iherb_idx is not None and not pd.isna(iherb_idx):
                 try:
                     iherb_row = df_iherb.loc[iherb_idx]
+                    
+                    # 아이허브 컬럼만 병합 (로켓 컬럼 보호)
                     for col in df_iherb.columns:
-                        df_final.at[idx, col] = iherb_row[col]
+                        if col not in ROCKET_PROTECTED_COLUMNS:
+                            # dtype 불일치 해결: 컬럼이 없으면 object 타입으로 생성
+                            if col not in df_final.columns:
+                                df_final[col] = pd.Series(dtype='object')
+                            
+                            # 값 할당
+                            df_final.at[idx, col] = iherb_row[col]
+                            
                 except KeyError:
                     pass
         

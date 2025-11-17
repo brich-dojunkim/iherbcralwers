@@ -68,23 +68,36 @@ class IntegratedDatabase:
         """)
         
         # product_features 테이블
-        conn.execute("""
+        conn.execute('''
             CREATE TABLE IF NOT EXISTS product_features (
                 snapshot_id             INTEGER NOT NULL,
                 vendor_item_id          TEXT    NOT NULL,
                 rocket_rank             INTEGER,
                 rocket_rating           REAL,
                 rocket_reviews          INTEGER,
+                rocket_category         TEXT,
                 iherb_stock             INTEGER,
                 iherb_stock_status      TEXT,
                 iherb_revenue           INTEGER,
                 iherb_sales_quantity    INTEGER,
                 iherb_item_winner_ratio REAL,
+                iherb_category          TEXT,
                 PRIMARY KEY (snapshot_id, vendor_item_id),
                 FOREIGN KEY (snapshot_id)    REFERENCES snapshots(id),
                 FOREIGN KEY (vendor_item_id) REFERENCES products(vendor_item_id)
             )
-        """)
+        ''')
+        
+        # 기존 테이블에 컬럼 추가 (마이그레이션)
+        try:
+            conn.execute("ALTER TABLE product_features ADD COLUMN rocket_category TEXT")
+        except:
+            pass  # 이미 존재
+        
+        try:
+            conn.execute("ALTER TABLE product_features ADD COLUMN iherb_category TEXT")
+        except:
+            pass  # 이미 존재
         
         # 인덱스
         conn.execute("CREATE INDEX IF NOT EXISTS idx_snapshots_date ON snapshots(snapshot_date DESC)")
@@ -324,22 +337,24 @@ class IntegratedDatabase:
         
         for f in features:
             conn.execute(
-                """INSERT OR REPLACE INTO product_features 
+                '''INSERT OR REPLACE INTO product_features 
                    (snapshot_id, vendor_item_id, rocket_rank, rocket_rating, rocket_reviews,
-                    iherb_stock, iherb_stock_status, iherb_revenue, iherb_sales_quantity,
-                    iherb_item_winner_ratio)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    rocket_category, iherb_stock, iherb_stock_status, iherb_revenue, 
+                    iherb_sales_quantity, iherb_item_winner_ratio, iherb_category)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
                 (
                     snapshot_id,
                     f.get('vendor_item_id'),
                     f.get('rocket_rank'),
                     f.get('rocket_rating'),
                     f.get('rocket_reviews'),
+                    f.get('rocket_category'),
                     f.get('iherb_stock'),
                     f.get('iherb_stock_status'),
                     f.get('iherb_revenue'),
                     f.get('iherb_sales_quantity'),
-                    f.get('iherb_item_winner_ratio')
+                    f.get('iherb_item_winner_ratio'),
+                    f.get('iherb_category')
                 )
             )
         

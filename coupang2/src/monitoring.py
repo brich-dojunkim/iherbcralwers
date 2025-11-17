@@ -506,11 +506,13 @@ class RocketDirectMonitorIntegrated:
                 'rocket_rank': p['rank'],
                 'rocket_rating': p['rating_score'],
                 'rocket_reviews': p['review_count'],
+                'rocket_category': self.category_config['name'],  # ⭐ 추가
                 'iherb_stock': None,
                 'iherb_stock_status': None,
                 'iherb_revenue': None,
                 'iherb_sales_quantity': None,
-                'iherb_item_winner_ratio': None
+                'iherb_item_winner_ratio': None,
+                'iherb_category': None  # ⭐ 추가 (엑셀에서 채움)
             })
         
         # 일괄 저장
@@ -553,11 +555,26 @@ def main():
     integrated_db = IntegratedDatabase(Config.INTEGRATED_DB_PATH)
     integrated_db.init_database()
     
-    # Snapshot 생성
+    # Snapshot 생성 (카테고리 URL 포함)
     today = datetime.now().strftime('%Y-%m-%d')
-    snapshot_id = integrated_db.create_snapshot(snapshot_date=today)
     
+    # 카테고리 URL 구성
+    rocket_urls = {}
+    for category_config in Config.ROCKET_CATEGORIES:
+        url_column = category_config['url_column']  # 'rocket_category_url_1/2/3'
+        url_key = url_column.replace('rocket_category_', '')  # 'url_1/2/3'
+        full_url = Config.ROCKET_BASE_URL + category_config['url_path']
+        rocket_urls[url_key] = full_url
+    
+    snapshot_id = integrated_db.create_snapshot(
+        snapshot_date=today,
+        rocket_urls=rocket_urls
+    )
+
     print(f"\n✅ Snapshot 생성: ID={snapshot_id}, 날짜={today}")
+    print(f"   • 헬스/건강식품: {rocket_urls.get('url_1', 'N/A')}")
+    print(f"   • 출산유아동: {rocket_urls.get('url_2', 'N/A')}")
+    print(f"   • 스포츠레저: {rocket_urls.get('url_3', 'N/A')}")
     
     # 크롤링 실행 (3개 카테고리 모두)
     all_success = True

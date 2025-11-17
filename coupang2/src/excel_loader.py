@@ -377,11 +377,13 @@ class ExcelLoader:
                 'rocket_rank': None,  # 로켓은 별도
                 'rocket_rating': None,
                 'rocket_reviews': None,
+                'rocket_category': None,  # ⭐ 추가 (크롤링에서 채움)
                 'iherb_stock': None,  # price_inventory에서
                 'iherb_stock_status': None,
                 'iherb_revenue': to_int(row.get('매출(원)', 0)),
                 'iherb_sales_quantity': to_int(row.get('판매량', 0)),
-                'iherb_item_winner_ratio': to_float(row.get('아이템위너 비율(%)', 0))
+                'iherb_item_winner_ratio': to_float(row.get('아이템위너 비율(%)', 0)),
+                'iherb_category': row.get('카테고리')  # ⭐ 추가
             })
         
         return features_data
