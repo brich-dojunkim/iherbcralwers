@@ -23,7 +23,7 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 # 통합 모듈 import
-from data_manager import DataManager
+from src.data_manager import DataManager
 
 
 def get_available_dates(db_path):
@@ -559,7 +559,7 @@ def main():
     
     # Config import
     sys.path.insert(0, str(Path(__file__).parent.parent))
-    from config_settings import Config
+    from config import Config
     
     DB_PATH = Config.INTEGRATED_DB_PATH
     OUTPUT_DIR = Config.OUTPUT_DIR

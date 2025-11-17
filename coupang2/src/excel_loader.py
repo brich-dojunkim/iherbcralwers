@@ -9,6 +9,7 @@ price_inventory, SELLER_INSIGHTS, Coupang_Price 3종 처리
 
 import pandas as pd
 import re
+import sqlite3
 from pathlib import Path
 from typing import Optional, List, Dict
 from datetime import datetime
@@ -43,6 +44,22 @@ class ExcelLoader:
         """
         self.db = db
     
+    def _find_file(self, directory: Path, pattern: str) -> Optional[Path]:
+        """패턴에 맞는 파일 찾기
+        
+        Args:
+            directory: 검색할 디렉토리
+            pattern: 파일 패턴 (예: '*price_inventory*.xlsx')
+        
+        Returns:
+            찾은 파일 경로 또는 None
+        """
+        files = list(directory.glob(pattern))
+        if not files:
+            return None
+        # 가장 최근 파일 반환
+        return max(files, key=lambda f: f.stat().st_mtime)
+    
     def load_all_excel_files(self, snapshot_id: int, 
                             excel_dir: Path,
                             price_file: Optional[Path] = None,
@@ -69,20 +86,44 @@ class ExcelLoader:
         
         # 파일 자동 탐색
         if price_file is None:
-            price_files = list(excel_dir.glob("*price_inventory*.xlsx"))
-            price_file = sorted(price_files, key=lambda x: x.stat().st_mtime, reverse=True)[0] if price_files else None
-        
+            price_file = self._find_file(excel_dir, '*price_inventory*.xlsx')
         if insights_file is None:
-            insights_files = list(excel_dir.glob("*SELLER_INSIGHTS*.xlsx"))
-            insights_file = sorted(insights_files, key=lambda x: x.stat().st_mtime, reverse=True)[0] if insights_files else None
-        
+            insights_file = self._find_file(excel_dir, '*SELLER_INSIGHTS*.xlsx')
         if reco_file is None:
-            reco_files = list(excel_dir.glob("Coupang_Price_*.xlsx"))
-            reco_file = sorted(reco_files, key=lambda x: x.stat().st_mtime, reverse=True)[0] if reco_files else None
-        
+            reco_file = self._find_file(excel_dir, 'Coupang_Price_*.xlsx')
         if upc_file is None:
-            upc_files = list(excel_dir.glob("20251024_*.xlsx"))
-            upc_file = sorted(upc_files, key=lambda x: x.stat().st_mtime, reverse=True)[0] if upc_files else None
+            upc_file = self._find_file(excel_dir, '20251024_*.xlsx')
+        
+        # 찾은 파일명을 snapshot에 업데이트
+        file_names = {}
+        if price_file and price_file.exists():
+            file_names['price'] = price_file.name
+        if insights_file and insights_file.exists():
+            file_names['insights'] = insights_file.name
+        if reco_file and reco_file.exists():
+            file_names['reco'] = reco_file.name
+        
+        if file_names:
+            conn = sqlite3.connect(self.db.db_path)
+            update_parts = []
+            params = []
+            if 'price' in file_names:
+                update_parts.append("price_file_name = ?")
+                params.append(file_names['price'])
+            if 'insights' in file_names:
+                update_parts.append("insights_file_name = ?")
+                params.append(file_names['insights'])
+            if 'reco' in file_names:
+                update_parts.append("reco_file_name = ?")
+                params.append(file_names['reco'])
+            params.append(snapshot_id)
+            
+            conn.execute(
+                f"UPDATE snapshots SET {', '.join(update_parts)} WHERE id = ?",
+                params
+            )
+            conn.commit()
+            conn.close()
         
         # 1. price_inventory 처리
         products_data = []
@@ -142,8 +183,26 @@ class ExcelLoader:
             # snapshot_id 추가
             for f in features_data:
                 f['snapshot_id'] = snapshot_id
-            self.db.batch_save_product_features(snapshot_id, features_data)
-            print(f"   ✓ Features: {len(features_data):,}개")
+            
+            # products 테이블에 존재하는 vendor_item_id만 필터링
+            conn = sqlite3.connect(self.db.db_path)
+            cursor = conn.execute(
+                "SELECT vendor_item_id FROM products"
+            )
+            existing_ids = {row[0] for row in cursor.fetchall()}
+            conn.close()
+            
+            # 존재하는 것만 필터링
+            filtered_features = [
+                f for f in features_data 
+                if f['vendor_item_id'] in existing_ids
+            ]
+            
+            if filtered_features:
+                self.db.batch_save_product_features(snapshot_id, filtered_features)
+                print(f"   ✓ Features: {len(filtered_features):,}개 (전체 {len(features_data):,}개 중)")
+            else:
+                print(f"   ⚠️ Features: 매칭되는 상품 없음")
         
         print(f"\n{'='*80}")
         print(f"✅ 엑셀 적재 완료")
@@ -152,7 +211,7 @@ class ExcelLoader:
         return {
             'products': len(products_data),
             'prices': len(prices_data),
-            'features': len(features_data)
+            'features': len(filtered_features) if features_data else 0
         }
     
     def _load_price_inventory(self, file_path: Path) -> tuple:
@@ -295,10 +354,16 @@ class ExcelLoader:
         df = pd.read_excel(file_path, sheet_name='vendor item metrics')
         
         def to_int(s):
-            return pd.to_numeric(s, errors='coerce').fillna(0).astype(int)
+            # 이미 숫자면 그대로, 아니면 변환
+            if isinstance(s, (int, float)):
+                return int(s) if not pd.isna(s) else 0
+            return int(pd.to_numeric(s, errors='coerce').fillna(0))
         
         def to_float(s):
-            return pd.to_numeric(s, errors='coerce').fillna(0.0).round(1)
+            # 이미 숫자면 그대로, 아니면 변환
+            if isinstance(s, (int, float)):
+                return round(float(s), 1) if not pd.isna(s) else 0.0
+            return round(float(pd.to_numeric(s, errors='coerce').fillna(0)), 1)
         
         features_data = []
         for _, row in df.iterrows():
@@ -323,32 +388,31 @@ class ExcelLoader:
 
 
 def main():
-    """테스트"""
+    """엑셀 파일 로드"""
     from database import IntegratedDatabase
     
-    db_path = "/home/claude/test_integrated.db"
-    excel_dir = Path("/home/claude/test_excel")
+    # 프로젝트 루트 기준 경로
+    project_root = Path(__file__).parent.parent
+    db_path = project_root / "data" / "integrated" / "rocket_iherb.db"
+    excel_dir = project_root / "data" / "iherb"
     
-    db = IntegratedDatabase(db_path)
+    # DB 초기화
+    db = IntegratedDatabase(str(db_path))
     db.init_database()
     
     # Snapshot 생성
-    snapshot_id = db.create_snapshot(
-        snapshot_date='2025-01-15',
-        file_names={
-            'price': 'price_20250115.xlsx',
-            'insights': 'insights_20250115.xlsx',
-            'reco': 'reco_20250115.xlsx'
-        }
-    )
+    today = datetime.now().strftime('%Y-%m-%d')
+    snapshot_id = db.create_snapshot(snapshot_date=today)
+    print(f"✅ Snapshot 생성: ID={snapshot_id}, 날짜={today}")
     
     # Excel 적재
     loader = ExcelLoader(db)
+    result = loader.load_all_excel_files(snapshot_id, excel_dir)
     
-    # 실제 파일 경로를 지정하거나 자동 탐색
-    # result = loader.load_all_excel_files(snapshot_id, excel_dir)
-    
-    print(f"✅ 테스트 완료")
+    print(f"\n🎉 완료!")
+    print(f"  상품: {result['products']:,}개")
+    print(f"  가격: {result['prices']:,}개")
+    print(f"  성과: {result['features']:,}개")
 
 
 if __name__ == "__main__":

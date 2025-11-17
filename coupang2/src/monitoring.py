@@ -531,9 +531,18 @@ class RocketDirectMonitorIntegrated:
 
 def main():
     """메인 (통합 버전)"""
-    # Config와 통합 DB import
-    sys.path.insert(0, str(Path(__file__).parent.parent))
-    from config.settings import Config
+    # 프로젝트 루트를 sys.path에 추가
+    project_root = Path(__file__).parent.parent
+    sys.path.insert(0, str(project_root))
+    
+    # Config import
+    config_path = project_root / "config" / "settings.py"
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("settings", config_path)
+    config_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(config_module)
+    Config = config_module.Config
+    
     from database import IntegratedDatabase
     from excel_loader import ExcelLoader
     
@@ -550,46 +559,75 @@ def main():
     
     print(f"\n✅ Snapshot 생성: ID={snapshot_id}, 날짜={today}")
     
-    # 크롤링 실행 (예시: 첫 번째 카테고리만)
-    category_config = Config.ROCKET_CATEGORIES[0]
+    # 크롤링 실행 (3개 카테고리 모두)
+    all_success = True
     
-    monitor = RocketDirectMonitorIntegrated(
-        integrated_db=integrated_db,
-        category_config=category_config,
-        headless=False
-    )
+    for idx, category_config in enumerate(Config.ROCKET_CATEGORIES, 1):
+        print(f"\n{'='*80}")
+        print(f"📦 [{idx}/{len(Config.ROCKET_CATEGORIES)}] {category_config['name']}")
+        print(f"{'='*80}")
+        
+        monitor = RocketDirectMonitorIntegrated(
+            integrated_db=integrated_db,
+            category_config=category_config,
+            headless=False
+        )
+        
+        try:
+            if not monitor.start_driver():
+                print(f"❌ 브라우저 시작 실패: {category_config['name']}")
+                all_success = False
+                monitor.close()
+                continue
+            
+            result = monitor.run_monitoring_cycle(snapshot_id, Config.ROCKET_BASE_URL)
+            
+            if result['success']:
+                print(f"\n✅ 크롤링 완료: {category_config['name']}")
+            else:
+                print(f"❌ 크롤링 실패: {category_config['name']}")
+                all_success = False
+        
+        except KeyboardInterrupt:
+            print(f"\n⚠️ 사용자 중단: {category_config['name']}")
+            monitor.close()
+            raise
+        except Exception as e:
+            print(f"❌ 오류 발생: {category_config['name']} - {e}")
+            import traceback
+            traceback.print_exc()
+            all_success = False
+        finally:
+            monitor.close()
     
+    # 모든 카테고리 크롤링 완료 후
+    if all_success:
+        print(f"\n{'='*80}")
+        print(f"✅ 모든 카테고리 크롤링 완료")
+        print(f"{'='*80}")
+    else:
+        print(f"\n{'='*80}")
+        print(f"⚠️ 일부 카테고리 크롤링 실패")
+        print(f"{'='*80}")
+    
+    # 엑셀 업로드 (크롤링 성공 여부와 관계없이 실행)
     try:
-        if not monitor.start_driver():
-            print("❌ 브라우저 시작 실패")
-            return
+        print(f"\n{'='*80}")
+        print(f"📥 엑셀 파일 업로드 시작")
+        print(f"{'='*80}")
         
-        result = monitor.run_monitoring_cycle(snapshot_id, Config.ROCKET_BASE_URL)
+        loader = ExcelLoader(integrated_db)
+        loader.load_all_excel_files(
+            snapshot_id=snapshot_id,
+            excel_dir=Config.IHERB_EXCEL_DIR
+        )
         
-        if result['success']:
-            print(f"\n✅ 크롤링 완료")
-            
-            # 엑셀 업로드
-            print(f"\n{'='*80}")
-            print(f"📥 엑셀 파일 업로드 시작")
-            print(f"{'='*80}")
-            
-            loader = ExcelLoader(integrated_db)
-            loader.load_all_excel_files(
-                snapshot_id=snapshot_id,
-                excel_dir=Config.IHERB_EXCEL_DIR
-            )
-            
-            print(f"\n🎉 모든 작업 완료!")
-        
-    except KeyboardInterrupt:
-        print("\n⚠️ 중단됨")
+        print(f"\n🎉 모든 작업 완료!")
+    
     except Exception as e:
-        print(f"❌ 오류: {e}")
+        print(f"\n❌ 엑셀 업로드 실패: {e}")
         import traceback
         traceback.print_exc()
-    finally:
-        monitor.close()
 
 
 if __name__ == "__main__":
