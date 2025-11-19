@@ -529,10 +529,69 @@ class RocketDirectMonitorIntegrated:
         """리소스 정리"""
         if self.browser:
             self.browser.close()
+ 
+def check_excel_date(excel_dir: str, today: datetime) -> bool:
+    """
+    엑셀 파일 이름에 포함된 날짜(YYYYMMDD)와 오늘 날짜가 다른지 사전 감지.
+    - 파일명에서 20YYYYMMDD 형태의 8자리 숫자를 찾아 비교
+    - 날짜가 섞여 있거나 오늘과 다르면 경고 후 계속 여부를 물어봄
+
+    Returns:
+        True  -> 계속 진행
+        False -> 작업 중단
+    """
+    excel_path = Path(excel_dir)
+    if not excel_path.exists():
+        print(f"\n⚠️ 엑셀 디렉토리가 존재하지 않습니다: {excel_path}")
+        return False
+
+    excel_files = sorted(excel_path.glob("*.xlsx"))
+    if not excel_files:
+        print(f"\n⚠️ 엑셀 파일(.xlsx)이 없습니다: {excel_path}")
+        # 엑셀이 없는데 굳이 진행할 이유가 없다면 False로 막는게 안전
+        return False
+
+    today_ymd = today.strftime("%Y%m%d")
+    found_dates = set()
+
+    for f in excel_files:
+        # 예: iherb_20251119.xlsx, 20251119_아이허브.xlsx 등
+        m = re.search(r"(20\d{6})", f.stem)
+        if m:
+            found_dates.add(m.group(1))
+
+    if not found_dates:
+        print("\n⚠️ 엑셀 파일 이름에서 날짜(YYYYMMDD)를 찾지 못했습니다.")
+        print("   예: iherb_20251119.xlsx 처럼 날짜를 포함시키면 자동 검증이 가능합니다.")
+        ans = input("날짜 검증 없이 계속 진행할까요? (y/n): ").strip().lower()
+        if ans != "y":
+            print("🚫 작업을 중단합니다.")
+            return False
+        return True
+
+    print("\n📂 발견된 엑셀 파일 날짜들:")
+    for d in sorted(found_dates):
+        print(f"  - {d}")
+
+    if found_dates == {today_ymd}:
+        print(f"\n✅ 엑셀 파일 날짜가 오늘({today_ymd})과 일치합니다.")
+        return True
+    else:
+        print(f"\n⚠️ 엑셀 파일 날짜가 오늘({today_ymd})과 다릅니다.")
+        ans = input("그래도 계속 진행할까요? (y/n): ").strip().lower()
+        if ans != "y":
+            print("🚫 작업을 중단합니다.")
+            return False
+        print("➡️ 사용자 선택에 따라 계속 진행합니다.")
+        return True
 
 
 def main():
-    """메인 (통합 버전)"""
+    """메인 (통합 버전)
+    1) 엑셀 파일 날짜 사전 검증
+    2) 스냅샷 생성 + 크롤링 단계
+    3) 엑셀 업로드 단계
+    """
     # 프로젝트 루트를 sys.path에 추가
     project_root = Path(__file__).parent.parent
     sys.path.insert(0, str(project_root))
@@ -550,101 +609,129 @@ def main():
     
     # 디렉토리 생성
     Config.ensure_directories()
-    
-    # 통합 DB 초기화
+
+    # 오늘 날짜 객체 / 문자열
+    today_dt = datetime.now()
+    today = today_dt.strftime('%Y-%m-%d')
+
+    # -------------------------------------------------
+    # 0) 엑셀 파일 날짜 사전 검증
+    #    → 여기서 안 맞으면 아예 전체 파이프라인 중단
+    # -------------------------------------------------
+    print("\n🕵️ 엑셀 파일 날짜 사전 검증 중...")
+    if not check_excel_date(Config.IHERB_EXCEL_DIR, today_dt):
+        return
+
+    # -------------------------------------------------
+    # DB 초기화
+    # -------------------------------------------------
     integrated_db = IntegratedDatabase(Config.INTEGRATED_DB_PATH)
     integrated_db.init_database()
     
-    # Snapshot 생성 (카테고리 URL 포함)
-    today = datetime.now().strftime('%Y-%m-%d')
-    
-    # 카테고리 URL 구성
-    rocket_urls = {}
-    for category_config in Config.ROCKET_CATEGORIES:
-        url_column = category_config['url_column']  # 'rocket_category_url_1/2/3'
-        url_key = url_column.replace('rocket_category_', '')  # 'url_1/2/3'
-        full_url = Config.ROCKET_BASE_URL + category_config['url_path']
-        rocket_urls[url_key] = full_url
-    
-    snapshot_id = integrated_db.create_snapshot(
-        snapshot_date=today,
-        rocket_urls=rocket_urls
-    )
-
-    print(f"\n✅ Snapshot 생성: ID={snapshot_id}, 날짜={today}")
-    print(f"   • 헬스/건강식품: {rocket_urls.get('url_1', 'N/A')}")
-    print(f"   • 출산유아동: {rocket_urls.get('url_2', 'N/A')}")
-    print(f"   • 스포츠레저: {rocket_urls.get('url_3', 'N/A')}")
-    
-    # 크롤링 실행 (3개 카테고리 모두)
-    all_success = True
-    
-    for idx, category_config in enumerate(Config.ROCKET_CATEGORIES, 1):
-        print(f"\n{'='*80}")
-        print(f"📦 [{idx}/{len(Config.ROCKET_CATEGORIES)}] {category_config['name']}")
-        print(f"{'='*80}")
+    # -------------------------------------------------
+    # 1) 스냅샷 생성 + 로켓직구 크롤링 단계
+    # -------------------------------------------------
+    def run_crawling_phase() -> int:
+        """스냅샷 생성 후 3개 카테고리 크롤링까지 수행하고 snapshot_id 반환"""
+        # 카테고리 URL 구성
+        rocket_urls = {}
+        for category_config in Config.ROCKET_CATEGORIES:
+            url_column = category_config['url_column']  # 'rocket_category_url_1/2/3'
+            url_key = url_column.replace('rocket_category_', '')  # 'url_1/2/3'
+            full_url = Config.ROCKET_BASE_URL + category_config['url_path']
+            rocket_urls[url_key] = full_url
         
-        monitor = RocketDirectMonitorIntegrated(
-            integrated_db=integrated_db,
-            category_config=category_config,
-            headless=False
+        snapshot_id = integrated_db.create_snapshot(
+            snapshot_date=today,
+            rocket_urls=rocket_urls
         )
+
+        print(f"\n✅ Snapshot 생성: ID={snapshot_id}, 날짜={today}")
+        print(f"   • 헬스/건강식품: {rocket_urls.get('url_1', 'N/A')}")
+        print(f"   • 출산유아동: {rocket_urls.get('url_2', 'N/A')}")
+        print(f"   • 스포츠레저: {rocket_urls.get('url_3', 'N/A')}")
         
-        try:
-            if not monitor.start_driver():
-                print(f"❌ 브라우저 시작 실패: {category_config['name']}")
-                all_success = False
+        # 크롤링 실행 (3개 카테고리 모두)
+        all_success = True
+        
+        for idx, category_config in enumerate(Config.ROCKET_CATEGORIES, 1):
+            print(f"\n{'='*80}")
+            print(f"📦 [{idx}/{len(Config.ROCKET_CATEGORIES)}] {category_config['name']}")
+            print(f"{'='*80}")
+            
+            monitor = RocketDirectMonitorIntegrated(
+                integrated_db=integrated_db,
+                category_config=category_config,
+                headless=False
+            )
+            
+            try:
+                if not monitor.start_driver():
+                    print(f"❌ 브라우저 시작 실패: {category_config['name']}")
+                    all_success = False
+                    monitor.close()
+                    continue
+                
+                result = monitor.run_monitoring_cycle(snapshot_id, Config.ROCKET_BASE_URL)
+                
+                if result['success']:
+                    print(f"\n✅ 크롤링 완료: {category_config['name']}")
+                else:
+                    print(f"❌ 크롤링 실패: {category_config['name']}")
+                    all_success = False
+            
+            except KeyboardInterrupt:
+                print(f"\n⚠️ 사용자 중단: {category_config['name']}")
                 monitor.close()
-                continue
-            
-            result = monitor.run_monitoring_cycle(snapshot_id, Config.ROCKET_BASE_URL)
-            
-            if result['success']:
-                print(f"\n✅ 크롤링 완료: {category_config['name']}")
-            else:
-                print(f"❌ 크롤링 실패: {category_config['name']}")
+                raise
+            except Exception as e:
+                print(f"❌ 오류 발생: {category_config['name']} - {e}")
+                import traceback
+                traceback.print_exc()
                 all_success = False
+            finally:
+                monitor.close()
         
-        except KeyboardInterrupt:
-            print(f"\n⚠️ 사용자 중단: {category_config['name']}")
-            monitor.close()
-            raise
+        # 모든 카테고리 크롤링 완료 후 로그 (기존 동작 유지)
+        if all_success:
+            print(f"\n{'='*80}")
+            print(f"✅ 모든 카테고리 크롤링 완료")
+            print(f"{'='*80}")
+        else:
+            print(f"\n{'='*80}")
+            print(f"⚠️ 일부 카테고리 크롤링 실패")
+            print(f"{'='*80}")
+        
+        return snapshot_id
+
+    # -------------------------------------------------
+    # 2) 엑셀 업로드 단계
+    # -------------------------------------------------
+    def run_excel_phase(snapshot_id: int):
+        """엑셀 파일을 읽어 해당 snapshot_id에 업로드"""
+        try:
+            print(f"\n{'='*80}")
+            print(f"📥 엑셀 파일 업로드 시작 (snapshot_id={snapshot_id})")
+            print(f"{'='*80}")
+            
+            loader = ExcelLoader(integrated_db)
+            loader.load_all_excel_files(
+                snapshot_id=snapshot_id,
+                excel_dir=Config.IHERB_EXCEL_DIR
+            )
+            
+            print(f"\n🎉 엑셀 업로드 포함 전체 작업 완료!")
+        
         except Exception as e:
-            print(f"❌ 오류 발생: {category_config['name']} - {e}")
+            print(f"\n❌ 엑셀 업로드 실패: {e}")
             import traceback
             traceback.print_exc()
-            all_success = False
-        finally:
-            monitor.close()
-    
-    # 모든 카테고리 크롤링 완료 후
-    if all_success:
-        print(f"\n{'='*80}")
-        print(f"✅ 모든 카테고리 크롤링 완료")
-        print(f"{'='*80}")
-    else:
-        print(f"\n{'='*80}")
-        print(f"⚠️ 일부 카테고리 크롤링 실패")
-        print(f"{'='*80}")
-    
-    # 엑셀 업로드 (크롤링 성공 여부와 관계없이 실행)
-    try:
-        print(f"\n{'='*80}")
-        print(f"📥 엑셀 파일 업로드 시작")
-        print(f"{'='*80}")
-        
-        loader = ExcelLoader(integrated_db)
-        loader.load_all_excel_files(
-            snapshot_id=snapshot_id,
-            excel_dir=Config.IHERB_EXCEL_DIR
-        )
-        
-        print(f"\n🎉 모든 작업 완료!")
-    
-    except Exception as e:
-        print(f"\n❌ 엑셀 업로드 실패: {e}")
-        import traceback
-        traceback.print_exc()
+
+    # -------------------------------------------------
+    # 실제 실행 플로우
+    # -------------------------------------------------
+    snapshot_id = run_crawling_phase()
+    run_excel_phase(snapshot_id)
 
 
 if __name__ == "__main__":

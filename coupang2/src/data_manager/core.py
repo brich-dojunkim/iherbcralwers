@@ -10,7 +10,7 @@ DataManager Core
 import pandas as pd
 from typing import Optional
 
-from .loaders import DataLoader
+from .db_loader import DataLoader
 from .matcher import ProductMatcher
 from .filter import DynamicFilter
 from .calculator import PriceCalculator
