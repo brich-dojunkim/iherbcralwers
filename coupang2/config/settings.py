@@ -25,11 +25,10 @@ class Config:
     DATA_DIR = PROJECT_ROOT / "data"
     
     # 기존 DB (legacy)
-    LEGACY_DB_PATH = DATA_DIR / "rocket" / "monitoring.db"
     MATCHING_CSV_PATH = DATA_DIR / "rocket" / "rocket.csv"
     
     # 통합 DB (신규)
-    INTEGRATED_DB_PATH = DATA_DIR / "integrated" / "rocket_iherb.db"
+    INTEGRATED_DB_PATH = DATA_DIR / "rocket_iherb.db"
     
     # 엑셀 디렉토리
     IHERB_EXCEL_DIR = DATA_DIR / "iherb"
