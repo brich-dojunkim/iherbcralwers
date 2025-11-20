@@ -1,0 +1,207 @@
+<div id="sub_header">
+    <div class="board-head">
+        <!-- <div class="lnb-viewer" id="nav-open-btn" href="#left-nav">Menu</div> -->
+        <ol class="breadcrumb">
+            <li id="menuTree"></li>
+        </ol>
+        <h3 class="h1">해외직구 위해식품 차단 목록</h3>
+      <div style="font-size:15px;margin-bottom: 15px;" 소비자의="" 피해를="" 예방하기="" 위하여="" 건강을="" 해칠="" 우려가="" 있는="" 제품을="" 관계기관에="" 통관="" 차단="" 요청한="" 제품="" 목록입니다..<="" div="">
+    </div>
+</div>
+<div class="list-container">
+
+    <div class="search-container">
+        <span class="total">Total: <strong id="total_cnt">1</strong> Articles</span>
+        <div class="search-wrap">
+                <fieldset>
+                    <legend>상세 검색</legend>
+                                <label for="search_type_all" class="hidden">검색구분</label>
+                                <select id="search_type_all" name="search_type_all" class="selecter_basic">
+                                    <option value="000">전체</option>
+                                    <option value="001">제품명</option>
+                                    <option value="002">제조사명</option>
+                                    <option value="003">검출성분</option>
+                                    
+                                    
+                                    <option value="004">제조국가</option>
+                                    <option value="007">등록일</option>
+                                </select>
+                        <label for="search_keyword" class="hidden"></label>
+                        <input type="text" title="검색어를 입력해주세요" id="search_keyword" name="search_keyword" value="" onkeyup="if(event.keyCode==13){javascript:setDefault(); }" maxlength="30">
+                        <a href="javascript:setDefault();" class="btn btn-default" role="button">검색</a>
+                        <div class="search-cnt-wrap">
+                                <label for="show_cnt">목록게시글수</label>
+                                <select id="show_cnt" name="show_cnt" class="selecter_basic">
+                                    <option value="10">10개씩</option>
+                                    <option value="20">20개씩</option>
+                                    <option value="30">30개씩</option>
+                                    <option value="40">40개씩</option>
+                                    <option value="50">50개씩</option>
+                                </select>
+                            <a href="#" id="show_cnt-btn" class="btn btn-default" role="button">보기</a>
+                            <a href="javascript:fn_excelDown();" class="btn btn-default" id="excelBtn" role="button">엑셀다운로드</a>
+                        </div>
+                </fieldset>
+        </div>
+
+    </div>
+   
+
+    <style>
+        .cus-sort-out{
+            width:100%;
+            text-align: left;
+        }
+
+        .cus-sort-p > li > a:link{
+
+        }
+
+        .cus-sort-p > li{
+            display: inline-block;
+            /*padding:0px 5px;*/
+            width:47px;
+        }
+        .cat-container td{border-bottom:none!important;}
+        .cat-container table{margin-bottom: 0px;}
+        /*.cus-sort-han{display: none;}*/
+        #search_type{width:100px;}
+        .cus-sort-p > li > a:link{font-size:15px;}
+        @media all and (max-width:640px){
+            .cat-container > table tbody td{display:block; width:100%;}
+            .cat-container > table colgroup col{width:100% !important;}
+            #search_type{width:100% !important;}
+        }
+    </style>
+    <div class="cat-container">
+        <table style="background:#f6f6f6;">
+        <caption>검색구분, 키워드를 통한 상세검색을 제공하기 위한 표입니다.</caption>
+            <colgroup>
+                <col style="width: 15%;">
+                <col style="width:85%;">
+            </colgroup>
+
+
+
+
+
+
+            <tbody><tr>
+                <td style="">
+                    <div class="select-container w100">
+                        <label for="search_type" class="hidden">검색구분</label>
+                        <select title="검색구분 선택" id="search_type" name="search_type" class="selecter_basic">
+                            <option value="001">제품명</option>
+                            <!--<option value="002">제조사명</option>-->
+                            <option value="003">검출성분</option>
+                            <!--<option value="004">제조국가</option>-->
+                        </select>
+                    </div>
+                </td>
+                <script>
+                    $(function(){
+
+                    })
+
+                </script>
+
+                <td>
+                    <div class="cus-sort-out">
+                        <ul class="cus-sort-p">
+                            <li><a href="javascript:setChaSearchList('A','eng');">[A]</a></li>
+                            <li><a href="javascript:setChaSearchList('B','eng');">[B]</a></li>
+                            <li><a href="javascript:setChaSearchList('C','eng');">[C]</a></li>
+                            <li><a href="javascript:setChaSearchList('D','eng');">[D]</a></li>
+                            <li><a href="javascript:setChaSearchList('E','eng');">[E]</a></li>
+                            <li><a href="javascript:setChaSearchList('F','eng');">[F]</a></li>
+                            <li><a href="javascript:setChaSearchList('G','eng');">[G]</a></li>
+                            <li><a href="javascript:setChaSearchList('H','eng');">[H]</a></li>
+                            <li><a href="javascript:setChaSearchList('I','eng');">[I]</a></li>
+                            <li><a href="javascript:setChaSearchList('J','eng');">[J]</a></li>
+                            <li><a href="javascript:setChaSearchList('K','eng');">[K]</a></li>
+                            <li><a href="javascript:setChaSearchList('L','eng');">[L]</a></li>
+                            <li><a href="javascript:setChaSearchList('M','eng');">[M]</a></li>
+                            <li><a href="javascript:setChaSearchList('N','eng');">[N]</a></li>
+                            <li><a href="javascript:setChaSearchList('O','eng');">[O]</a></li>
+                            <li><a href="javascript:setChaSearchList('P','eng');">[P]</a></li>
+                            <li><a href="javascript:setChaSearchList('Q','eng');">[Q]</a></li>
+                            <li><a href="javascript:setChaSearchList('R','eng');">[R]</a></li>
+                            <li><a href="javascript:setChaSearchList('S','eng');">[S]</a></li>
+                            <li><a href="javascript:setChaSearchList('T','eng');">[T]</a></li>
+                            <li><a href="javascript:setChaSearchList('U','eng');">[U]</a></li>
+                            <li><a href="javascript:setChaSearchList('V','eng');">[V]</a></li>
+                            <li><a href="javascript:setChaSearchList('W','eng');">[W]</a></li>
+                            <li><a href="javascript:setChaSearchList('X','eng');">[X]</a></li>
+                            <li><a href="javascript:setChaSearchList('Y','eng');">[Y]</a></li>
+                            <li><a href="javascript:setChaSearchList('Z','eng');">[Z]</a></li>
+                            <li><a href="javascript:setChaSearchList('0','num');">[0 ~ 9]</a></li>
+                        </ul>
+
+                    </div>
+                </td>
+            </tr>
+            <tr>
+                <td></td>
+                <td>
+                    <div class="cus-sort-out">
+                        <ul class="cus-sort-p cus-sort-han">
+                            <li><a href="javascript:setChaSearchList('ㄱ','han');">[ㄱ]</a></li>
+                            <li><a href="javascript:setChaSearchList('ㄴ','han');">[ㄴ]</a></li>
+                            <li><a href="javascript:setChaSearchList('ㄷ','han');">[ㄷ]</a></li>
+                            <li><a href="javascript:setChaSearchList('ㄹ','han');">[ㄹ]</a></li>
+                            <li><a href="javascript:setChaSearchList('ㅁ','han');">[ㅁ]</a></li>
+                            <li><a href="javascript:setChaSearchList('ㅂ','han');">[ㅂ]</a></li>
+                            <li><a href="javascript:setChaSearchList('ㅅ','han');">[ㅅ]</a></li>
+                            <li><a href="javascript:setChaSearchList('ㅇ','han');">[ㅇ]</a></li>
+                            <li><a href="javascript:setChaSearchList('ㅈ','han');">[ㅈ]</a></li>
+                            <li><a href="javascript:setChaSearchList('ㅊ','han');">[ㅊ]</a></li>
+                            <li><a href="javascript:setChaSearchList('ㅋ','han');">[ㅋ]</a></li>
+                            <li><a href="javascript:setChaSearchList('ㅌ','han');">[ㅌ]</a></li>
+                            <li><a href="javascript:setChaSearchList('ㅍ','han');">[ㅍ]</a></li>
+                            <li><a href="javascript:setChaSearchList('ㅎ','han');">[ㅎ]</a></li>
+                            <li><a href="javascript:setChaSearchList('ㄲ','han');">[ㄲ]</a></li>
+                            <li><a href="javascript:setChaSearchList('ㄸ','han');">[ㄸ]</a></li>
+                            <li><a href="javascript:setChaSearchList('ㅃ','han');">[ㅃ]</a></li>
+                            <li><a href="javascript:setChaSearchList('ㅆ','han');">[ㅆ]</a></li>
+                            <li><a href="javascript:setChaSearchList('ㅉ','han');">[ㅉ]</a></li>
+                        </ul>
+                    </div>
+                </td>
+            </tr>
+        </tbody></table>
+    </div>
+
+</div>
+<div class="list-container responsive-table">
+    <table id="board">
+        <caption>위해식품 차단목록-번호,제품명,제조사,검출성분,제조국가,등록일 정보를 제공하는 표입니다.</caption>
+        <colgroup>
+            <col style="width:50px;">
+            <col style="width:200px;">
+            
+            <col style="width:150px;">
+            <col style="width:200px;">
+            <col style="width:100px;">
+            <col style="width:100px;">
+        </colgroup>
+        <thead>
+        <tr>
+            <th scope="col">번호</th>
+            <th scope="col">제품명</th>
+            <!-- <th scope="col">제품분류</th> -->
+            <th scope="col">제조사</th>
+            <!-- <th scope="col">위해성분명</th> -->
+            <th scope="col">검출성분</th>
+            <th scope="col">제조국가</th>
+            <th scope="col">등록일</th>
+            <th scope="col">조회수</th>
+        </tr>
+        </thead>
+        <tbody id="listFrame"><tr><td class="num">1</td><td><a href="#none" onclick="javascript:fn_moveDetail(20175913);" class="ellipsis">super enzymes</a></td><td>Now Foods</td><td>우피 유래 원료 사용
+</td><td>미국</td><td>2017-12-27</td><td>945</td></tr></tbody>
+    </table>
+</div>
+<div class="board-footer">
+    <div class="pagination compact-theme simple-pagination"><ul><li class="active"><span class="current prev">이전페이지</span></li><li class="active"><span class="current">1</span></li><li class="active"><span class="current next">다음페이지</span></li></ul></div>
+</div>
+</div>
