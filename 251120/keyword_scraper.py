@@ -1,5 +1,5 @@
 """
-쿠팡 검색 결과 페이지 스크래퍼 - monitoring.py 기반 개선
+쿠팡 검색 결과 페이지 스크래퍼 - 실제 HTML 구조 반영
 """
 
 from selenium.webdriver.common.by import By
@@ -14,7 +14,7 @@ from bs4 import BeautifulSoup
 
 
 class CoupangScraper:
-    """쿠팡 검색 결과 스크래퍼 - 개선 버전"""
+    """쿠팡 검색 결과 스크래퍼 - 실제 HTML 구조 반영"""
     
     def scrape_search_results(self, driver, keyword: str, page: int) -> List[Dict]:
         """검색 결과 페이지에서 상품 정보 추출"""
@@ -68,7 +68,7 @@ class CoupangScraper:
             pass
     
     def _find_product_elements(self, driver, soup):
-        """Selenium과 BeautifulSoup 모두 시도하여 상품 요소 찾기"""
+        """실제 쿠팡 HTML 구조에 맞춘 상품 요소 찾기"""
         
         # 디버깅: HTML 저장
         debug_html_path = '/tmp/coupang_debug.html'
@@ -79,58 +79,63 @@ class CoupangScraper:
         except:
             pass
         
-        # 방법 1: Selenium으로 찾기
+        # ========== 실제 쿠팡 HTML 구조에 맞춘 선택자 ==========
+        
+        # 방법 1: ul#product-list > li (가장 확실)
+        try:
+            elements = soup.select('ul#product-list > li')
+            print(f"[DEBUG] 'ul#product-list > li': {len(elements)}개")
+            if elements and len(elements) > 5:
+                print(f"✓ ul#product-list로 {len(elements)}개 찾음")
+                return elements
+        except Exception as e:
+            print(f"[DEBUG] ul#product-list 실패: {e}")
+        
+        # 방법 2: li[class*="ProductUnit_productUnit"]
+        try:
+            elements = soup.select('li[class*="ProductUnit_productUnit"]')
+            print(f"[DEBUG] 'ProductUnit_productUnit': {len(elements)}개")
+            if elements and len(elements) > 5:
+                print(f"✓ ProductUnit 클래스로 {len(elements)}개 찾음")
+                return elements
+        except Exception as e:
+            print(f"[DEBUG] ProductUnit 클래스 실패: {e}")
+        
+        # 방법 3: li[data-id] (data-id 속성 있는 li)
+        try:
+            elements = soup.select('li[data-id]')
+            print(f"[DEBUG] 'li[data-id]': {len(elements)}개")
+            if elements and len(elements) > 5:
+                print(f"✓ li[data-id]로 {len(elements)}개 찾음")
+                return elements
+        except Exception as e:
+            print(f"[DEBUG] li[data-id] 실패: {e}")
+        
+        # 방법 4: Selenium으로 시도
+        print(f"[DEBUG] Selenium 선택자 시도 중...")
         selectors_selenium = [
-            'li.search-product',
-            'li[class*="search-product"]',
-            'li.baby-product',
-            'li[id^="productItem"]',
-            'div.search-product',
-            'ul#productList li',
-            'li[data-product-id]',
-            'li[data-vendor-item-id]',
+            'ul#product-list > li',
+            'li[class*="ProductUnit"]',
+            'li[data-id]',
         ]
         
-        print(f"[DEBUG] Selenium 선택자 시도 중...")
         for selector in selectors_selenium:
             try:
                 elements = driver.find_elements(By.CSS_SELECTOR, selector)
-                print(f"[DEBUG]   '{selector}': {len(elements)}개")
+                print(f"[DEBUG]   Selenium '{selector}': {len(elements)}개")
                 if elements and len(elements) > 5:
-                    print(f"✓ Selenium 선택자 '{selector}'로 {len(elements)}개 찾음")
+                    print(f"✓ Selenium '{selector}'로 {len(elements)}개 찾음")
                     return elements
             except Exception as e:
-                print(f"[DEBUG]   '{selector}': 오류 - {e}")
+                print(f"[DEBUG]   Selenium '{selector}': 오류 - {e}")
                 continue
         
-        # 방법 2: BeautifulSoup로 찾기
-        selectors_bs = [
-            'li.search-product',
-            'li[class*="search-product"]',
-            'li.baby-product',
-            'div.search-product',
-            'li[data-product-id]',
-        ]
-        
-        print(f"[DEBUG] BeautifulSoup 선택자 시도 중...")
-        for selector in selectors_bs:
-            try:
-                elements = soup.select(selector)
-                print(f"[DEBUG]   '{selector}': {len(elements)}개")
-                if elements and len(elements) > 5:
-                    print(f"✓ BeautifulSoup 선택자 '{selector}'로 {len(elements)}개 찾음")
-                    return elements
-            except Exception as e:
-                print(f"[DEBUG]   '{selector}': 오류 - {e}")
-                continue
-        
-        # 방법 3: 모든 li 요소 찾기 (최후의 수단)
+        # 방법 5: 모든 li 요소 중 상품 URL 패턴만 필터링
         print(f"[DEBUG] 모든 li 요소 찾기 시도...")
         all_li = soup.find_all('li')
         print(f"[DEBUG] 전체 li 요소: {len(all_li)}개")
         
         if len(all_li) > 0:
-            # li 중에서 링크가 있고 상품 URL 패턴인 것만 필터링
             product_li = []
             for li in all_li:
                 link = li.find('a', href=True)
@@ -142,23 +147,23 @@ class CoupangScraper:
                 print(f"✓ URL 패턴으로 {len(product_li)}개 찾음")
                 return product_li
         
-        # 클래스명 분석
-        print(f"\n[DEBUG] 페이지의 모든 클래스명 샘플:")
+        # 디버깅: 클래스명 분석
+        print(f"\n[DEBUG] 페이지의 상품 관련 클래스명:")
         all_elements = soup.find_all(class_=True)
         class_names = set()
-        for elem in all_elements[:100]:  # 처음 100개만
+        for elem in all_elements[:200]:
             if elem.get('class'):
                 for cls in elem['class']:
-                    if any(keyword in cls.lower() for keyword in ['product', 'item', 'search']):
+                    if 'product' in cls.lower() or 'item' in cls.lower():
                         class_names.add(cls)
         
-        for cls in sorted(class_names)[:20]:
+        for cls in sorted(class_names)[:30]:
             print(f"  - {cls}")
         
         return []
     
     def _extract_product_info(self, element, keyword: str, page: int, rank: int, soup) -> Optional[Dict]:
-        """단일 상품 정보 추출 - monitoring.py 스타일"""
+        """단일 상품 정보 추출 - 실제 HTML 구조 반영"""
         try:
             product = {
                 'keyword': keyword,
@@ -191,11 +196,11 @@ class CoupangScraper:
             product['product_id'] = product_id
             product['url'] = url if url.startswith('http') else f"https://www.coupang.com{url}"
             
-            # 2. 상품명 추출
+            # 2. 상품명 추출 - 실제 클래스명 반영
             product['name'] = self._extract_product_name_bs(element) if is_bs else self._extract_product_name_selenium(element)
             product['brand'] = self._extract_brand(product['name'])
             
-            # 3. 가격 정보
+            # 3. 가격 정보 - 실제 클래스명 반영
             product['price'] = self._extract_price_bs(element) if is_bs else self._extract_price_selenium(element)
             
             # 4. 원가
@@ -224,12 +229,17 @@ class CoupangScraper:
         except Exception as e:
             return None
     
-    # ========== BeautifulSoup 기반 추출 메서드 ==========
+    # ========== BeautifulSoup 기반 추출 메서드 - 실제 HTML 구조 반영 ==========
     
     def _extract_product_name_bs(self, element) -> str:
-        """BeautifulSoup로 상품명 추출"""
-        # 여러 선택자 시도
-        selectors = ['div.name', 'div[class*="name"]', 'span.name']
+        """BeautifulSoup로 상품명 추출 - 실제 클래스명"""
+        # 실제 클래스명: ProductUnit_productNameV2__cV9cw
+        selectors = [
+            'div[class*="ProductUnit_productName"]',  # 부분 매칭
+            'div[class*="productName"]',
+            'div.name',
+            'span.name'
+        ]
         
         for selector in selectors:
             elem = element.select_one(selector)
@@ -241,15 +251,23 @@ class CoupangScraper:
         if link and link['title']:
             return link['title'].strip()
         
+        # alt 속성 (이미지)
+        img = element.find('img', alt=True)
+        if img and img['alt']:
+            return img['alt'].strip()
+        
         return ''
     
     def _extract_price_bs(self, element) -> Optional[int]:
-        """BeautifulSoup로 가격 추출"""
+        """BeautifulSoup로 가격 추출 - 실제 클래스명"""
+        # 실제 클래스명: Price_priceValue__A4KOr
         selectors = [
+            'strong[class*="Price_priceValue"]',  # 부분 매칭
+            'strong[class*="priceValue"]',
+            'div[class*="Price_salePrice"] strong',
             'strong.price-value',
             'span.price-value',
-            'em.sale',
-            'strong[class*="price"]'
+            'em.sale'
         ]
         
         for selector in selectors:
@@ -263,7 +281,13 @@ class CoupangScraper:
     
     def _extract_original_price_bs(self, element) -> Optional[int]:
         """BeautifulSoup로 원가 추출"""
-        selectors = ['del.base-price', 'del', 'span.base-price']
+        # 실제: PriceInfo_basePrice__8BQ32 또는 del 태그
+        selectors = [
+            'del[class*="PriceInfo_basePrice"]',
+            'del[class*="basePrice"]',
+            'del',
+            'span.base-price'
+        ]
         
         for selector in selectors:
             elem = element.select_one(selector)
@@ -276,48 +300,99 @@ class CoupangScraper:
     
     def _extract_discount_bs(self, element) -> Optional[int]:
         """BeautifulSoup로 할인율 추출"""
-        elem = element.select_one('span.discount-percentage, span[class*="discount"]')
-        if elem:
-            return self._parse_discount(elem.get_text(strip=True))
+        # 실제: PriceInfo_discountRate__EsQ8I
+        selectors = [
+            'span[class*="PriceInfo_discountRate"]',
+            'span[class*="discountRate"]',
+            'div[class*="discount"]',
+            'span.discount-percentage'
+        ]
+        
+        for selector in selectors:
+            elem = element.select_one(selector)
+            if elem:
+                return self._parse_discount(elem.get_text(strip=True))
+        
         return None
     
     def _extract_rating_bs(self, element) -> Optional[float]:
         """BeautifulSoup로 평점 추출"""
-        elem = element.select_one('em.rating, span.rating')
-        if elem:
-            try:
-                return float(elem.get_text(strip=True))
-            except:
-                pass
+        # 실제: ProductRating_star__RGSlV의 width 스타일 또는 텍스트
+        selectors = [
+            'div[class*="ProductRating_star"]',
+            'span[class*="rating"]',
+            'em.rating'
+        ]
+        
+        for selector in selectors:
+            elem = element.select_one(selector)
+            if elem:
+                # width 스타일에서 추출 (예: width: 100% → 5.0)
+                style = elem.get('style', '')
+                if 'width' in style:
+                    match = re.search(r'width:\s*(\d+)%', style)
+                    if match:
+                        width_percent = int(match.group(1))
+                        return round(width_percent / 20, 1)  # 100% = 5.0
+                
+                # 텍스트에서 추출
+                try:
+                    return float(elem.get_text(strip=True))
+                except:
+                    pass
+        
         return None
     
     def _extract_review_count_bs(self, element) -> int:
         """BeautifulSoup로 리뷰수 추출"""
-        elem = element.select_one('span.rating-total-count, span[class*="rating-count"]')
-        if elem:
-            return self._parse_review_count(elem.get_text(strip=True))
+        # 실제: ProductRating_ratingCount__R0Vhz
+        selectors = [
+            'span[class*="ProductRating_ratingCount"]',
+            'span[class*="ratingCount"]',
+            'span.rating-total-count'
+        ]
+        
+        for selector in selectors:
+            elem = element.select_one(selector)
+            if elem:
+                return self._parse_review_count(elem.get_text(strip=True))
+        
         return 0
     
     def _check_rocket_bs(self, element) -> bool:
         """BeautifulSoup로 로켓배송 확인"""
-        rocket_elem = element.select_one('span.rocket-badge, [class*="rocket"]')
-        return rocket_elem is not None
+        # 실제: ImageBadge 내 rocket 이미지
+        selectors = [
+            'img[alt*="로켓"]',
+            'img[src*="rocket"]',
+            'div[class*="rocket"]',
+            'span.rocket-badge'
+        ]
+        
+        for selector in selectors:
+            elem = element.select_one(selector)
+            if elem:
+                return True
+        
+        return False
     
     def _extract_image_bs(self, element) -> str:
         """BeautifulSoup로 이미지 URL 추출"""
+        # 실제: ProductUnit_productImage 내 img
         img = element.find('img')
         if img:
+            # src 또는 data-src
             return img.get('src', '') or img.get('data-src', '')
         return ''
     
-    # ========== Selenium 기반 추출 메서드 (기존 유지) ==========
+    # ========== Selenium 기반 추출 메서드 ==========
     
     def _extract_product_name_selenium(self, element) -> str:
-        """Selenium으로 상품명 추출"""
+        """Selenium으로 상품명 추출 - 실제 클래스명"""
         selectors = [
-            'div.name',
-            'div.product-name',
-            'div[class*="name"]',
+            'div[class*="ProductUnit_productName"]',
+            'div[class*="productName"]',
+            'div.name'
         ]
         
         for selector in selectors:
@@ -338,14 +413,31 @@ class CoupangScraper:
         except:
             pass
         
+        # alt 속성
+        try:
+            img = element.find_element(By.CSS_SELECTOR, 'img')
+            alt = img.get_attribute('alt')
+            if alt:
+                return alt.strip()
+        except:
+            pass
+        
         return ''
     
     def _extract_price_selenium(self, element, original=False) -> Optional[int]:
-        """Selenium으로 가격 추출"""
+        """Selenium으로 가격 추출 - 실제 클래스명"""
         if original:
-            selectors = ['del.base-price', 'del']
+            selectors = [
+                'del[class*="basePrice"]',
+                'del'
+            ]
         else:
-            selectors = ['strong.price-value', 'span.price-value', 'em.sale']
+            selectors = [
+                'strong[class*="priceValue"]',
+                'strong[class*="Price_priceValue"]',
+                'strong.price-value',
+                'span.price-value'
+            ]
         
         for selector in selectors:
             try:
@@ -360,35 +452,80 @@ class CoupangScraper:
     
     def _extract_discount_selenium(self, element) -> Optional[int]:
         """Selenium으로 할인율 추출"""
-        try:
-            elem = element.find_element(By.CSS_SELECTOR, 'span.discount-percentage')
-            return self._parse_discount(elem.text.strip())
-        except:
-            return None
+        selectors = [
+            'span[class*="discountRate"]',
+            'span.discount-percentage'
+        ]
+        
+        for selector in selectors:
+            try:
+                elem = element.find_element(By.CSS_SELECTOR, selector)
+                return self._parse_discount(elem.text.strip())
+            except:
+                continue
+        
+        return None
     
     def _extract_rating_selenium(self, element) -> Optional[float]:
         """Selenium으로 평점 추출"""
-        try:
-            elem = element.find_element(By.CSS_SELECTOR, 'em.rating')
-            return float(elem.text.strip())
-        except:
-            return None
+        selectors = [
+            'div[class*="ProductRating_star"]',
+            'em.rating'
+        ]
+        
+        for selector in selectors:
+            try:
+                elem = element.find_element(By.CSS_SELECTOR, selector)
+                
+                # style에서 width 추출
+                style = elem.get_attribute('style')
+                if style and 'width' in style:
+                    match = re.search(r'width:\s*(\d+)%', style)
+                    if match:
+                        width_percent = int(match.group(1))
+                        return round(width_percent / 20, 1)
+                
+                # 텍스트 추출
+                text = elem.text.strip()
+                if text:
+                    return float(text)
+            except:
+                continue
+        
+        return None
     
     def _extract_review_count_selenium(self, element) -> int:
         """Selenium으로 리뷰수 추출"""
-        try:
-            elem = element.find_element(By.CSS_SELECTOR, 'span.rating-total-count')
-            return self._parse_review_count(elem.text.strip())
-        except:
-            return 0
+        selectors = [
+            'span[class*="ratingCount"]',
+            'span.rating-total-count'
+        ]
+        
+        for selector in selectors:
+            try:
+                elem = element.find_element(By.CSS_SELECTOR, selector)
+                return self._parse_review_count(elem.text.strip())
+            except:
+                continue
+        
+        return 0
     
     def _check_rocket_selenium(self, element) -> bool:
         """Selenium으로 로켓배송 확인"""
-        try:
-            element.find_element(By.CSS_SELECTOR, 'span.rocket-badge, [class*="rocket"]')
-            return True
-        except:
-            return False
+        selectors = [
+            'img[alt*="로켓"]',
+            'img[src*="rocket"]',
+            'span.rocket-badge'
+        ]
+        
+        for selector in selectors:
+            try:
+                element.find_element(By.CSS_SELECTOR, selector)
+                return True
+            except:
+                continue
+        
+        return False
     
     def _extract_image_selenium(self, element) -> str:
         """Selenium으로 이미지 URL 추출"""
@@ -397,101 +534,8 @@ class CoupangScraper:
             return img.get_attribute('src') or ''
         except:
             return ''
-        """여러 선택자로 텍스트 추출 시도"""
-        for selector in selectors:
-            try:
-                elem = element.find_element(By.CSS_SELECTOR, selector)
-                text = elem.text.strip()
-                if text:
-                    return text
-            except:
-                continue
-        return ''
     
-    def _extract_price(self, element, selectors: List[str]) -> Optional[int]:
-        """여러 선택자로 가격 추출 시도"""
-        for selector in selectors:
-            try:
-                elem = element.find_element(By.CSS_SELECTOR, selector)
-                text = elem.text.strip()
-                price = self._parse_price(text)
-                if price:
-                    return price
-            except:
-                continue
-        return None
-    
-    def _extract_discount(self, element, selectors: List[str]) -> Optional[int]:
-        """여러 선택자로 할인율 추출 시도"""
-        for selector in selectors:
-            try:
-                elem = element.find_element(By.CSS_SELECTOR, selector)
-                text = elem.text.strip()
-                discount = self._parse_discount(text)
-                if discount:
-                    return discount
-            except:
-                continue
-        return None
-    
-    def _extract_rating(self, element, selectors: List[str]) -> Optional[float]:
-        """여러 선택자로 평점 추출 시도"""
-        for selector in selectors:
-            try:
-                elem = element.find_element(By.CSS_SELECTOR, selector)
-                text = elem.text.strip()
-                return float(text)
-            except:
-                continue
-        return None
-    
-    def _extract_review_count(self, element, selectors: List[str]) -> int:
-        """여러 선택자로 리뷰수 추출 시도"""
-        for selector in selectors:
-            try:
-                elem = element.find_element(By.CSS_SELECTOR, selector)
-                text = elem.text.strip()
-                count = self._parse_review_count(text)
-                if count > 0:
-                    return count
-            except:
-                continue
-        return 0
-    
-    def _check_rocket(self, element) -> bool:
-        """로켓배송 여부 확인"""
-        rocket_selectors = [
-            'span.rocket-badge',
-            'badge.rocket',
-            'span[class*="rocket"]',
-            'img[alt*="로켓"]'
-        ]
-        
-        for selector in rocket_selectors:
-            try:
-                element.find_element(By.CSS_SELECTOR, selector)
-                return True
-            except:
-                continue
-        return False
-    
-    def _extract_image(self, element) -> str:
-        """이미지 URL 추출"""
-        img_selectors = [
-            'img.search-product-wrap-img',
-            'img[class*="product"]',
-            'img'
-        ]
-        
-        for selector in img_selectors:
-            try:
-                img = element.find_element(By.CSS_SELECTOR, selector)
-                src = img.get_attribute('src')
-                if src and 'coupang' in src:
-                    return src
-            except:
-                continue
-        return ''
+    # ========== 파싱 유틸리티 ==========
     
     def _extract_product_id(self, url: str) -> str:
         """URL에서 상품 ID 추출"""
@@ -549,7 +593,9 @@ class CoupangScraper:
             return 0
         
         # 괄호 안의 숫자 추출 (1,234)
-        numbers = re.sub(r'[^\d]', '', review_text)
+        # 또는 "9,999+"를 9999로 변환
+        text = review_text.replace('+', '').replace(',', '')
+        numbers = re.sub(r'[^\d]', '', text)
         if numbers:
             return int(numbers)
         return 0
