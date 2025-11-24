@@ -190,7 +190,7 @@ class ThumbnailCollector:
 class ThumbnailValidator:
     """Gemini를 사용한 썸네일 비교 검증"""
     
-    def __init__(self, api_key: str, model_name: str = "gemini-2.0-flash"):
+    def __init__(self, api_key: str, model_name: str = "gemini-2.5-flash"):
         """
         Args:
             api_key: Gemini API 키
