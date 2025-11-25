@@ -1,6 +1,6 @@
 """
 쿠팡 상품 검색 및 정보 수집 모듈
-기존 프로젝트의 coupang_manager.BrowserManager 사용
+직접 URL 방식으로 봇 탐지 우회
 """
 
 import sys
@@ -13,10 +13,9 @@ sys.path.insert(0, project_root)
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException
 import time
 import re
-from typing import List, Optional, Dict, Tuple
+from typing import List, Optional
 from dataclasses import dataclass
 
 
@@ -38,12 +37,12 @@ class CoupangProduct:
 
 
 class CoupangCrawler:
-    """쿠팡 크롤러 - 기존 BrowserManager 사용"""
+    """쿠팡 크롤러 - 직접 URL 방식"""
     
     def __init__(self, browser_manager):
         """
         Args:
-            browser_manager: coupang.coupang_manager.BrowserManager 인스턴스
+            browser_manager: coupang_manager.BrowserManager 인스턴스
         """
         if not browser_manager:
             raise ValueError("browser_manager가 필요합니다")
@@ -66,9 +65,10 @@ class CoupangCrawler:
         
         try:
             search_url = f"https://www.coupang.com/np/search?q={query}"
-            print(f"  쿠팡 검색: {search_url}")
+            print(f"  쿠팡 검색: {search_url[:80]}...")
             
-            self.browser.get_with_coupang_referrer(search_url)
+            # ✅ 직접 open_with_referrer 호출 (봇 탐지 우회)
+            self.browser.open_with_referrer(search_url)
             time.sleep(3)
             
             # 낱개상품 필터 적용
@@ -84,7 +84,7 @@ class CoupangCrawler:
         return products
     
     def _apply_single_item_filter(self):
-        """낱개상품 필터 적용 (첨부 코드 참조)"""
+        """낱개상품 필터 적용"""
         try:
             filter_script = """
             const filterLabels = document.querySelectorAll('label');
@@ -108,17 +108,18 @@ class CoupangCrawler:
             print(f"  ⚠ 필터 적용 실패: {e}")
     
     def _parse_search_results(self, top_n: int) -> List[CoupangProduct]:
-        """검색 결과 파싱"""
+        """검색 결과 파싱 - 실제 HTML 구조 반영"""
         products = []
         
         try:
-            # 상품 리스트 대기
-            WebDriverWait(self.driver, 10).until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, "li[class*='search-product']"))
+            # 상품 리스트 대기 (최신 쿠팡 선택자)
+            WebDriverWait(self.driver, 15).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, "li.ProductUnit_productUnit__Qd6sv"))
             )
             
             # 상품 요소 찾기
-            product_elements = self.driver.find_elements(By.CSS_SELECTOR, "li[class*='search-product']")
+            product_elements = self.driver.find_elements(By.CSS_SELECTOR, "li.ProductUnit_productUnit__Qd6sv")
+            print(f"  ✓ {len(product_elements)}개 상품 발견")
             
             for idx, elem in enumerate(product_elements[:top_n], 1):
                 try:
@@ -129,7 +130,7 @@ class CoupangCrawler:
                     print(f"  ⚠ 상품 {idx} 파싱 실패: {e}")
                     continue
             
-            print(f"  ✓ {len(products)}개 상품 수집")
+            print(f"  ✓ {len(products)}개 상품 수집 완료")
             
         except Exception as e:
             print(f"  ✗ 검색 결과 파싱 실패: {e}")
@@ -137,34 +138,48 @@ class CoupangCrawler:
         return products
     
     def _parse_product_element(self, elem, rank: int) -> Optional[CoupangProduct]:
-        """개별 상품 요소 파싱"""
+        """개별 상품 요소 파싱 - 최신 쿠팡 HTML 구조"""
         try:
-            # 상품명
-            name_elem = elem.find_element(By.CSS_SELECTOR, "div.name")
+            # 상품명 (최신 선택자)
+            name_elem = elem.find_element(By.CSS_SELECTOR, "div.ProductUnit_productNameV2__cV9cw")
             name = name_elem.text.strip()
             
             # URL
             link_elem = elem.find_element(By.CSS_SELECTOR, "a")
             url = link_elem.get_attribute('href')
             
-            # 가격
+            # 가격 파싱 (복잡한 구조)
             price = 0
+            shipping_fee = 0
+            
             try:
-                price_elem = elem.find_element(By.CSS_SELECTOR, "strong.price-value")
-                price_text = price_elem.text.strip().replace(',', '').replace('원', '')
-                price = int(price_text)
+                price_area = elem.find_element(By.CSS_SELECTOR, "div.PriceArea_priceArea__NntJz")
+                price_texts = price_area.find_elements(By.CSS_SELECTOR, "span")
+                
+                for text_elem in price_texts:
+                    text = text_elem.text.strip()
+                    # "33,000원" 형태 찾기 (1정당 제외)
+                    if '원' in text and '정당' not in text:
+                        clean = text.replace(',', '').replace('원', '').strip()
+                        if clean.isdigit():
+                            price = int(clean)
+                            break
             except:
                 pass
             
             # 배송비
-            shipping_fee = 0
             try:
-                shipping_elem = elem.find_element(By.CSS_SELECTOR, ".shipping-fee")
-                shipping_text = shipping_elem.text
-                if '무료' not in shipping_text:
-                    match = re.search(r'([\d,]+)원', shipping_text)
-                    if match:
-                        shipping_fee = int(match.group(1).replace(',', ''))
+                shipping_texts = elem.find_elements(By.CSS_SELECTOR, "span, div")
+                for text_elem in shipping_texts:
+                    text = text_elem.text.strip()
+                    if '무료배송' in text or '무료' in text:
+                        shipping_fee = 0
+                        break
+                    elif '배송비' in text:
+                        match = re.search(r'([\d,]+)원', text)
+                        if match:
+                            shipping_fee = int(match.group(1).replace(',', ''))
+                            break
             except:
                 pass
             
@@ -173,7 +188,7 @@ class CoupangCrawler:
             # 썸네일
             thumbnail_url = None
             try:
-                img_elem = elem.find_element(By.CSS_SELECTOR, "img")
+                img_elem = elem.find_element(By.CSS_SELECTOR, "figure.ProductUnit_productImage__Mqcg1 img")
                 thumbnail_url = img_elem.get_attribute('src')
                 if not thumbnail_url or thumbnail_url.startswith('data:'):
                     thumbnail_url = img_elem.get_attribute('data-src')
@@ -190,15 +205,18 @@ class CoupangCrawler:
             rating = None
             review_count = None
             try:
-                rating_elem = elem.find_element(By.CSS_SELECTOR, ".rating")
-                rating_text = rating_elem.text
+                rating_div = elem.find_element(By.CSS_SELECTOR, "div.ProductRating_productRating__jjf7W")
+                rating_text = rating_div.text
+                
+                # 평점 추출
                 match = re.search(r'(\d+\.?\d*)', rating_text)
                 if match:
                     rating = float(match.group(1))
                 
-                review_elem = elem.find_element(By.CSS_SELECTOR, ".rating-total-count")
-                review_text = review_elem.text.strip('()')
-                review_count = int(review_text.replace(',', ''))
+                # 리뷰 개수 추출 (123)
+                match_review = re.search(r'\((\d+,?\d*)\)', rating_text)
+                if match_review:
+                    review_count = int(match_review.group(1).replace(',', ''))
             except:
                 pass
             
@@ -219,7 +237,7 @@ class CoupangCrawler:
         except Exception as e:
             return None
     
-    def get_product_detail(self, product_url: str) -> Optional[Dict]:
+    def get_product_detail(self, product_url: str) -> Optional[dict]:
         """
         상품 상세 페이지 정보 수집
         
@@ -231,60 +249,93 @@ class CoupangCrawler:
         """
         try:
             print(f"  상세 페이지 접속...")
-            self.browser.get_with_coupang_referrer(product_url)
+            # ✅ 직접 open_with_referrer 사용
+            self.browser.open_with_referrer(product_url)
             time.sleep(3)
             
             detail_info = {}
             
-            # 상품명
-            try:
-                name_elem = self.driver.find_element(By.CSS_SELECTOR, "h1.prod-buy-header__title")
-                detail_info['name'] = name_elem.text.strip()
-            except:
-                pass
+            # 판매자 정보 추출 (여러 방법 시도)
+            seller_name = None
             
-            # 가격
+            # 방법 1: JavaScript로 정확히 추출
             try:
-                price_elem = self.driver.find_element(By.CSS_SELECTOR, ".total-price strong")
-                price_text = price_elem.text.strip().replace(',', '').replace('원', '')
-                detail_info['price'] = int(price_text)
-            except:
-                pass
-            
-            # 배송비
-            try:
-                shipping_elem = self.driver.find_element(By.CSS_SELECTOR, ".shipping-fee-txt")
-                shipping_text = shipping_elem.text
-                if '무료' in shipping_text:
-                    detail_info['shipping_fee'] = 0
-                else:
-                    match = re.search(r'([\d,]+)원', shipping_text)
-                    if match:
-                        detail_info['shipping_fee'] = int(match.group(1).replace(',', ''))
-            except:
-                detail_info['shipping_fee'] = 0
-            
-            # 리뷰 정보
-            try:
-                rating_elem = self.driver.find_element(By.CSS_SELECTOR, ".rating-star-container")
-                detail_info['rating'] = rating_elem.get_attribute('data-rating')
+                script = """
+                // Tailwind CSS 구조
+                const sellerLink = document.querySelector('a[href*="shop.coupang.com"]');
+                if (sellerLink) {
+                    // childNodes에서 텍스트만 추출 (div 제외)
+                    let text = '';
+                    for (let node of sellerLink.childNodes) {
+                        if (node.nodeType === Node.TEXT_NODE) {
+                            text += node.textContent.trim();
+                        }
+                    }
+                    if (text) return text;
+                    
+                    // 또는 firstChild가 텍스트인 경우
+                    if (sellerLink.firstChild && sellerLink.firstChild.nodeType === Node.TEXT_NODE) {
+                        return sellerLink.firstChild.textContent.trim();
+                    }
+                }
                 
-                review_elem = self.driver.find_element(By.CSS_SELECTOR, ".rating-count-txt")
-                review_text = review_elem.text.strip()
-                match = re.search(r'(\d+)', review_text.replace(',', ''))
-                if match:
-                    detail_info['review_count'] = int(match.group(1))
-            except:
-                pass
+                // 기존 구조
+                const oldSelectors = ['.seller-name', '.prod-sale-vendor-name', '.vendor-name'];
+                for (let sel of oldSelectors) {
+                    const elem = document.querySelector(sel);
+                    if (elem) return elem.textContent.trim();
+                }
+                
+                return null;
+                """
+                
+                seller_name = self.driver.execute_script(script)
+                if seller_name:
+                    print(f"  ✓ 판매자: {seller_name}")
+                
+            except Exception as e:
+                print(f"  ⚠ JS 판매자 추출 실패: {e}")
             
-            # 판매자
-            try:
-                seller_elem = self.driver.find_element(By.CSS_SELECTOR, ".seller-name")
-                detail_info['seller_name'] = seller_elem.text.strip()
-            except:
-                pass
+            # 방법 2: Selenium으로 추출 (백업)
+            if not seller_name:
+                seller_selectors = [
+                    "a[href*='shop.coupang.com/vid']",
+                    "a[href*='shop.coupang.com']",
+                    ".seller-name",
+                    ".prod-sale-vendor-name",
+                    ".vendor-name",
+                ]
+                
+                for selector in seller_selectors:
+                    try:
+                        seller_elem = self.driver.find_element(By.CSS_SELECTOR, selector)
+                        seller_text = seller_elem.text.strip()
+                        
+                        # 줄바꿈으로 분리하여 첫 번째 유효한 텍스트 추출
+                        if seller_text:
+                            lines = seller_text.split('\n')
+                            for line in lines:
+                                clean = line.strip()
+                                # "판매자:", "보러가기" 등 제외
+                                if clean and len(clean) > 1 and \
+                                   '보러가기' not in clean and \
+                                   '판매자:' not in clean and \
+                                   '판매자' != clean:
+                                    seller_name = clean
+                                    print(f"  ✓ 판매자: {seller_name}")
+                                    break
+                            if seller_name:
+                                break
+                    except:
+                        continue
             
-            # 썸네일 이미지
+            if not seller_name:
+                print("  ⚠ 판매자 정보 없음")
+            
+            if seller_name:
+                detail_info['seller_name'] = seller_name
+            
+            # 상세 썸네일 (더 고화질)
             try:
                 img_elem = self.driver.find_element(By.CSS_SELECTOR, "img.prod-image__detail")
                 detail_info['thumbnail_url'] = img_elem.get_attribute('src')
@@ -316,7 +367,7 @@ class CoupangCrawler:
             match = re.search(pattern, text_lower)
             if match:
                 count = int(match.group(1))
-                if 10 <= count <= 1000:
+                if 10 <= count <= 1000:  # 유효 범위
                     return count
         
         return None
@@ -334,6 +385,9 @@ class CoupangCrawler:
             '쏜리서치', 'Thorne',
             '솔가', 'Solgar',
             '라이프익스텐션', 'Life Extension',
+            '칼라일', 'Carlyle',
+            '네이처스웨이', "Nature's Way",
+            '블루보넷', 'Bluebonnet',
         ]
         
         text_upper = text.upper()

@@ -1,0 +1,7 @@
+# Coupang Manager 필수 패키지
+
+# 브라우저 (selenium 포함)
+undetected-chromedriver>=3.5.0
+
+# 주의: selenium을 별도로 설치하지 마세요
+# undetected-chromedriver가 내부적으로 처리합니다
