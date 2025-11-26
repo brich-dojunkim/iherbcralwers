@@ -24,9 +24,6 @@ __date__ = "2024-11-25"
 # 브라우저 관리
 from .browser import BrowserManager as CoupangBrowser
 
-# 크롤러
-from .crawler import CoupangCrawler
-
 # HTML 선택자 & 헬퍼
 from .selectors import (
     CoupangSelectors,

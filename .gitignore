@@ -45,3 +45,4 @@ loginner-sale-*.json
 *.secrets.json
 coupang2/config/google_credentials.json
 inner-sale-979c1e8ed412.json
+coupang/config/google_credentials.json

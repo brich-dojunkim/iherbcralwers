@@ -40,12 +40,12 @@ class CoupangSelectors:
     PRICE_AREA = "div.PriceArea_priceArea__NntJz"
     
     # 개별 가격 요소들
-    PRICE_DISCOUNT_RATE = "div.custom-oos.fw-mr-[2px]"  # 할인율
-    PRICE_ORIGINAL = "del.custom-oos"  # 원가
-    PRICE_FINAL = "div.custom-oos.fw-text-[20px]"  # 최종가
+    PRICE_DISCOUNT_RATE = "div.custom-oos.fw-mr-[2px]"    # 할인율
+    PRICE_ORIGINAL = "del.custom-oos"                     # 원가
+    PRICE_FINAL = "div.custom-oos.fw-text-[20px]"         # 최종가
     
     # 배송 정보
-    SHIPPING_FREE = "span[style*='color:#454F5B']"  # "무료배송" 텍스트
+    SHIPPING_FREE = "span[style*='color:#454F5B']"        # "무료배송" 텍스트
     SHIPPING_INFO = "div.fw-text-[14px]"
     
     # 리뷰
@@ -56,36 +56,47 @@ class CoupangSelectors:
     # 상품 링크
     PRODUCT_LINK = "a"
     
-    # 상품 이미지
-    PRODUCT_IMAGE = "figure.ProductUnit_productImage__Mqcg1 img"
+    # 상품 이미지 (검색 결과 카드 썸네일)
+    # - 새 UI: <img alt="Product image" class="twc-w-full ...">
+    # - 구 UI: figure.ProductUnit_productImage__Mqcg1 img
+    PRODUCT_IMAGE = (
+        "img[alt='Product image'], "
+        "img.twc-w-full, "
+        "figure.ProductUnit_productImage__Mqcg1 img"
+    )   
     
     # ========================================
     # 상품 상세 페이지
     # ========================================
     
     # 상품명
-    DETAIL_PRODUCT_NAME = "h1.prod-buy-header__title"
+    DETAIL_PRODUCT_NAME = "h1.product-title"
     
     # 가격
-    DETAIL_PRICE = ".total-price strong"
+    DETAIL_PRICE = "div.price-amount.final-price-amount"
     
     # 배송비
-    DETAIL_SHIPPING = ".shipping-fee-txt"
+    DETAIL_SHIPPING = ".price-shipping-fee-info-container div.twc-ml-[3px]"
     
     # 리뷰
     DETAIL_RATING = ".rating-star-container"
     DETAIL_REVIEW_COUNT = ".rating-count-txt"
     
     # 판매자 (중요!)
+    # 예: <a href="https://shop.coupang.com/vid/XXXXX">판매자명 ...</a>
     DETAIL_SELLER = "a[href*='shop.coupang.com']"
     DETAIL_SELLER_ALTERNATIVES = [
         "a[href*='shop.coupang.com/vid']",
         ".seller-name",
-        ".vendor-name"
+        ".vendor-name",
     ]
     
-    # 상품 이미지
-    DETAIL_IMAGE = "img.prod-image__detail"
+    # 상품 이미지 (상세 페이지 메인이미지)
+    DETAIL_IMAGE = (
+        "img[alt='Product image'], "
+        "img.twc-w-full, "
+        "img.prod-image__detail"
+    )
     
     # ========================================
     # 필터
@@ -153,12 +164,14 @@ class CoupangHTMLStructure:
     """
     
     DETAIL_PAGE_EXAMPLE = """
-    <div class="twc-flex">
-        판매자:
-        <a href="https://shop.coupang.com/vid/A00506659">
-            판매자명
-            <div>판매자 상품 보러가기</div>
-        </a>
+    <div class="seller-info ...">
+        <div class="twc-flex">
+            판매자:
+            <a href="https://shop.coupang.com/vid/A00506659">
+                판매자명
+                <div>판매자 상품 보러가기</div>
+            </a>
+        </div>
     </div>
     """
     
@@ -182,9 +195,6 @@ class CoupangHTMLHelper:
         
         Args:
             text: "104,700원" 또는 "104700원"
-            
-        Returns:
-            104700 (int) 또는 None
         """
         import re
         match = re.search(CoupangHTMLPatterns.PRICE_PATTERN, text)
@@ -196,12 +206,6 @@ class CoupangHTMLHelper:
     def extract_discount_rate(text: str) -> Optional[int]:
         """
         텍스트에서 할인율 추출
-        
-        Args:
-            text: "46%" 또는 "46 %"
-            
-        Returns:
-            46 (int) 또는 None
         """
         import re
         match = re.search(CoupangHTMLPatterns.DISCOUNT_PATTERN, text)
@@ -213,14 +217,6 @@ class CoupangHTMLHelper:
     def extract_count(text: str, min_count: int = 10, max_count: int = 1000) -> Optional[int]:
         """
         텍스트에서 정수(캡슐/정 개수) 추출
-        
-        Args:
-            text: 상품명
-            min_count: 최소 유효 개수
-            max_count: 최대 유효 개수
-            
-        Returns:
-            정수 또는 None
         """
         import re
         
@@ -237,12 +233,6 @@ class CoupangHTMLHelper:
     def is_free_shipping(text: str) -> bool:
         """
         무료배송 여부 확인
-        
-        Args:
-            text: 배송 정보 텍스트
-            
-        Returns:
-            True if 무료배송
         """
         text_lower = text.lower()
         return any(keyword in text_lower for keyword in CoupangHTMLPatterns.SHIPPING_FREE_KEYWORDS)
@@ -254,9 +244,6 @@ class CoupangHTMLHelper:
         
         Args:
             text: "배송비 2,500원" 또는 "무료배송"
-            
-        Returns:
-            배송비 (int), 무료면 0
         """
         if CoupangHTMLHelper.is_free_shipping(text):
             return 0
@@ -280,9 +267,6 @@ class CoupangHTMLHelper:
         
         Args:
             text: "(5135)" 또는 "5135개"
-            
-        Returns:
-            리뷰 수 (int) 또는 None
         """
         import re
         
@@ -305,9 +289,6 @@ class CoupangHTMLHelper:
         
         Args:
             text: "판매자명\n판매자 상품 보러가기"
-            
-        Returns:
-            "판매자명"
         """
         # 줄바꿈 기준 분리
         lines = text.split('\n')

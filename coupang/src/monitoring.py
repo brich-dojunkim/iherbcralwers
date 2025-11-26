@@ -5,6 +5,8 @@
 로켓직구 모니터링 시스템 (통합 버전)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 크롤링 + 엑셀 업로드 통합
+
+🔄 리팩토링: coupang_manager 모듈 사용 (undetected-chromedriver)
 """
 
 import sys
@@ -24,16 +26,19 @@ IHERB_PRICE_ROOT = os.path.dirname(COUPANG2_ROOT)
 sys.path.insert(0, IHERB_PRICE_ROOT)
 sys.path.insert(0, COUPANG2_ROOT)
 
-# 쿠팡 크롤러
-from coupang.coupang_manager import BrowserManager
-from selenium.webdriver.common.by import By
+# 쿠팡 매니저 (undetected-chromedriver)
+from coupang_manager import CoupangBrowser
 
 
 class ScrollExtractor:
     """무한 스크롤 상품 추출기"""
     
-    def __init__(self, browser_manager):
-        self.browser = browser_manager
+    def __init__(self, browser):
+        """
+        Args:
+            browser: CoupangBrowser 인스턴스
+        """
+        self.browser = browser
         self.filter_applied = False
     
     @property
@@ -182,7 +187,7 @@ class ScrollExtractor:
             print("🔍 판매량순 필터 적용 중...")
             time.sleep(2)
             
-            filter_buttons = self.driver.find_elements(By.CSS_SELECTOR, 'li.sortkey')
+            filter_buttons = self.driver.find_elements("css selector", 'li.sortkey')
             
             for button in filter_buttons:
                 try:
@@ -205,11 +210,11 @@ class ScrollExtractor:
         """현재 페이지에서 신규 상품만 추출"""
         try:
             new_products = []
-            product_elements = self.driver.find_elements(By.CSS_SELECTOR, 'li.product-wrap')
+            product_elements = self.driver.find_elements("css selector", 'li.product-wrap')
             
             for element in product_elements:
                 try:
-                    link_elem = element.find_element(By.CSS_SELECTOR, 'a.product-wrapper')
+                    link_elem = element.find_element("css selector", 'a.product-wrapper')
                     product_url = link_elem.get_attribute('href')
                     
                     if not product_url:
@@ -350,20 +355,10 @@ class RocketDirectMonitorIntegrated:
         """
         self.category_config = category_config
         self.integrated_db = integrated_db
-        self.browser = BrowserManager(headless=headless)
-        self.extractor = None
+        self.browser = CoupangBrowser(headless=headless)
+        self.extractor = ScrollExtractor(self.browser)
         
         print(f"✅ {category_config['name']} 모니터 초기화 완료")
-    
-    def start_driver(self) -> bool:
-        """브라우저 드라이버 시작"""
-        print("🚀 Chrome 드라이버 시작 중...")
-        if self.browser.start_driver():
-            print("✅ Chrome 드라이버 시작 완료")
-            self.extractor = ScrollExtractor(self.browser)
-            return True
-        print("❌ Chrome 드라이버 시작 실패")
-        return False
     
     def run_monitoring_cycle(self, snapshot_id: int, base_url: str) -> dict:
         """모니터링 사이클 실행
@@ -385,13 +380,6 @@ class RocketDirectMonitorIntegrated:
         start_time = time.time()
         
         try:
-            if not self.extractor:
-                return {
-                    'success': False,
-                    'error_message': 'Extractor 초기화 실패',
-                    'action': 'continue'
-                }
-            
             print(f"\n[1/2] 📜 페이지 크롤링 중...")
             current_products, filter_applied, error_message = self.extractor.extract_all_products_with_scroll(page_url)
             
@@ -506,13 +494,13 @@ class RocketDirectMonitorIntegrated:
                 'rocket_rank': p['rank'],
                 'rocket_rating': p['rating_score'],
                 'rocket_reviews': p['review_count'],
-                'rocket_category': self.category_config['name'],  # ⭐ 추가
+                'rocket_category': self.category_config['name'],
                 'iherb_stock': None,
                 'iherb_stock_status': None,
                 'iherb_revenue': None,
                 'iherb_sales_quantity': None,
                 'iherb_item_winner_ratio': None,
-                'iherb_category': None  # ⭐ 추가 (엑셀에서 채움)
+                'iherb_category': None
             })
         
         # 일괄 저장
@@ -531,15 +519,7 @@ class RocketDirectMonitorIntegrated:
             self.browser.close()
  
 def check_excel_date(excel_dir: str, today: datetime) -> bool:
-    """
-    엑셀 파일 이름에 포함된 날짜(YYYYMMDD)와 오늘 날짜가 다른지 사전 감지.
-    - 파일명에서 20YYYYMMDD 형태의 8자리 숫자를 찾아 비교
-    - 날짜가 섞여 있거나 오늘과 다르면 경고 후 계속 여부를 물어봄
-
-    Returns:
-        True  -> 계속 진행
-        False -> 작업 중단
-    """
+    """엑셀 파일 날짜 검증"""
     excel_path = Path(excel_dir)
     if not excel_path.exists():
         print(f"\n⚠️ 엑셀 디렉토리가 존재하지 않습니다: {excel_path}")
@@ -548,14 +528,12 @@ def check_excel_date(excel_dir: str, today: datetime) -> bool:
     excel_files = sorted(excel_path.glob("*.xlsx"))
     if not excel_files:
         print(f"\n⚠️ 엑셀 파일(.xlsx)이 없습니다: {excel_path}")
-        # 엑셀이 없는데 굳이 진행할 이유가 없다면 False로 막는게 안전
         return False
 
     today_ymd = today.strftime("%Y%m%d")
     found_dates = set()
 
     for f in excel_files:
-        # 예: iherb_20251119.xlsx, 20251119_아이허브.xlsx 등
         m = re.search(r"(20\d{6})", f.stem)
         if m:
             found_dates.add(m.group(1))
@@ -587,12 +565,7 @@ def check_excel_date(excel_dir: str, today: datetime) -> bool:
 
 
 def main():
-    """메인 (통합 버전)
-    1) 엑셀 파일 날짜 사전 검증
-    2) 스냅샷 생성 + 크롤링 단계
-    3) 엑셀 업로드 단계
-    """
-    # 프로젝트 루트를 sys.path에 추가
+    """메인"""
     project_root = Path(__file__).parent.parent
     sys.path.insert(0, str(project_root))
     
@@ -607,37 +580,25 @@ def main():
     from database import IntegratedDatabase
     from excel_loader import ExcelLoader
     
-    # 디렉토리 생성
     Config.ensure_directories()
 
-    # 오늘 날짜 객체 / 문자열
     today_dt = datetime.now()
     today = today_dt.strftime('%Y-%m-%d')
 
-    # -------------------------------------------------
-    # 0) 엑셀 파일 날짜 사전 검증
-    #    → 여기서 안 맞으면 아예 전체 파이프라인 중단
-    # -------------------------------------------------
+    # 엑셀 날짜 검증
     print("\n🕵️ 엑셀 파일 날짜 사전 검증 중...")
     if not check_excel_date(Config.IHERB_EXCEL_DIR, today_dt):
         return
 
-    # -------------------------------------------------
-    # DB 초기화
-    # -------------------------------------------------
     integrated_db = IntegratedDatabase(Config.INTEGRATED_DB_PATH)
     integrated_db.init_database()
     
-    # -------------------------------------------------
-    # 1) 스냅샷 생성 + 로켓직구 크롤링 단계
-    # -------------------------------------------------
+    # 크롤링
     def run_crawling_phase() -> int:
-        """스냅샷 생성 후 3개 카테고리 크롤링까지 수행하고 snapshot_id 반환"""
-        # 카테고리 URL 구성
         rocket_urls = {}
         for category_config in Config.ROCKET_CATEGORIES:
-            url_column = category_config['url_column']  # 'rocket_category_url_1/2/3'
-            url_key = url_column.replace('rocket_category_', '')  # 'url_1/2/3'
+            url_column = category_config['url_column']
+            url_key = url_column.replace('rocket_category_', '')
             full_url = Config.ROCKET_BASE_URL + category_config['url_path']
             rocket_urls[url_key] = full_url
         
@@ -647,11 +608,7 @@ def main():
         )
 
         print(f"\n✅ Snapshot 생성: ID={snapshot_id}, 날짜={today}")
-        print(f"   • 헬스/건강식품: {rocket_urls.get('url_1', 'N/A')}")
-        print(f"   • 출산유아동: {rocket_urls.get('url_2', 'N/A')}")
-        print(f"   • 스포츠레저: {rocket_urls.get('url_3', 'N/A')}")
         
-        # 크롤링 실행 (3개 카테고리 모두)
         all_success = True
         
         for idx, category_config in enumerate(Config.ROCKET_CATEGORIES, 1):
@@ -666,12 +623,6 @@ def main():
             )
             
             try:
-                if not monitor.start_driver():
-                    print(f"❌ 브라우저 시작 실패: {category_config['name']}")
-                    all_success = False
-                    monitor.close()
-                    continue
-                
                 result = monitor.run_monitoring_cycle(snapshot_id, Config.ROCKET_BASE_URL)
                 
                 if result['success']:
@@ -692,7 +643,6 @@ def main():
             finally:
                 monitor.close()
         
-        # 모든 카테고리 크롤링 완료 후 로그 (기존 동작 유지)
         if all_success:
             print(f"\n{'='*80}")
             print(f"✅ 모든 카테고리 크롤링 완료")
@@ -704,11 +654,8 @@ def main():
         
         return snapshot_id
 
-    # -------------------------------------------------
-    # 2) 엑셀 업로드 단계
-    # -------------------------------------------------
+    # 엑셀 업로드
     def run_excel_phase(snapshot_id: int):
-        """엑셀 파일을 읽어 해당 snapshot_id에 업로드"""
         try:
             print(f"\n{'='*80}")
             print(f"📥 엑셀 파일 업로드 시작 (snapshot_id={snapshot_id})")
@@ -727,9 +674,6 @@ def main():
             import traceback
             traceback.print_exc()
 
-    # -------------------------------------------------
-    # 실제 실행 플로우
-    # -------------------------------------------------
     snapshot_id = run_crawling_phase()
     run_excel_phase(snapshot_id)
 
