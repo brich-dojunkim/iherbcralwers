@@ -1,6 +1,6 @@
 """
 Gemini 기반 상품 매칭
-- 후보 선택
+- 후보 선택 (강화된 필터링)
 - 이미지 비교
 """
 
@@ -12,7 +12,7 @@ from typing import Tuple, Optional, List, Any
 
 
 class CandidateSelector:
-    """Gemini 후보 선택"""
+    """Gemini 후보 선택 (필터링 강화)"""
     
     def __init__(self, api_key: str):
         genai.configure(api_key=api_key)
@@ -23,21 +23,24 @@ class CandidateSelector:
         GNC 상품과 쿠팡 후보 비교하여 최적 선택
         
         Args:
-            gnc_product: GNC 상품 객체 (product_name 속성만 사용)
-            candidates: 쿠팡 후보 리스트 (name, final_price, review_count, rating만 사용)
+            gnc_product: GNC 상품 객체
+            candidates: 쿠팡 후보 리스트
+        
+        Returns:
+            (선택된 상품, 신뢰도, 이유)
+            신뢰도는 'high' 또는 'none'만 사용
         """
         if not candidates:
-            return None, "low", "후보 없음"
+            return None, "none", "후보 없음"
         
         try:
-            # GNC 쪽은 상품명만 사용 (브랜드/정수 파라미터는 사용하지 않음)
             gnc_name = getattr(gnc_product, "product_name", "") or getattr(gnc_product, "name", "")
-            gnc_desc = getattr(gnc_product, "description", "")  # 있으면 추가 정보로 사용, 없어도 무방
+            gnc_desc = getattr(gnc_product, "description", "")
             
             gnc_info = f"""
 GNC 원본 상품:
 - 상품명: {gnc_name}
-- 추가 정보(있으면 사용): {gnc_desc}
+- 추가 정보: {gnc_desc if gnc_desc else '없음'}
 """
             
             def fmt_num(value):
@@ -47,7 +50,6 @@ GNC 원본 상품:
                     return f"{value:,}"
                 return str(value)
             
-            # 쿠팡 후보 정보: 상품명 / 가격 / 리뷰 / 평점만 사용
             candidates_info = "\n\n".join([
                 f"""후보 {i+1}:
 - 상품명: {c.name}
@@ -66,48 +68,52 @@ GNC 원본 상품:
 쿠팡 후보:
 {candidates_info}
 
-⚠️ **매우 중요한 규칙:**
+⚠️ **매우 중요한 규칙 (절대 준수):**
 
-1. **브랜드가 다르면 절대 매칭하지 마세요**
-   - 브랜드 이름은 상품명 텍스트 안에서 추론하세요.
-   - 예: GNC, 지앤씨, NOW, Solgar 등 상품명에 포함된 브랜드명을 기준으로 판단하세요.
-   - 예: GNC 제품인데 후보 상품명에 NOW, Solgar 등이 들어가면 → "매칭 불가"
-   
-2. **주성분이 다르면 절대 매칭하지 마세요**
-   - 예: "Vitamin D3" vs "Vitamin C" → "매칭 불가"
-   - 예: "Omega-3" vs "Omega-6" → "매칭 불가"
-   - 성분명도 모두 상품명 텍스트에서 판단하세요.
-   
-3. **정수(캡슐/정 개수)가 명백히 다르면 매칭하지 마세요**
-   - 예: 180정 vs 30정 → "매칭 불가"
-   - 예: 200 capsules vs 30 softgels → "매칭 불가"
-   - 정수 정보 역시 상품명 텍스트에 나온 숫자(예: "180정", "200 capsules")로 판단하세요.
-   
-4. **용량/함량이 다르면 매칭하지 마세요**
-   - 예: 1000mg vs 500mg, 1000IU vs 5000IU 등
-   - 상품명에 포함된 숫자와 단위를 기준으로 비교하세요.
-   
-5. **의심스러우면 매칭하지 마세요**
-   - 확실하지 않으면 "매칭 불가"를 선택하세요.
-   - 잘못된 매칭보다 매칭 안 하는 게 낫습니다.
+1. **브랜드가 다르면 → 매칭 불가**
+   - 상품명에서 브랜드 추론
+   - 예: GNC ≠ NOW, Solgar, Nature's Bounty
 
-**매칭 기준 (가능한 한 모두 충족해야 함):**
-1. ✅ 상품명에 나타난 브랜드가 동일
-2. ✅ 상품명에 나타난 주성분/제품 타입이 동일
-3. ✅ 상품명에 나타난 정수(캡슐/정 개수)가 유사
-4. ✅ 상품명에 나타난 용량/함량이 유사
+2. **주성분이 다르면 → 매칭 불가**
+   - 예: Vitamin D3 ≠ Vitamin C
+   - 예: Dandelion Root ≠ Ginger Root
+   - 예: B-Complex 150 ≠ Balanced B-Complex
 
-응답 형식:
+3. **정수가 명백히 다르면 → 매칭 불가**
+   - 예: 180정 ≠ 30정
+   - 예: 200정 ≠ 100정
+
+4. **용량/함량이 다르면 → 매칭 불가**
+   - 예: 1000mg ≠ 500mg
+   - 예: 2000IU ≠ 5000IU
+
+5. **묶음 상품은 → 매칭 불가** ⭐ 중요!
+   - "100정 x 2개" → 매칭 불가
+   - "60정 2SET" → 매칭 불가  
+   - "3개 SET" → 매칭 불가
+   - 묶음 표시: "x2", "x3", "SET", "세트", "2개", "3개"
+
+6. **의심스러우면 → 매칭 불가**
+   - 확신이 없으면 "매칭 불가"
+   - **medium 신뢰도는 사실상 불일치**
+
+**신뢰도 기준:**
+- **high**: 브랜드, 성분, 용량, 정수 **모두** 정확히 일치
+- **none**: 위 중 **하나라도** 불일치 OR 의심스러움 OR 묶음 상품
+
+⚠️ **절대 금지: medium 신뢰도 사용 금지!**
+- high 또는 none만 사용하세요
+- medium이라고 생각되면 → none으로 처리
+
+**응답 형식:**
 선택: 후보 X (또는 "매칭 불가")
-신뢰도: high/medium/low/none
-이유: (구체적 설명)
+신뢰도: high (또는 none)
+이유: (간결하게 1-2문장, 어떤 기준으로 판단했는지)
 
-예시:
-✅ 좋은 매칭: GNC "Vitamin D3 1000 IU 180 Tablets" vs 쿠팡 "지앤씨 비타민 D3 1000IU 180정"
-→ 선택: 후보 1, 신뢰도: high, 이유: 상품명에 표시된 브랜드(GNC/지앤씨), 성분(D3), 용량(1000IU), 정수(180정) 모두 일치
-
-❌ 나쁜 매칭: GNC "Vitamin D3" vs 쿠팡 "나우푸드 비타민 D3"
-→ 선택: 매칭 불가, 신뢰도: none, 이유: 상품명에 표시된 브랜드 불일치 (GNC ≠ 나우푸드)
+**예시:**
+- ✅ "선택: 후보 1, 신뢰도: high, 이유: GNC 브랜드, 셀레늄 200mcg, 200정 모두 일치"
+- ❌ "선택: 매칭 불가, 신뢰도: none, 이유: 100정 x 2개로 묶음 상품"
+- ❌ "선택: 매칭 불가, 신뢰도: none, 이유: B-Complex 150 vs Balanced B-Complex, 제품명 불일치"
 """
             
             response = self.model.generate_content(prompt)
@@ -118,24 +124,26 @@ GNC 원본 상품:
                 return None, 'none', result
             
             # 신뢰도 파싱
-            confidence = 'low'
+            confidence = 'none'
             lower = result.lower()
-            if 'high' in lower or '신뢰도: high' in result or '높음' in result:
+            
+            if 'high' in lower or '신뢰도: high' in result:
                 confidence = 'high'
-            elif 'medium' in lower or '신뢰도: medium' in result or '중간' in result:
-                confidence = 'medium'
-            elif 'none' in lower:
+            
+            # medium은 none으로 강제 변환
+            if 'medium' in lower:
+                return None, 'none', f"중간 신뢰도는 불충분. 매칭 불가.\n{result}"
+            
+            # none이면 매칭 불가
+            if confidence == 'none':
                 return None, 'none', result
             
-            # 후보 파싱
+            # 후보 파싱 (high인 경우만)
             for i in range(len(candidates)):
                 if f"후보 {i+1}" in result:
-                    # low 신뢰도면 매칭 불가로 처리
-                    if confidence == 'low':
-                        return None, 'none', f"낮은 신뢰도로 매칭 거부\n{result}"
                     return candidates[i], confidence, result
             
-            # 파싱 실패 시 매칭 불가
+            # 파싱 실패
             return None, 'none', f"응답 파싱 실패\n{result}"
             
         except Exception as e:
@@ -151,7 +159,12 @@ class ImageMatcher:
         self.model = genai.GenerativeModel('gemini-2.0-flash')
     
     def compare_images(self, gnc_url: str, coupang_url: str) -> Tuple[bool, str, str]:
-        """두 이미지 비교"""
+        """
+        두 이미지 비교
+        
+        Returns:
+            (일치 여부, 신뢰도, 이유)
+        """
         try:
             gnc_img = self._download_image(gnc_url)
             coupang_img = self._download_image(coupang_url)
@@ -166,19 +179,24 @@ class ImageMatcher:
 ⚠️ **엄격한 기준:**
 
 1. **브랜드 로고가 다르면 → 불일치**
-   - GNC 로고 vs 다른 브랜드 로고 → 불일치
-   
+   - GNC 로고 vs 다른 브랜드 로고
+
 2. **패키징 디자인이 다르면 → 불일치**
-   - 색상, 레이아웃, 글자 위치 등
-   
+   - 색상, 레이아웃, 글자 배치
+
 3. **제품명이 다르면 → 불일치**
-   - "Vitamin D3" vs "Vitamin C" → 불일치
-   
+   - Vitamin D3 vs Vitamin C
+   - Dandelion Root vs Ginger Root
+
 4. **용량/개수 표시가 명백히 다르면 → 불일치**
-   - 180정 vs 30정 → 불일치
-   
-5. **의심스러우면 → 불일치**
-   - 확실하지 않으면 "불일치"를 선택하세요
+   - 180정 vs 30정
+   - 100 Capsules vs 200 Capsules
+
+5. **패키징 문구가 다르면 → 불일치**
+   - "Suitable for Vegetarian" vs "Antioxidant Support"
+   - 서로 다른 제품일 가능성
+
+6. **의심스러우면 → 불일치**
 
 **확인 사항:**
 ✅ 브랜드 로고 완전 일치
@@ -186,10 +204,14 @@ class ImageMatcher:
 ✅ 제품명 일치
 ✅ 용량/정수 표시 유사
 
-응답 형식:
-판정: 일치/불일치
+**응답 형식:**
+판정: 일치 (또는 불일치)
 신뢰도: high/medium/low
-이유: (구체적 설명)
+이유: (구체적으로 1-2문장)
+
+**예시:**
+- ✅ "판정: 일치, 신뢰도: high, 이유: GNC 로고, Selenium 제품명, 200정 표시 모두 동일"
+- ❌ "판정: 불일치, 신뢰도: high, 이유: 패키징 문구 다름 (Vegetarian vs Antioxidant Support)"
 """
             
             response = self.model.generate_content([prompt, gnc_img, coupang_img])
@@ -201,13 +223,13 @@ class ImageMatcher:
             # 신뢰도 파싱
             confidence = 'medium'
             lower = result.lower()
-            if 'high' in lower or '신뢰도: high' in result or '높음' in result:
+            if 'high' in lower or '신뢰도: high' in result:
                 confidence = 'high'
-            elif 'low' in lower or '신뢰도: low' in result or '낮음' in result:
+            elif 'low' in lower or '신뢰도: low' in result:
                 confidence = 'low'
             
-            # low 신뢰도에서 일치라고 하면 불일치로 처리
-            if is_match and confidence == 'low':
+            # low 신뢰도면 불일치로 처리
+            if confidence == 'low':
                 return False, 'low', f"낮은 신뢰도로 불일치 처리\n{result}"
             
             return is_match, confidence, result
