@@ -242,6 +242,13 @@ class ProductMatchingSystem:
             
             if not selected:
                 print(f"  ✗ 매칭 불가")
+                # Gemini 응답 분석
+                if '매칭 불가' in reason or '매칭불가' in reason:
+                    # 진짜 매칭 불가 (Gemini가 판단)
+                    result.selection_reason = clean_reason(reason)
+                else:
+                    # 파싱 실패 (Gemini가 선택했지만 우리가 못 찾음)
+                    result.selection_reason = "후보 선택 실패 (응답 파싱 오류)"
                 return result
             
             print(f"  선택: {selected.name[:50]}...")
@@ -310,9 +317,26 @@ class ProductMatchingSystem:
         
         # 파일이 존재하면 append, 없으면 새로 생성
         if os.path.exists(self.output_path):
+            # 기존 파일의 마지막이 개행으로 끝나는지 확인
+            with open(self.output_path, 'rb') as f:
+                f.seek(-1, 2)  # 파일 끝에서 1바이트 전으로 이동
+                last_char = f.read(1)
+                needs_newline = (last_char != b'\n')
+            
+            # append 모드로 저장
+            if needs_newline:
+                # 개행 추가 후 저장
+                with open(self.output_path, 'a', encoding='utf-8-sig') as f:
+                    f.write('\n')
+            
             df.to_csv(self.output_path, mode='a', header=False, index=False, encoding='utf-8-sig')
         else:
             df.to_csv(self.output_path, index=False, encoding='utf-8-sig')
+        
+        # processed_nos 업데이트 (중복 처리 방지)
+        if hasattr(self, 'processed_nos'):
+            for r in self.results:
+                self.processed_nos.add(r.no)
         
         # 저장 후 results 초기화 (메모리 절약)
         self.results.clear()
@@ -324,7 +348,7 @@ class ProductMatchingSystem:
             self.initialize_crawlers()
             
             # 기존 처리된 NO 로드
-            processed_nos = self.load_existing_results()
+            self.processed_nos = self.load_existing_results()
             
             priority, normal = self.load_products(priority_numbers)
             
@@ -335,11 +359,16 @@ class ProductMatchingSystem:
                 print(f"{'='*60}")
                 
                 # 미처리 상품만 필터링
-                priority_to_process = [p for p in priority if p.get('NO') not in processed_nos]
+                priority_to_process = [p for p in priority if p.get('NO') not in self.processed_nos]
                 
-                if processed_nos and priority_to_process:
-                    print(f"✓ 이미 처리됨: {len(priority) - len(priority_to_process)}개")
+                if self.processed_nos:
+                    processed_priority = len(priority) - len(priority_to_process)
+                    print(f"✓ 우선순위 전체: {len(priority)}개")
+                    print(f"✓ 이미 처리됨: {processed_priority}개")
                     print(f"✓ 처리 예정: {len(priority_to_process)}개")
+                
+                if not priority_to_process:
+                    print("✓ 우선순위 상품 모두 처리 완료!")
                 
                 for idx, p in enumerate(priority_to_process, 1):
                     print(f"\n진행: {idx}/{len(priority_to_process)}")
@@ -355,22 +384,26 @@ class ProductMatchingSystem:
                 print(f"{'='*60}")
                 
                 # 미처리 상품만 필터링
-                normal_to_process = [p for p in normal if p.get('NO') not in processed_nos]
+                normal_to_process = [p for p in normal if p.get('NO') not in self.processed_nos]
                 
-                if processed_nos and normal_to_process:
-                    print(f"✓ 이미 처리됨: {len(normal) - len(normal_to_process)}개")
+                if self.processed_nos:
+                    processed_normal = len(normal) - len(normal_to_process)
+                    print(f"✓ 일반 상품 전체: {len(normal)}개")
+                    print(f"✓ 이미 처리됨: {processed_normal}개")
                     print(f"✓ 처리 예정: {len(normal_to_process)}개")
+                
+                if not normal_to_process:
+                    print("✓ 일반 상품 모두 처리 완료!")
                 
                 for idx, p in enumerate(normal_to_process, 1):
                     print(f"\n진행: {idx}/{len(normal_to_process)}")
                     result = self.process_product(p)
                     self.results.append(result)
-                    
-                    if idx % 10 == 0:
-                        self.save_results()
+                    self.save_results()  # ✅ 매번 저장 (우선순위와 동일)
                     time.sleep(2)
                 
-                self.save_results()
+                # 마지막 저장은 이미 위에서 매번 하므로 불필요
+                # self.save_results()  # 제거
             
             print(f"\n✓ 완료")
             print(f"✓ 결과 파일: {self.output_path}")

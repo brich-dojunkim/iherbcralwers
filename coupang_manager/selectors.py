@@ -1,10 +1,13 @@
 """
 쿠팡 HTML 선택자 라이브러리
 HTML 구조 변경 시 이 파일만 수정하면 됨
+
+✨ v3.0 - 검색 결과 페이지 기반 (상세 페이지 불필요)
 """
 
 from dataclasses import dataclass
 from typing import List, Optional
+import re
 
 
 @dataclass
@@ -27,7 +30,7 @@ class CoupangSelectors:
     SEARCH_BUTTON = "button.headerSearchBtn"
     
     # ========================================
-    # 상품 리스트 (검색 결과)
+    # 상품 리스트 (검색 결과) - 모든 정보 수집 가능
     # ========================================
     
     # 상품 카드
@@ -39,14 +42,24 @@ class CoupangSelectors:
     # 가격 영역
     PRICE_AREA = "div.PriceArea_priceArea__NntJz"
     
-    # 개별 가격 요소들
-    PRICE_DISCOUNT_RATE = "div.custom-oos.fw-mr-[2px]"    # 할인율
-    PRICE_ORIGINAL = "del.custom-oos"                     # 원가
-    PRICE_FINAL = "div.custom-oos.fw-text-[20px]"         # 최종가
+    # 가격 요소들
+    PRICE_DISCOUNT_RATE = "div.custom-oos"  # 할인율 (여러 개 중 필터 필요)
+    PRICE_ORIGINAL = "del.custom-oos"        # 정가
+    PRICE_SALE = "div.custom-oos"            # 판매가 (fw-text-[20px] 포함)
+    PRICE_UNIT = "span.custom-oos"           # 1정당 가격
     
     # 배송 정보
-    SHIPPING_FREE = "span[style*='color:#454F5B']"        # "무료배송" 텍스트
-    SHIPPING_INFO = "div.fw-text-[14px]"
+    DELIVERY_INFO_CONTAINER = "div.fw-text-[14px]"
+    DELIVERY_DATE_SPAN = "span[style*='color']"  # 도착 예정일
+    FREE_SHIPPING_SPAN = "span[style*='454F5B']"  # 무료배송
+    SHIPPING_FEE_BADGE = "div.TextBadge_feePrice__n_gta"  # 배송비 배지 (NEW)
+    
+    # 배지
+    BADGE_CONTAINER = "div.fw-flex.fw-flex-wrap.fw-gap-[4px]"
+    IMAGE_BADGE = "div.ImageBadge_default__JWaYp img"
+    COUPICK_BADGE = "div.ImageBadge_coupick"
+    ROCKET_BADGE = "img[src*='rocket']"
+    JIKGU_BADGE = "img[src*='jikgu']"
     
     # 리뷰
     RATING_CONTAINER = "div.ProductRating_productRating__jjf7W"
@@ -56,54 +69,15 @@ class CoupangSelectors:
     # 상품 링크
     PRODUCT_LINK = "a"
     
-    # 상품 이미지 (검색 결과 카드 썸네일)
-    # - 새 UI: <img alt="Product image" class="twc-w-full ...">
-    # - 구 UI: figure.ProductUnit_productImage__Mqcg1 img
+    # 상품 이미지
     PRODUCT_IMAGE = (
         "img[alt='Product image'], "
         "img.twc-w-full, "
         "figure.ProductUnit_productImage__Mqcg1 img"
-    )   
-    
-    # ========================================
-    # 상품 상세 페이지
-    # ========================================
-    
-    # 상품명
-    DETAIL_PRODUCT_NAME = "h1.product-title"
-    
-    # 가격
-    DETAIL_PRICE = "div.price-amount.final-price-amount"
-    
-    # 배송비
-    DETAIL_SHIPPING = ".price-shipping-fee-info-container div.twc-ml-[3px]"
-    
-    # 리뷰
-    DETAIL_RATING = ".rating-star-container"
-    DETAIL_REVIEW_COUNT = ".rating-count-txt"
-    
-    # 판매자 (중요!)
-    # 예: <a href="https://shop.coupang.com/vid/XXXXX">판매자명 ...</a>
-    DETAIL_SELLER = "a[href*='shop.coupang.com']"
-    DETAIL_SELLER_ALTERNATIVES = [
-        "a[href*='shop.coupang.com/vid']",
-        ".seller-name",
-        ".vendor-name",
-    ]
-    
-    # 상품 이미지 (상세 페이지 메인이미지)
-    DETAIL_IMAGE = (
-        "img[alt='Product image'], "
-        "img.twc-w-full, "
-        "img.prod-image__detail"
     )
     
-    # ========================================
     # 필터
-    # ========================================
-    
-    # 낱개상품 필터 레이블
-    FILTER_LABEL = "label"  # JavaScript로 텍스트 매칭 필요
+    FILTER_LABEL = "label"
 
 
 @dataclass
@@ -113,8 +87,9 @@ class CoupangHTMLPatterns:
     # 가격 패턴
     PRICE_PATTERN = r'([\d,]+)원'
     DISCOUNT_PATTERN = r'(\d+)%'
+    UNIT_PRICE_PATTERN = r'1정당\s*([\d,]+)원'
     
-    # 정수 패턴 (캡슐/정 개수)
+    # 정수 패턴
     COUNT_PATTERNS = [
         r'(\d+)정',
         r'(\d+)캡슐',
@@ -126,63 +101,10 @@ class CoupangHTMLPatterns:
     
     # 배송비 패턴
     SHIPPING_FREE_KEYWORDS = ['무료', '무료배송', 'free']
-    SHIPPING_FEE_PATTERN = r'배송비\s*([\d,]+)원'
+    SHIPPING_FEE_PATTERN = r'([\d,]+)원'
     
     # 리뷰 수 패턴
     REVIEW_COUNT_PATTERN = r'\((\d+)\)'
-    REVIEW_COUNT_PATTERN_ALT = r'(\d+)개'
-
-
-class CoupangHTMLStructure:
-    """쿠팡 HTML 구조 참조 (주석용)"""
-    
-    SEARCH_RESULT_EXAMPLE = """
-    <li class="ProductUnit_productUnit__Qd6sv" data-id="...">
-        <a href="/vp/products/...">
-            <figure class="ProductUnit_productImage__Mqcg1">
-                <img alt="..." src="...">
-            </figure>
-            <div class="ProductUnit_productInfo__1l0il">
-                <div class="ProductUnit_productNameV2__cV9cw">
-                    상품명
-                </div>
-                <div class="PriceArea_priceArea__NntJz">
-                    <div class="custom-oos">
-                        <div class="custom-oos fw-mr-[2px]">할인율</div>
-                        <div class="custom-oos fw-text-[20px]">가격</div>
-                    </div>
-                </div>
-                <div class="ProductRating_productRating__jjf7W">
-                    <span class="ProductRating_rating__lMxS9">
-                        <div class="ProductRating_star__RGSlV">별점</div>
-                    </span>
-                    <span class="ProductRating_ratingCount__R0Vhz">(리뷰수)</span>
-                </div>
-            </div>
-        </a>
-    </li>
-    """
-    
-    DETAIL_PAGE_EXAMPLE = """
-    <div class="seller-info ...">
-        <div class="twc-flex">
-            판매자:
-            <a href="https://shop.coupang.com/vid/A00506659">
-                판매자명
-                <div>판매자 상품 보러가기</div>
-            </a>
-        </div>
-    </div>
-    """
-    
-    SEARCH_INPUT_EXAMPLE = """
-    <input type="text" 
-           maxlength="49" 
-           placeholder="찾고 싶은 상품을 검색해보세요!" 
-           class="headerSearchKeyword coupang-search" 
-           name="q" 
-           value="">
-    """
 
 
 class CoupangHTMLHelper:
@@ -190,13 +112,7 @@ class CoupangHTMLHelper:
     
     @staticmethod
     def extract_price(text: str) -> Optional[int]:
-        """
-        텍스트에서 가격 추출
-        
-        Args:
-            text: "104,700원" 또는 "104700원"
-        """
-        import re
+        """가격 추출: "104,700원" → 104700"""
         match = re.search(CoupangHTMLPatterns.PRICE_PATTERN, text)
         if match:
             return int(match.group(1).replace(',', ''))
@@ -204,22 +120,23 @@ class CoupangHTMLHelper:
     
     @staticmethod
     def extract_discount_rate(text: str) -> Optional[int]:
-        """
-        텍스트에서 할인율 추출
-        """
-        import re
+        """할인율 추출: "46%" → 46"""
         match = re.search(CoupangHTMLPatterns.DISCOUNT_PATTERN, text)
         if match:
             return int(match.group(1))
         return None
     
     @staticmethod
+    def extract_unit_price(text: str) -> Optional[int]:
+        """1정당 가격 추출: "(1정당 340원)" → 340"""
+        match = re.search(CoupangHTMLPatterns.UNIT_PRICE_PATTERN, text)
+        if match:
+            return int(match.group(1).replace(',', ''))
+        return None
+    
+    @staticmethod
     def extract_count(text: str, min_count: int = 10, max_count: int = 1000) -> Optional[int]:
-        """
-        텍스트에서 정수(캡슐/정 개수) 추출
-        """
-        import re
-        
+        """정수(캡슐/정) 추출"""
         text_lower = text.lower()
         for pattern in CoupangHTMLPatterns.COUNT_PATTERNS:
             match = re.search(pattern, text_lower)
@@ -231,9 +148,7 @@ class CoupangHTMLHelper:
     
     @staticmethod
     def is_free_shipping(text: str) -> bool:
-        """
-        무료배송 여부 확인
-        """
+        """무료배송 여부"""
         text_lower = text.lower()
         return any(keyword in text_lower for keyword in CoupangHTMLPatterns.SHIPPING_FREE_KEYWORDS)
     
@@ -243,79 +158,59 @@ class CoupangHTMLHelper:
         배송비 추출
         
         Args:
-            text: "배송비 2,500원" 또는 "무료배송"
+            text: "배송비 2,500원" 또는 "배송비 11,900원 조건부 무료배송" 또는 "무료배송"
+        
+        Returns:
+            배송비 (int)
         """
         if CoupangHTMLHelper.is_free_shipping(text):
-            return 0
+            # "무료" 키워드가 있어도 금액이 명시되어 있으면 그 금액 추출
+            # 예: "배송비 2,500원 조건부 무료배송" → 2500
+            pass
         
-        import re
-        match = re.search(CoupangHTMLPatterns.SHIPPING_FEE_PATTERN, text)
+        # "배송비 11,900원" → 11900 추출
+        match = re.search(r'배송비\s*([\d,]+)원', text)
         if match:
             return int(match.group(1).replace(',', ''))
         
-        # 패턴 매칭 실패 시 일반 숫자 찾기
-        match = re.search(r'([\d,]+)원', text)
-        if match:
-            return int(match.group(1).replace(',', ''))
-        
+        # 무료배송
         return 0
     
     @staticmethod
     def extract_review_count(text: str) -> Optional[int]:
-        """
-        리뷰 수 추출
-        
-        Args:
-            text: "(5135)" 또는 "5135개"
-        """
-        import re
-        
-        # (5135) 형태
+        """리뷰 수 추출: "(5135)" → 5135"""
         match = re.search(CoupangHTMLPatterns.REVIEW_COUNT_PATTERN, text)
         if match:
-            return int(match.group(1).replace(',', ''))
+            return int(match.group(1))
+        return None
+    
+    @staticmethod
+    def parse_delivery_type(img_src: str) -> Optional[str]:
+        """배지 이미지에서 배송 타입: "logo_jikgu.png" → "직구" """
+        if not img_src:
+            return None
         
-        # 5135개 형태
-        match = re.search(r'(\d+)개', text)
-        if match:
-            return int(match.group(1).replace(',', ''))
+        img_src_lower = img_src.lower()
+        
+        if 'jikgu' in img_src_lower:
+            return "직구"
+        elif 'rocket' in img_src_lower or 'badge_' in img_src_lower:
+            return "로켓배송"
+        elif 'wow' in img_src_lower:
+            return "와우배송"
         
         return None
     
     @staticmethod
-    def clean_seller_name(text: str) -> str:
-        """
-        판매자명 정리
-        
-        Args:
-            text: "판매자명\n판매자 상품 보러가기"
-        """
-        # 줄바꿈 기준 분리
-        lines = text.split('\n')
-        
-        # 제외할 키워드
-        exclude_keywords = ['보러가기', '판매자:', 'seller']
-        
-        for line in lines:
-            line = line.strip()
-            if line and not any(keyword in line.lower() for keyword in exclude_keywords):
-                return line
-        
-        return text.strip()
-
-
-# ========================================
-# 버전 정보
-# ========================================
-
-COUPANG_HTML_VERSION = "2024-11-25"
-LAST_VERIFIED = "2024-11-25"
-
-# 변경 이력
-CHANGELOG = """
-2024-11-25:
-- 초기 버전 생성
-- 검색 결과 페이지 선택자 추가
-- 상품 상세 페이지 선택자 추가
-- 헬퍼 함수 추가
-"""
+    def is_rocket_delivery(badges: List[str]) -> bool:
+        """배지 목록에서 로켓배송 여부"""
+        return any('로켓' in badge for badge in badges)
+    
+    @staticmethod
+    def extract_rating_from_style(style: str) -> Optional[float]:
+        """style width%에서 별점: "width:100%" → 5.0"""
+        match = re.search(r'width:\s*([\d\.]+)%', style)
+        if match:
+            width = float(match.group(1))
+            return round(width / 20.0, 1)
+        return None

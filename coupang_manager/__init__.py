@@ -28,8 +28,7 @@ from .browser import BrowserManager as CoupangBrowser
 from .selectors import (
     CoupangSelectors,
     CoupangHTMLHelper,
-    CoupangHTMLPatterns,
-    CoupangHTMLStructure
+    CoupangHTMLPatterns
 )
 
 # 데이터 모델
