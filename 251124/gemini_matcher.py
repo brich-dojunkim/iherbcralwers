@@ -95,25 +95,33 @@ GNC 원본 상품:
             if '매칭 불가' in result or '매칭불가' in result:
                 return None, 'none', result
             
-            # 신뢰도 파싱
-            confidence = 'none'
+            # 신뢰도 파싱 (없으면 medium으로 기본 설정)
+            confidence = 'medium'  # ⭐ 기본값 변경
             lower = result.lower()
             
             if 'high' in lower or '신뢰도: high' in result:
                 confidence = 'high'
             elif 'medium' in lower or '신뢰도: medium' in result:
                 confidence = 'medium'
+            elif 'low' in lower or '신뢰도: low' in result:
+                confidence = 'none'  # low는 매칭 불가
             
-            # none이면 매칭 불가
+            # low 신뢰도면 매칭 불가
             if confidence == 'none':
                 return None, 'none', result
             
             # 후보 파싱 (1부터 시작, 후보 1 = candidates[0])
+            print(f"  🐛 파싱 시도: candidates 수={len(candidates)}")
             for i in range(1, len(candidates) + 1):  # ⭐ 1부터 len+1까지
-                if f"후보 {i}" in result:
+                search_text = f"후보 {i}"
+                print(f"  🐛 검색: '{search_text}' in result? {search_text in result}")
+                if search_text in result:
+                    print(f"  ✅ 후보 {i} 찾음! → candidates[{i-1}]")
                     return candidates[i-1], confidence, result  # ⭐ i-1 인덱스
             
             # 파싱 실패
+            print(f"  ❌ 파싱 실패!")
+            print(f"  📄 전체 응답:\n{repr(result)}")
             return None, 'none', f"응답 파싱 실패\n{result}"
             
         except Exception as e:
