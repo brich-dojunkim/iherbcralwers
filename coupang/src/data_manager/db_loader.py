@@ -94,6 +94,7 @@ class DataLoader:
         핵심 변경사항:
         - iherb_category 컬럼 추가
         - 정가(iherb_original_price) 통계 추가
+        - 최근 7일 지표(iherb_sales_quantity_last_7d, iherb_coupang_share_last_7d) 추가
         """
         conn = sqlite3.connect(self.db_path)
         
@@ -113,7 +114,9 @@ class DataLoader:
                 f.iherb_revenue,
                 f.iherb_sales_quantity,
                 f.iherb_item_winner_ratio,
-                f.iherb_category
+                f.iherb_category,
+                f.iherb_sales_quantity_last_7d,
+                f.iherb_coupang_share_last_7d
             FROM products p
             LEFT JOIN product_price pr 
                 ON p.vendor_item_id = pr.vendor_item_id 
@@ -153,6 +156,17 @@ class DataLoader:
                         print(f"      • {cat}: {count:,}개")
                 if len(category_counts) > 5:
                     print(f"      ... 외 {len(category_counts) - 5}개")
+        
+        # 7일 지표 간단 체크 (옵션)
+        if 'iherb_sales_quantity_last_7d' in df.columns:
+            non_null_7d = df['iherb_sales_quantity_last_7d'].notna().sum()
+            if non_null_7d > 0:
+                print(f"   ✓ 최근 7일 판매량 값 있음: {non_null_7d:,}개")
+        
+        if 'iherb_coupang_share_last_7d' in df.columns:
+            non_null_share = df['iherb_coupang_share_last_7d'].notna().sum()
+            if non_null_share > 0:
+                print(f"   ✓ 최근 7일 쿠팡점유율 값 있음: {non_null_share:,}개")
         
         return df
     
@@ -241,6 +255,8 @@ class DataLoader:
     @staticmethod
     def _compose_url(product_id, item_id, vendor_id) -> Optional[str]:
         """쿠팡 URL 생성"""
+        import pandas as pd  # lazy import 방지용
+        
         if pd.notna(product_id) and pd.notna(item_id):
             url = f"https://www.coupang.com/vp/products/{product_id}?itemId={item_id}"
             if pd.notna(vendor_id):
@@ -250,7 +266,7 @@ class DataLoader:
 
 
 def main():
-    """테스트"""
+    """간단 테스트용"""
     db_path = "/Users/brich/Desktop/iherb_price/coupang2/data/integrated/rocket_iherb.db"
     
     loader = DataLoader(db_path)

@@ -11,10 +11,11 @@ DataManager Core
 - Product ID 기반 매칭 수행
 - 가격 비교/할인율/손익분기 할인율 계산
 - (옵션) 아이허브 미매칭 상품까지 포함한 전체 뷰 생성
+- (신규) 여러 스냅샷(panel)을 한 번에 가져오는 기반 제공
 """
 
 import pandas as pd
-from typing import Optional
+from typing import Optional, List, Dict, Any
 
 from .db_loader import DataLoader
 from .matcher import ProductMatcher
@@ -34,22 +35,51 @@ class DataManager:
         self.matcher = ProductMatcher()
         self.calculator = PriceCalculator()
 
-    def get_integrated_df(
+    # ------------------------------------------------------------------
+    # 0) 내부 공통 유틸
+    # ------------------------------------------------------------------
+    def _resolve_snapshot_id(
+        self,
+        target_date: Optional[str],
+        snapshot_id: Optional[int],
+    ) -> Optional[int]:
+        """
+        target_date / snapshot_id 둘 중 무엇이 들어오든
+        실제 snapshot_id 하나로 정리하는 내부 함수.
+        - snapshot_id가 있으면 우선 사용
+        - 없으면 target_date로 lookup
+        - 둘 다 없으면 최신 snapshot 사용
+        """
+        if snapshot_id is not None:
+            return snapshot_id
+
+        if target_date:
+            sid = self.loader.get_snapshot_by_date(target_date)
+            return sid
+
+        # 아무 것도 없으면 latest
+        sid = self.loader.get_latest_snapshot_id()
+        return sid
+
+    # ------------------------------------------------------------------
+    # 1) 단일 스냅샷 뷰 (기존 get_integrated_df 로직 → get_snapshot_view로 이동)
+    # ------------------------------------------------------------------
+    def get_snapshot_view(
         self,
         target_date: Optional[str] = None,
         snapshot_id: Optional[int] = None,
         include_unmatched: bool = True,
     ) -> pd.DataFrame:
         """
-        통합 데이터프레임 생성
+        단일 스냅샷 통합 뷰 생성
 
         Args:
-            target_date: 특정 날짜 (None이면 최신 snapshot)
+            target_date: 특정 날짜 (YYYY-MM-DD) – None이면 최신 snapshot
             snapshot_id: 특정 snapshot ID (지정 시 target_date보다 우선)
             include_unmatched: 아이허브 미매칭 상품 포함 여부
 
         Returns:
-            DataFrame with columns:
+            통합 DataFrame (기존 get_integrated_df와 동일 구조)
 
             [매칭 정보]
             - matching_status: '로켓매칭' 또는 '미매칭'
@@ -76,9 +106,13 @@ class DataManager:
             - iherb_url
 
             [아이허브 판매 성과]
-            - iherb_revenue
-            - iherb_sales_quantity
-            - iherb_item_winner_ratio
+            - iherb_revenue                : 누적 매출 (전체 기간 또는 스냅샷 기준)
+            - iherb_sales_quantity         : 누적 판매 수량
+            - iherb_item_winner_ratio      : 아이템 위너 비율 (%)
+
+            [아이허브 최근 7일 성과]
+            - iherb_sales_quantity_last_7d : 최근 7일 판매 수량
+            - iherb_coupang_share_last_7d  : 최근 7일 '쿠팡' 채널 비중 (%)
 
             [가격 비교/할인 전략]
             - price_diff, price_diff_pct, cheaper_source
@@ -91,19 +125,13 @@ class DataManager:
         """
 
         # 1. snapshot ID 결정
-        if snapshot_id is None:
-            if target_date:
-                snapshot_id = self.loader.get_snapshot_by_date(target_date)
-                if snapshot_id is None:
-                    return pd.DataFrame()
-            else:
-                snapshot_id = self.loader.get_latest_snapshot_id()
-                if snapshot_id is None:
-                    return pd.DataFrame()
+        sid = self._resolve_snapshot_id(target_date, snapshot_id)
+        if sid is None:
+            return pd.DataFrame()
 
         # 2. 로켓 / 아이허브 데이터 로드
-        df_rocket = self.loader.load_rocket_data(snapshot_id)
-        df_iherb = self.loader.load_iherb_data(snapshot_id)
+        df_rocket = self.loader.load_rocket_data(sid)
+        df_iherb = self.loader.load_iherb_data(sid)
 
         if df_rocket.empty and df_iherb.empty:
             return pd.DataFrame()
@@ -232,3 +260,106 @@ class DataManager:
             df_final = df_final.drop(columns=["_sort_key"]).reset_index(drop=True)
 
         return df_final
+
+    def get_integrated_df(
+        self,
+        target_date: Optional[str] = None,
+        snapshot_id: Optional[int] = None,
+        include_unmatched: bool = True,
+    ) -> pd.DataFrame:
+        """
+        ✅ 기존 함수 이름 유지용 래퍼
+        내부적으로는 get_snapshot_view를 그대로 호출한다.
+        """
+        return self.get_snapshot_view(
+            target_date=target_date,
+            snapshot_id=snapshot_id,
+            include_unmatched=include_unmatched,
+        )
+
+    # ------------------------------------------------------------------
+    # 2) 여러 스냅샷(panel) 뷰
+    # ------------------------------------------------------------------
+    def get_panel_views(
+        self,
+        snapshot_ids: Optional[List[int]] = None,
+        n_latest: int = 3,
+        include_unmatched: bool = True,
+    ) -> List[Dict[str, Any]]:
+        """
+        여러 스냅샷을 한 번에 가져오는 panel 기반 뷰.
+
+        Args:
+            snapshot_ids:
+                - 명시적으로 스냅샷 ID 목록을 지정하고 싶을 때 사용
+                - None이면 최신 n_latest개를 자동으로 사용
+            n_latest:
+                - snapshot_ids가 None일 때만 사용
+                - 예: n_latest=3 → 최신 3개 스냅샷
+            include_unmatched:
+                - 각 snapshot_view에서 미매칭 포함 여부
+
+        Returns:
+            panel: 리스트 형태
+                [
+                    {
+                        "snapshot_id": int,
+                        "snapshot_date": "YYYY-MM-DD",
+                        "df": pd.DataFrame
+                    },
+                    ...
+                ]
+
+            ※ 날짜는 오래된 것 → 최신 순으로 정렬해서 돌려준다.
+            (D-2, D-1, D 이런 순서로 metrics에서 쓰기 쉽게)
+        """
+
+        # 1) 사용할 snapshot 목록 결정
+        if snapshot_ids is None:
+            # 최신 n_latest개 스냅샷 ID/날짜 목록 가져오기
+            snapshots_df = self.loader.list_snapshots(limit=n_latest)
+            if snapshots_df.empty:
+                return []
+
+            # 오래된 날짜 → 최신 날짜 순으로 정렬
+            snapshots_df = snapshots_df.sort_values(
+                ["snapshot_date", "id"], ascending=[True, True]
+            )
+            id_list = snapshots_df["id"].tolist()
+            date_map = {
+                row["id"]: row["snapshot_date"] for _, row in snapshots_df.iterrows()
+            }
+        else:
+            # 직접 지정된 ID 목록 사용
+            # 날짜는 get_snapshot_info로 개별 조회
+            id_list = list(snapshot_ids)
+            date_map = {}
+            for sid in id_list:
+                info = self.loader.get_snapshot_info(sid)
+                date_map[sid] = info["snapshot_date"] if info else None
+
+            # 날짜 기준 정렬 (알 수 없는 날짜는 뒤로)
+            id_list = sorted(
+                id_list,
+                key=lambda x: (date_map.get(x) is None, date_map.get(x)),
+            )
+
+        # 2) 각 snapshot별 view 생성
+        panel: List[Dict[str, Any]] = []
+        for sid in id_list:
+            df = self.get_snapshot_view(
+                snapshot_id=sid,
+                include_unmatched=include_unmatched,
+            )
+            if df is None or df.empty:
+                continue
+
+            panel.append(
+                {
+                    "snapshot_id": sid,
+                    "snapshot_date": date_map.get(sid),
+                    "df": df,
+                }
+            )
+
+        return panel

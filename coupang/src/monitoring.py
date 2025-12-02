@@ -346,7 +346,7 @@ class ScrollExtractor:
 class RocketDirectMonitorIntegrated:
     """로켓직구 모니터 (통합 DB 버전)"""
     
-    def __init__(self, integrated_db, category_config: dict, headless: bool = True):
+    def __init__(self, integrated_db, category_config: dict, headless: bool = False):
         """
         Args:
             integrated_db: IntegratedDatabase 인스턴스

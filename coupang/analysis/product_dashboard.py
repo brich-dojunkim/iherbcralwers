@@ -44,16 +44,42 @@ def get_data(db_path: str):
     if df_curr.empty:
         conn.close()
         return pd.DataFrame(), current_date, prev_date
-    
-    # 전일 데이터(이전 스냅샷)에서 판매량/가격/위너비율만 추출
-    prev = df_prev[['iherb_vendor_id', 'iherb_sales_quantity', 'iherb_price',
-                    'iherb_item_winner_ratio']].copy()
-    prev.columns = ['iherb_vendor_id', 'sales_prev', 'price_prev', 'winner_prev']
-    prev = prev.drop_duplicates('iherb_vendor_id', keep='last')
-    
-    # 병합 (오늘 스냅샷 기준, 전일 값 붙이기)
-    df = df_curr.merge(prev, on='iherb_vendor_id', how='left')
-    
+
+    # ─────────────────────────────────────────────────────
+    # 1) 이전 스냅샷에서 필요한 컬럼이 있는지 체크
+    # ─────────────────────────────────────────────────────
+    required_prev_cols = [
+        'iherb_vendor_id',
+        'iherb_sales_quantity',
+        'iherb_price',
+        'iherb_item_winner_ratio',
+    ]
+    has_prev = (
+        (df_prev is not None)
+        and (not df_prev.empty)
+        and all(col in df_prev.columns for col in required_prev_cols)
+    )
+
+    df = df_curr.copy()
+
+    if has_prev:
+        # 전일 데이터(이전 스냅샷)에서 판매량/가격/위너비율만 추출
+        prev = df_prev[required_prev_cols].copy()
+        prev.columns = ['iherb_vendor_id', 'sales_prev', 'price_prev', 'winner_prev']
+        prev = prev.drop_duplicates('iherb_vendor_id', keep='last')
+        
+        # 병합 (오늘 스냅샷 기준, 전일 값 붙이기)
+        df = df.merge(prev, on='iherb_vendor_id', how='left')
+    else:
+        # 이전 스냅샷에 유효 데이터가 없으면 전일 관련 컬럼을 NaN으로 생성
+        df['sales_prev'] = pd.NA
+        df['price_prev'] = pd.NA
+        df['winner_prev'] = pd.NA
+        # discount_prev는 아래에서 한 번에 계산하기 때문에 여기서는 생성만 해둬도 됨
+        # (calc_discount에서 알아서 NaN 유지)
+
+        print("\n⚠️ 이전 스냅샷에 유효한 비교 데이터가 없어 전일 비교값을 NaN으로 처리합니다.")
+
     # 할인율 계산 함수
     def calc_discount(orig, sale):
         o = pd.to_numeric(orig, errors='coerce')
