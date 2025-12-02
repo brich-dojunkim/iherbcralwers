@@ -207,11 +207,14 @@ class DataManager:
                 if df_matched.empty:
                     df_final = df_unmatched.copy()
                 else:
-                    df_final = pd.concat(
-                        [df_matched, df_unmatched],
-                        ignore_index=True,
-                        sort=False,
-                    )
+                    import warnings
+                    with warnings.catch_warnings():
+                        warnings.filterwarnings('ignore', category=FutureWarning)
+                        df_final = pd.concat(
+                            [df_matched, df_unmatched],
+                            ignore_index=True,
+                            sort=False,
+                        )
             else:
                 # 미매칭이 하나도 없으면 매칭 결과만 사용
                 df_final = df_matched.copy()
@@ -310,8 +313,7 @@ class DataManager:
                     ...
                 ]
 
-            ※ 날짜는 오래된 것 → 최신 순으로 정렬해서 돌려준다.
-            (D-2, D-1, D 이런 순서로 metrics에서 쓰기 쉽게)
+            ※ 최신 → 오래된 순으로 정렬 (D, D-1, D-2)
         """
 
         # 1) 사용할 snapshot 목록 결정
@@ -321,9 +323,9 @@ class DataManager:
             if snapshots_df.empty:
                 return []
 
-            # 오래된 날짜 → 최신 날짜 순으로 정렬
+            # 🔥 수정: 최신 → 오래된 순으로 정렬
             snapshots_df = snapshots_df.sort_values(
-                ["snapshot_date", "id"], ascending=[True, True]
+                ["snapshot_date", "id"], ascending=[False, False]  # ← 내림차순
             )
             id_list = snapshots_df["id"].tolist()
             date_map = {
@@ -338,10 +340,11 @@ class DataManager:
                 info = self.loader.get_snapshot_info(sid)
                 date_map[sid] = info["snapshot_date"] if info else None
 
-            # 날짜 기준 정렬 (알 수 없는 날짜는 뒤로)
+            # 🔥 수정: 날짜 기준 내림차순 정렬 (최신 먼저)
             id_list = sorted(
                 id_list,
                 key=lambda x: (date_map.get(x) is None, date_map.get(x)),
+                reverse=True  # ← 내림차순
             )
 
         # 2) 각 snapshot별 view 생성
