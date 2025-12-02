@@ -99,8 +99,8 @@ def create_excel_report(df: pd.DataFrame, output_path: str):
         '로켓_링크': df.get('rocket_url', np.nan),
         '아이허브_링크': df.get('iherb_url', np.nan),
         '품번': df.get('iherb_part_number', np.nan),
-        'UPC': pd.to_numeric(df.get('iherb_upc', np.nan), errors='coerce').astype('Int64'),
-        
+        'UPC': pd.to_numeric(df.get('iherb_upc', pd.Series(pd.NA, index=df.index)),errors='coerce').astype('Int64'),
+
         # 2️⃣ 핵심 지표 (9개)
         '순위': df.get('rocket_rank', np.nan),
         '판매량': df.get('iherb_sales_quantity', np.nan),

@@ -158,7 +158,7 @@ def apply_excel_styles(path: str, col_specs: list):
     GREEN = "C6EFCE"
     RED = "FFC7CE"
     
-    # 1행: 그룹 헤더 스타일
+    # 1행: 그룹 헤더 스타일 먼저 적용
     for i, spec in enumerate(col_specs, 1):
         c = ws.cell(1, i)
         c.fill = PatternFill(start_color=BG, end_color=BG, fill_type="solid")
@@ -184,9 +184,11 @@ def apply_excel_styles(path: str, col_specs: list):
         if start < end:
             ws.merge_cells(start_row=1, start_column=start, end_row=1, end_column=end)
         
+        # 병합 후 첫 셀에만 값 설정
         first_cell = ws.cell(1, start)
         first_cell.value = grp
         
+        # 병합 그룹의 양 끝 테두리 강조
         for i in range(start, end + 1):
             c = ws.cell(1, i)
             if i == start:
@@ -243,7 +245,7 @@ def apply_excel_styles(path: str, col_specs: list):
             if spec.number_format:
                 c.number_format = spec.number_format
             
-            # 조건부 서식
+            # 조건부 서식 (c.value로 수정!)
             if c.value not in (None, ''):
                 try:
                     if spec.is_delta or 'Δ' in spec.excel_label:
@@ -275,6 +277,7 @@ def apply_excel_styles(path: str, col_specs: list):
     ws.auto_filter.ref = f"A2:{get_column_letter(len(col_specs))}{ws.max_row}"
     
     wb.save(path)
+    print(f"\n✅ Excel 파일 저장 완료")
 
 
 def main():
