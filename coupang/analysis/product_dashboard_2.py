@@ -186,6 +186,8 @@ def prepare_output_dataframe(df, curr_date, prev_date):
 # Excel Layer: 시각화 스펙 정의
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+# product_dashboard_2.py - define_columns() 수정
+
 def define_columns(curr_d, prev_d):
     """컬럼 스펙 정의"""
     return [
@@ -206,15 +208,15 @@ def define_columns(curr_d, prev_d):
         get_delta_spec('판매량Δ'),
         get_delta_spec('위너비율Δ'),
         
-        # 가격상태
+        # 가격상태 - 🔥 name 파라미터 제거
         get_column_spec('iherb_original_price', name='정가'),
-        get_timestamped_spec('iherb_price', prev_d, name=f'판매가\n({prev_d})'),
-        get_timestamped_spec('iherb_price', curr_d, name=f'판매가\n({curr_d})'),
-        get_timestamped_spec('할인율', prev_d, name=f'할인율\n({prev_d})', number_format='0.0"%"'),
-        get_timestamped_spec('할인율', curr_d, name=f'할인율\n({curr_d})', number_format='0.0"%"'),
+        get_timestamped_spec('iherb_price', prev_d),  # ← name 제거
+        get_timestamped_spec('iherb_price', curr_d),  # ← name 제거
+        get_timestamped_spec('할인율', prev_d, number_format='0.0"%"'),  # ← name 제거
+        get_timestamped_spec('할인율', curr_d, number_format='0.0"%"'),  # ← name 제거
         get_column_spec('rocket_price', name='로켓_판매가'),
         
-        # 판매/위너
+        # 판매/위너 - 🔥 name 제거
         get_timestamped_spec('iherb_sales_quantity', curr_d - timedelta(days=1)),
         get_timestamped_spec('iherb_sales_quantity', prev_d - timedelta(days=1)),
         get_timestamped_spec('iherb_item_winner_ratio', curr_d - timedelta(days=1)),
@@ -339,8 +341,9 @@ def define_conditional_rules(curr_d):
         *make_delta_rule('할인율Δ'),
         *make_delta_rule('판매량Δ'),
         *make_delta_rule('위너비율Δ'),
-        *make_winner_rule(f'위너비율\n({curr_d - timedelta(days=1)})', threshold=100, exact=True),
-        *make_cheaper_source_rule('가격격차', '유리한곳'),
+        *make_winner_rule(f'위너비율\n({curr_d - timedelta(days=1)})', threshold=100),
+        *make_cheaper_source_rule('가격격차'),
+        *make_cheaper_source_rule('유리한곳'),
     ]
 
 
