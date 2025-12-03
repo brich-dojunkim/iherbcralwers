@@ -4,7 +4,7 @@
 """
 Excel Renderer
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Excel 렌더링 (매핑 + 렌더링 통합)
+Excel 렌더링 엔진 (성능 최적화)
 """
 
 import pandas as pd
@@ -12,10 +12,9 @@ from pathlib import Path
 from openpyxl import load_workbook
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 from openpyxl.utils import get_column_letter
-from openpyxl.formatting.rule import DataBarRule
 
-from src.metrics.schema import METRIC_TYPES
-from .styles import ExcelConfig, FORMATS
+from .types import ExcelConfig
+from .constants import COLOR_SCHEMES
 
 
 class ExcelRenderer:
@@ -34,37 +33,47 @@ class ExcelRenderer:
             {'success': bool, 'path': str, 'rows': int, 'cols': int, 'error': str}
         """
         try:
+            print(f"[RENDERER] 1/8 데이터 쓰기... ({len(df):,}행)")
             # 1. 데이터 쓰기
             with pd.ExcelWriter(self.output_path, engine='openpyxl') as writer:
                 df.to_excel(writer, sheet_name=self.sheet_name, index=False, header=False)
+            print(f"[RENDERER] 1/8 완료")
             
-            # 2. 헤더 공간 확보
+            print(f"[RENDERER] 2/8 파일 로드...")
+            # 2. 파일 로드
             self.wb = load_workbook(self.output_path)
             self.ws = self.wb[self.sheet_name]
             self.ws.insert_rows(1, 3)
+            print(f"[RENDERER] 2/8 완료")
             
-            # 3. 헤더 스타일
-            self._apply_header_styles(config.header_groups)
+            print(f"[RENDERER] 3/8 헤더 렌더링...")
+            # 3. 헤더
+            self._render_headers(config.groups)
+            print(f"[RENDERER] 3/8 완료")
             
+            print(f"[RENDERER] 4/8 컬럼 너비...")
             # 4. 컬럼 너비
-            self._set_column_widths(config.column_widths)
+            self._set_column_widths(config.columns)
+            print(f"[RENDERER] 4/8 완료")
             
-            # 5. 데이터 영역 스타일
-            self._apply_data_styles(config.column_formats or {})
+            print(f"[RENDERER] 5/8 데이터 영역 스타일...")
+            # 5. 데이터 영역
+            self._style_data_area(config.columns)
+            print(f"[RENDERER] 5/8 완료")
             
+            print(f"[RENDERER] 6/8 조건부 서식... ({len(config.conditional_rules)}개 규칙)")
             # 6. 조건부 서식
-            if config.conditional_formats:
-                self._apply_conditional_formats(config.conditional_formats)
+            if config.conditional_rules:
+                self._apply_conditional_rules(config.conditional_rules)
+            print(f"[RENDERER] 6/8 완료")
             
-            # 7. 데이터바
-            if config.databar_columns:
-                self._apply_databars(config.databar_columns)
+            print(f"[RENDERER] 7/8 링크 처리...")
+            # 7. 링크
+            self._apply_links()
+            print(f"[RENDERER] 7/8 완료")
             
-            # 8. 하이퍼링크
-            if config.link_columns:
-                self._apply_links(config.link_columns)
-            
-            # 9. UI
+            print(f"[RENDERER] 8/8 UI 설정...")
+            # 8. UI
             if config.freeze_panes:
                 self.ws.freeze_panes = self.ws.cell(*config.freeze_panes)
             
@@ -73,8 +82,9 @@ class ExcelRenderer:
                     f"A3:{get_column_letter(self.ws.max_column)}{self.ws.max_row}"
                 )
             
-            # 10. 저장
+            # 저장
             self.wb.save(self.output_path)
+            print(f"[RENDERER] 8/8 완료")
             
             return {
                 'success': True,
@@ -85,6 +95,8 @@ class ExcelRenderer:
             }
         
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             return {
                 'success': False,
                 'path': str(self.output_path),
@@ -97,8 +109,8 @@ class ExcelRenderer:
     # Private Methods
     # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     
-    def _apply_header_styles(self, groups):
-        """3단 헤더 스타일"""
+    def _render_headers(self, groups):
+        """3단 헤더 렌더링"""
         border = Border(
             left=Side(style='thin'),
             right=Side(style='thin'),
@@ -109,12 +121,13 @@ class ExcelRenderer:
         col_pos = 1
         
         for group in groups:
-            total_span = sum(len(sg.cols) for sg in group.sub_groups)
+            colors = COLOR_SCHEMES[group.color_scheme]
+            total_span = sum(len(sg.columns) for sg in group.sub_groups)
             
             # 1단: 그룹 헤더
             for i in range(col_pos, col_pos + total_span):
                 cell = self.ws.cell(1, i)
-                cell.fill = PatternFill(start_color=group.color_top, end_color=group.color_top, fill_type="solid")
+                cell.fill = PatternFill(start_color=colors["top"], end_color=colors["top"], fill_type="solid")
                 cell.font = Font(color="FFFFFF", bold=True, size=11)
                 cell.alignment = Alignment(horizontal='center', vertical='center')
                 cell.border = border
@@ -136,12 +149,12 @@ class ExcelRenderer:
             
             # 2단 & 3단
             for sub in group.sub_groups:
-                sub_span = len(sub.cols)
+                sub_span = len(sub.columns)
                 
                 # 2단
                 for i in range(col_pos, col_pos + sub_span):
                     cell = self.ws.cell(2, i)
-                    cell.fill = PatternFill(start_color=group.color_mid, end_color=group.color_mid, fill_type="solid")
+                    cell.fill = PatternFill(start_color=colors["mid"], end_color=colors["mid"], fill_type="solid")
                     cell.font = Font(color="FFFFFF", bold=True, size=11)
                     cell.alignment = Alignment(horizontal='center', vertical='center')
                     cell.border = border
@@ -152,25 +165,23 @@ class ExcelRenderer:
                 self.ws.cell(2, col_pos).value = sub.name
                 
                 # 3단
-                for i, col_name in enumerate(sub.cols):
+                for i, col_name in enumerate(sub.columns):
                     cell = self.ws.cell(3, col_pos + i)
                     cell.value = col_name
-                    cell.fill = PatternFill(start_color=group.color_bottom, end_color=group.color_bottom, fill_type="solid")
+                    cell.fill = PatternFill(start_color=colors["bottom"], end_color=colors["bottom"], fill_type="solid")
                     cell.font = Font(color="000000", bold=True, size=10)
                     cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
                     cell.border = border
                 
                 col_pos += sub_span
     
-    def _set_column_widths(self, widths):
-        """컬럼 너비"""
-        for col_idx in range(1, self.ws.max_column + 1):
-            col_name = self.ws.cell(3, col_idx).value
-            width = widths.get(col_name, 12.0)
-            self.ws.column_dimensions[get_column_letter(col_idx)].width = width
+    def _set_column_widths(self, columns):
+        """컬럼 너비 설정"""
+        for col_idx, col_spec in enumerate(columns, 1):
+            self.ws.column_dimensions[get_column_letter(col_idx)].width = col_spec.width
     
-    def _apply_data_styles(self, formats):
-        """데이터 영역 스타일"""
+    def _style_data_area(self, columns):
+        """데이터 영역 스타일 (테두리, 서식, 정렬)"""
         border = Border(
             left=Side(style='thin'),
             right=Side(style='thin'),
@@ -179,52 +190,63 @@ class ExcelRenderer:
         )
         
         for row_idx in range(4, self.ws.max_row + 1):
-            for col_idx in range(1, self.ws.max_column + 1):
+            for col_idx, col_spec in enumerate(columns, 1):
                 cell = self.ws.cell(row_idx, col_idx)
                 cell.border = border
-                cell.alignment = Alignment(vertical='center', wrap_text=False)
-                
-                col_name = self.ws.cell(3, col_idx).value
-                if col_name in formats:
-                    cell.number_format = formats[col_name]
+                cell.number_format = col_spec.number_format
+                cell.alignment = Alignment(
+                    horizontal=col_spec.alignment,
+                    vertical='center',
+                    wrap_text=False
+                )
     
-    def _apply_conditional_formats(self, formats):
-        """조건부 서식"""
-        for fmt in formats:
-            col_idx = self._find_column(fmt.column)
+    def _apply_conditional_rules(self, rules):
+        """조건부 서식 적용 (최적화: 컬럼별 한 번만 순회)"""
+        # 컬럼별로 규칙 그룹핑
+        rules_by_column = {}
+        for rule in rules:
+            if rule.column not in rules_by_column:
+                rules_by_column[rule.column] = []
+            rules_by_column[rule.column].append(rule)
+        
+        # 컬럼별 처리
+        for col_name, col_rules in rules_by_column.items():
+            col_idx = self._find_column(col_name)
             if not col_idx:
                 continue
             
+            # 해당 컬럼만 한 번 순회
             for row_idx in range(4, self.ws.max_row + 1):
                 cell = self.ws.cell(row_idx, col_idx)
-                try:
-                    if fmt.condition(cell.value):
-                        cell.fill = PatternFill(start_color=fmt.color, end_color=fmt.color, fill_type="solid")
-                except:
-                    pass
+                value = cell.value
+                
+                # 모든 규칙 체크 (첫 번째 매칭되는 것 적용)
+                for rule in col_rules:
+                    try:
+                        if rule.condition(value):
+                            if rule.fill_color:
+                                cell.fill = PatternFill(
+                                    start_color=rule.fill_color,
+                                    end_color=rule.fill_color,
+                                    fill_type="solid"
+                                )
+                            if rule.font_color:
+                                cell.font = Font(color=rule.font_color)
+                            break  # 첫 매칭만
+                    except:
+                        pass
     
-    def _apply_databars(self, columns):
-        """데이터바"""
-        for col_name in columns:
-            col_idx = self._find_column(col_name)
-            if not col_idx:
-                continue
-            
-            col_letter = get_column_letter(col_idx)
-            rule = DataBarRule(
-                start_type='num', start_value=0,
-                end_type='num', end_value=100,
-                color="63C384"
-            )
-            self.ws.conditional_formatting.add(f'{col_letter}4:{col_letter}{self.ws.max_row}', rule)
-    
-    def _apply_links(self, columns):
-        """하이퍼링크"""
-        for col_name in columns:
-            col_idx = self._find_column(col_name)
-            if not col_idx:
-                continue
-            
+    def _apply_links(self):
+        """하이퍼링크 처리"""
+        # 3행에서 링크 컬럼 찾기
+        link_columns = []
+        for col_idx in range(1, self.ws.max_column + 1):
+            col_name = self.ws.cell(3, col_idx).value
+            if col_name and ('링크' in str(col_name) or 'url' in str(col_name).lower()):
+                link_columns.append(col_idx)
+        
+        # 링크 처리
+        for col_idx in link_columns:
             for row_idx in range(4, self.ws.max_row + 1):
                 cell = self.ws.cell(row_idx, col_idx)
                 url = cell.value
@@ -236,30 +258,8 @@ class ExcelRenderer:
                     cell.alignment = Alignment(horizontal='center', vertical='center')
     
     def _find_column(self, col_name: str) -> int:
-        """컬럼명으로 인덱스 찾기"""
+        """컬럼명으로 인덱스 찾기 (3행 기준)"""
         for col_idx in range(1, self.ws.max_column + 1):
             if self.ws.cell(3, col_idx).value == col_name:
                 return col_idx
         return None
-
-
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# 헬퍼 함수: 메트릭 메타데이터 → Excel 서식 자동 매핑
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-def infer_format(metric_key: str) -> str:
-    """메트릭 타입 → Excel 서식 자동 추론"""
-    metric_type = METRIC_TYPES.get(metric_key)
-    
-    if metric_type == "currency":
-        return FORMATS["currency"]
-    elif metric_type == "percentage":
-        return FORMATS["percentage"]
-    elif metric_type == "integer":
-        return FORMATS["integer"]
-    elif metric_type == "float":
-        return FORMATS["float"]
-    elif metric_type == "url":
-        return FORMATS["text"]
-    
-    return None

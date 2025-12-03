@@ -2,19 +2,18 @@
 # -*- coding: utf-8 -*-
 
 """
-Excel Styles & Types
+Excel Constants
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Excel 스타일 상수 + 타입 정의
+색상 팔레트 및 서식 상수
 """
 
-from dataclasses import dataclass
-from typing import List, Callable, Any, Optional, Dict
+from typing import Dict
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 색상 팔레트
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-COLORS = {
+COLORS: Dict[str, str] = {
     # 기본
     "INFO_DARK": "0F172A",
     "INFO_MID": "475569",
@@ -50,51 +49,43 @@ COLORS = {
 # 숫자 서식
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-FORMATS = {
+FORMATS: Dict[str, str] = {
     "text": "@",
     "integer": "#,##0",
     "float": "0.0",
     "currency": "#,##0",
     "percentage": '0.0"%"',
+    "rank": "0",
 }
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# 타입 정의
+# 색상 조합 (3단 헤더용)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-@dataclass
-class SubGroup:
-    """2단 헤더 서브그룹"""
-    name: str
-    cols: List[str]
-
-
-@dataclass
-class HeaderGroup:
-    """3단 헤더 그룹"""
-    name: str
-    color_top: str
-    color_mid: str
-    color_bottom: str
-    sub_groups: List[SubGroup]
-
-
-@dataclass
-class ConditionalFormat:
-    """조건부 서식"""
-    column: str
-    condition: Callable[[Any], bool]
-    color: str
-
-
-@dataclass
-class ExcelConfig:
-    """Excel 렌더링 설정 (단순화)"""
-    header_groups: List[HeaderGroup]
-    column_widths: Dict[str, float]
-    column_formats: Dict[str, str] = None
-    conditional_formats: List[ConditionalFormat] = None
-    databar_columns: List[str] = None
-    link_columns: List[str] = None
-    freeze_panes: tuple = None
-    auto_filter: bool = True
+COLOR_SCHEMES: Dict[str, Dict[str, str]] = {
+    "info": {
+        "top": COLORS["INFO_DARK"],
+        "mid": COLORS["INFO_MID"],
+        "bottom": COLORS["INFO_LIGHT"],
+    },
+    "primary": {
+        "top": COLORS["PRIMARY_DARK"],
+        "mid": COLORS["PRIMARY_MID"],
+        "bottom": COLORS["PRIMARY_LIGHT"],
+    },
+    "secondary": {
+        "top": COLORS["SECONDARY_DARK"],
+        "mid": COLORS["SECONDARY_MID"],
+        "bottom": COLORS["SECONDARY_LIGHT"],
+    },
+    "tertiary": {
+        "top": COLORS["TERTIARY_DARK"],
+        "mid": COLORS["TERTIARY_MID"],
+        "bottom": COLORS["TERTIARY_LIGHT"],
+    },
+    "success": {
+        "top": COLORS["SUCCESS_DARK"],
+        "mid": COLORS["SUCCESS_MID"],
+        "bottom": COLORS["SUCCESS_LIGHT"],
+    },
+}
