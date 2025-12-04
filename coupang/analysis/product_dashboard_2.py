@@ -2,10 +2,14 @@
 # -*- coding: utf-8 -*-
 
 """
-상품 대시보드 (계층적 설계)
+상품 대시보드 (계층적 설계) - 수정됨
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Analysis Layer: 비즈니스 로직 (2개 스냅샷 비교)
 Excel Layer: 데이터 변환 & 렌더링 위임
+
+🔥 수정 사항:
+- define_columns() 순서를 column_map 순서와 정확히 일치시킴
+- 동적 계산 컬럼(할인율, 순위)을 ColumnSpec으로 직접 생성
 """
 
 import sys
@@ -26,6 +30,7 @@ from analysis.excel import (
     build_output_dataframe,
     
     # 컬럼 스펙 (Excel Layer)
+    ColumnSpec,
     get_column_spec,
     get_timestamped_spec,
     get_delta_spec,
@@ -117,21 +122,21 @@ def prepare_output_dataframe(df, curr_date, prev_date):
         import pandas as pd
         rank_iherb = pd.Series([pd.NA] * len(df))
     
-    # 선언적 컬럼 매핑
+    # 🔥 핵심: column_map 순서 = 최종 엑셀 컬럼 순서
     column_map = {
-        # 코어
+        # 1. 코어
         '매칭상태': (f'matching_status__{curr_s}',),
         '품번': (f'iherb_part_number__{curr_s}',),
         'Product_ID': (f'product_id__{curr_s}',),
         
-        # 할인전략
+        # 2. 할인전략
         '요청할인율': (f'requested_discount_rate__{curr_s}',),
         '추천할인율': (f'recommended_discount_rate__{curr_s}',),
         '손익분기할인율': (f'breakeven_discount_rate__{curr_s}',),
         '유리한곳': (f'cheaper_source__{curr_s}',),
         '가격격차': (f'price_diff__{curr_s}', 'Int64'),
         
-        # 가격상태
+        # 3. 가격상태 (정가 → 전일판매가 → 오늘판매가 → 전일할인율 → 오늘할인율 → 로켓)
         '정가': (f'iherb_original_price__{curr_s}', 'Int64'),
         f'판매가\n({prev_d})': (f'iherb_price__{prev_s}', 'Int64'),
         f'판매가\n({curr_d})': (f'iherb_price__{curr_s}', 'Int64'),
@@ -139,13 +144,13 @@ def prepare_output_dataframe(df, curr_date, prev_date):
         f'할인율\n({curr_d})': (None,),  # 동적 컬럼
         '로켓_판매가': (f'rocket_price__{curr_s}', 'Int64'),
         
-        # 판매/위너
+        # 4. 판매/위너 (오늘-1 → 전일-1 순서)
         f'판매량\n({curr_d - timedelta(days=1)})': (f'iherb_sales_quantity__{curr_s}', 'Int64'),
         f'판매량\n({prev_d - timedelta(days=1)})': (f'iherb_sales_quantity__{prev_s}', 'Int64'),
         f'위너비율\n({curr_d - timedelta(days=1)})': (f'iherb_item_winner_ratio__{curr_s}',),
         f'위너비율\n({prev_d - timedelta(days=1)})': (f'iherb_item_winner_ratio__{prev_s}',),
         
-        # 메타
+        # 5. 메타
         '제품명_아이허브': (f'iherb_product_name__{curr_s}',),
         '제품명_로켓': (f'rocket_product_name__{curr_s}',),
         '카테고리_아이허브': (f'iherb_category__{curr_s}',),
@@ -160,15 +165,12 @@ def prepare_output_dataframe(df, curr_date, prev_date):
         '순위_로켓': (f'rocket_rank__{curr_s}', 'Int64'),
         '평점': (f'rocket_rating__{curr_s}',),
         '리뷰수': (f'rocket_reviews__{curr_s}', 'Int64'),
+        
+        # 6. Δ 컬럼 (마지막에 추가)
+        '판매량Δ': (f'iherb_sales_quantity_delta_{curr_s}_{prev_s}', 'Int64'),
+        '위너비율Δ': (f'iherb_item_winner_ratio_delta_{curr_s}_{prev_s}',),
+        '할인율Δ': (None,),  # 동적 계산
     }
-    
-    # 델타 컬럼
-    delta_sales_col = f'iherb_sales_quantity_delta_{curr_s}_{prev_s}'
-    delta_winner_col = f'iherb_item_winner_ratio_delta_{curr_s}_{prev_s}'
-    
-    column_map['판매량Δ'] = (delta_sales_col, 'Int64') if delta_sales_col in df.columns else (None,)
-    column_map['위너비율Δ'] = (delta_winner_col,) if delta_winner_col in df.columns else (None,)
-    column_map['할인율Δ'] = (None,)  # 동적 계산
     
     # DataFrame 구성
     output_df = build_output_dataframe(df, column_map)
@@ -186,43 +188,36 @@ def prepare_output_dataframe(df, curr_date, prev_date):
 # Excel Layer: 시각화 스펙 정의
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-# product_dashboard_2.py - define_columns() 수정
-
 def define_columns(curr_d, prev_d):
-    """컬럼 스펙 정의"""
+    """컬럼 스펙 정의 - 🔥 column_map 순서와 100% 일치"""
     return [
-        # 코어
+        # 1. 코어
         get_column_spec('matching_status', name='매칭상태'),
         get_column_spec('iherb_part_number', name='품번'),
         get_column_spec('rocket_product_id', name='Product_ID'),
         
-        # 할인전략
+        # 2. 할인전략
         get_column_spec('requested_discount_rate', name='요청할인율'),
         get_column_spec('recommended_discount_rate', name='추천할인율'),
         get_column_spec('breakeven_discount_rate', name='손익분기할인율'),
         get_column_spec('cheaper_source', name='유리한곳'),
         get_column_spec('price_diff', name='가격격차'),
         
-        # 변화
-        get_delta_spec('할인율Δ'),
-        get_delta_spec('판매량Δ'),
-        get_delta_spec('위너비율Δ'),
-        
-        # 가격상태 - 🔥 name 파라미터 제거
+        # 3. 가격상태 (순서: 정가 → 전일판매가 → 오늘판매가 → 전일할인율 → 오늘할인율 → 로켓)
         get_column_spec('iherb_original_price', name='정가'),
-        get_timestamped_spec('iherb_price', prev_d),  # ← name 제거
-        get_timestamped_spec('iherb_price', curr_d),  # ← name 제거
-        get_timestamped_spec('할인율', prev_d, number_format='0.0"%"'),  # ← name 제거
-        get_timestamped_spec('할인율', curr_d, number_format='0.0"%"'),  # ← name 제거
+        get_timestamped_spec('iherb_price', str(prev_d)),
+        get_timestamped_spec('iherb_price', str(curr_d)),
+        ColumnSpec(name=f'할인율\n({prev_d})', width=14.0, number_format='0.0"%"', alignment='right'),
+        ColumnSpec(name=f'할인율\n({curr_d})', width=14.0, number_format='0.0"%"', alignment='right'),
         get_column_spec('rocket_price', name='로켓_판매가'),
         
-        # 판매/위너 - 🔥 name 제거
-        get_timestamped_spec('iherb_sales_quantity', curr_d - timedelta(days=1)),
-        get_timestamped_spec('iherb_sales_quantity', prev_d - timedelta(days=1)),
-        get_timestamped_spec('iherb_item_winner_ratio', curr_d - timedelta(days=1)),
-        get_timestamped_spec('iherb_item_winner_ratio', prev_d - timedelta(days=1)),
+        # 4. 판매/위너 (순서: 오늘-1 → 전일-1)
+        get_timestamped_spec('iherb_sales_quantity', str(curr_d - timedelta(days=1))),
+        get_timestamped_spec('iherb_sales_quantity', str(prev_d - timedelta(days=1))),
+        get_timestamped_spec('iherb_item_winner_ratio', str(curr_d - timedelta(days=1))),
+        get_timestamped_spec('iherb_item_winner_ratio', str(prev_d - timedelta(days=1))),
         
-        # 메타
+        # 5. 메타
         get_column_spec('iherb_product_name', name='제품명_아이허브'),
         get_column_spec('rocket_product_name', name='제품명_로켓'),
         get_column_spec('iherb_category', name='카테고리_아이허브'),
@@ -233,10 +228,15 @@ def define_columns(curr_d, prev_d):
         get_column_spec('rocket_vendor_id', name='Vendor_로켓'),
         get_column_spec('iherb_item_id', name='Item_아이허브'),
         get_column_spec('rocket_item_id', name='Item_로켓'),
-        get_column_spec('rank', name='순위_아이허브', number_format='0'),
+        ColumnSpec(name='순위_아이허브', width=14.0, number_format='0', alignment='right'),
         get_column_spec('rocket_rank', name='순위_로켓'),
         get_column_spec('rocket_rating', name='평점'),
         get_column_spec('rocket_reviews', name='리뷰수'),
+        
+        # 6. Δ 컬럼 (마지막)
+        get_delta_spec('판매량Δ'),
+        get_delta_spec('위너비율Δ'),
+        get_delta_spec('할인율Δ'),
     ]
 
 
@@ -258,13 +258,6 @@ def define_groups(curr_d, prev_d):
             ]
         ),
         GroupSpec(
-            name="변화",
-            color_scheme="secondary",
-            sub_groups=[
-                SubGroup(name="", columns=['할인율Δ', '판매량Δ', '위너비율Δ']),
-            ]
-        ),
-        GroupSpec(
             name="가격상태",
             color_scheme="tertiary",
             sub_groups=[
@@ -283,10 +276,10 @@ def define_groups(curr_d, prev_d):
             color_scheme="success",
             sub_groups=[
                 SubGroup(name="", columns=[
-                    f'판매량\n({prev_d - timedelta(days=1)})',
                     f'판매량\n({curr_d - timedelta(days=1)})',
-                    f'위너비율\n({prev_d - timedelta(days=1)})',
+                    f'판매량\n({prev_d - timedelta(days=1)})',
                     f'위너비율\n({curr_d - timedelta(days=1)})',
+                    f'위너비율\n({prev_d - timedelta(days=1)})',
                 ]),
             ]
         ),
@@ -332,6 +325,13 @@ def define_groups(curr_d, prev_d):
                 SubGroup(name="", columns=['평점', '리뷰수']),
             ]
         ),
+        GroupSpec(
+            name="변화",
+            color_scheme="secondary",
+            sub_groups=[
+                SubGroup(name="", columns=['판매량Δ', '위너비율Δ', '할인율Δ']),
+            ]
+        ),
     ]
 
 
@@ -355,7 +355,7 @@ def main():
     """메인 워크플로우"""
     
     print(f"\n{'='*80}")
-    print(f"📊 상품 대시보드 생성")
+    print(f"📊 상품 대시보드 생성 (수정됨)")
     print(f"{'='*80}")
     
     # [1] Analysis Layer - 데이터 로드
@@ -375,6 +375,11 @@ def main():
     output_df = prepare_output_dataframe(df, curr_date, prev_date)
     print(f"✅ {len(output_df):,}행 × {len(output_df.columns)}열")
     
+    # 🔍 디버깅: 컬럼 순서 확인
+    print(f"\n[DEBUG] 출력 DF 컬럼 순서:")
+    for i, col in enumerate(output_df.columns, 1):
+        print(f"  {i:2d}. {col}")
+    
     # [3] Excel Layer - 시각화 스펙 정의
     print(f"\n[3/4] Excel 스펙 정의 중...")
     curr_d = datetime.strptime(curr_date, "%Y-%m-%d").date()
@@ -383,6 +388,10 @@ def main():
     columns = define_columns(curr_d, prev_d)
     groups = define_groups(curr_d, prev_d)
     rules = define_conditional_rules(curr_d)
+    
+    print(f"\n[DEBUG] 컬럼 스펙 순서:")
+    for i, col_spec in enumerate(columns, 1):
+        print(f"  {i:2d}. {col_spec.name}")
     
     config = ExcelConfig(
         groups=groups,
