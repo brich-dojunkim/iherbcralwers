@@ -4,7 +4,13 @@
 """
 Excel Renderer
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Excel 렌더링 엔진 (성능 최적화)
+Excel 렌더링 엔진 (컬럼-값 매핑 책임)
+
+🔥 핵심 기능:
+  - config.columns 순서대로 DataFrame 자동 정렬 (컬럼-값 매핑 보장)
+  - 3단 헤더 렌더링
+  - 조건부 서식 적용
+  - 하이퍼링크 처리
 """
 
 import pandas as pd
@@ -29,10 +35,27 @@ class ExcelRenderer:
     def render(self, df: pd.DataFrame, config: ExcelConfig) -> dict:
         """DataFrame → Excel 렌더링
         
+        🔥 Excel Layer 책임: config.columns 순서대로 컬럼-값 자동 매핑
+        
         Returns:
             {'success': bool, 'path': str, 'rows': int, 'cols': int, 'error': str}
         """
         try:
+            # 🔥 Step 0: config 순서대로 컬럼 자동 정렬
+            ordered_columns = [col.name for col in config.columns]
+            
+            # df에 없는 컬럼 체크
+            missing = [c for c in ordered_columns if c not in df.columns]
+            if missing:
+                print(f"⚠️  경고: DataFrame에 없는 컬럼: {missing}")
+                for col in missing:
+                    df[col] = pd.NA
+            
+            # config.columns 순서대로 재정렬 (Analysis 순서 무관)
+            df = df[ordered_columns].copy()
+            
+            print(f"[RENDERER] 0/8 컬럼 정렬 완료 (config 순서 보장)")
+            
             print(f"[RENDERER] 1/8 데이터 쓰기... ({len(df):,}행)")
             # 1. 데이터 쓰기
             with pd.ExcelWriter(self.output_path, engine='openpyxl') as writer:
