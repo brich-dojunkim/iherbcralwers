@@ -1,6 +1,6 @@
 """
 YouTube 채널 동영상 정보 수집 및 요약 스크립트
-Whisper(로컬 STT) + Gemini(텍스트 요약) 방식
+Groq Whisper API(초고속 STT) + Gemini(텍스트 요약)
 """
 
 import json
@@ -14,13 +14,20 @@ from typing import List, Dict
 import yt_dlp
 from google import genai
 from google.genai.types import HttpOptions
+from groq import Groq  # Groq API 추가
 
 import pandas as pd
 from openpyxl import load_workbook
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 from openpyxl.utils import get_column_letter
 
-from faster_whisper import WhisperModel
+try:
+    from faster_whisper import WhisperModel
+    WHISPER_AVAILABLE = True
+except ImportError:
+    WHISPER_AVAILABLE = False
+    print("⚠️  faster-whisper 미설치. Groq만 사용 가능.")
+    print("   설치: pip install faster-whisper")
 
 # YouTube 채널 목록
 CHANNELS = [
@@ -32,6 +39,83 @@ CHANNELS = [
     "https://www.youtube.com/@HongSee_yaksa"
 ]
 
+
+# ─────────────────────────────────────────────────────
+# Rate Limit 추적 클래스
+# ─────────────────────────────────────────────────────
+
+class RateLimitTracker:
+    """
+    Groq Whisper API의 ASH (Audio Seconds per Hour) 제한 추적
+    슬라이딩 윈도우 방식으로 과거 1시간 동안의 오디오 처리량 추적
+    """
+    def __init__(self, limit_ash: int = 7000):  # 7200초 중 200초는 버퍼
+        self.limit_ash = limit_ash
+        self.requests = []  # [(timestamp, duration), ...]
+    
+    def _clean_old_requests(self):
+        """1시간 이상 된 요청 제거"""
+        now = time.time()
+        self.requests = [(t, d) for t, d in self.requests if now - t < 3600]
+    
+    def get_current_ash(self) -> int:
+        """현재 1시간 윈도우의 누적 오디오 초"""
+        self._clean_old_requests()
+        return sum(d for _, d in self.requests)
+    
+    def can_process(self, duration: int) -> bool:
+        """지정된 duration을 처리할 수 있는지 확인"""
+        current = self.get_current_ash()
+        return current + duration <= self.limit_ash
+    
+    def wait_time_needed(self, duration: int) -> float:
+        """
+        duration을 처리하기 위해 필요한 대기 시간 (초)
+        가장 오래된 요청이 윈도우에서 빠질 때까지 대기
+        """
+        self._clean_old_requests()
+        current = self.get_current_ash()
+        
+        if current + duration <= self.limit_ash:
+            return 0
+        
+        # 목표: current_ash가 limit - duration 이하로 떨어질 때까지
+        target = self.limit_ash - duration
+        
+        if not self.requests:
+            return 0
+        
+        # 요청들을 시간순으로 제거하면서 계산
+        accumulated = current
+        now = time.time()
+        
+        for timestamp, req_duration in sorted(self.requests, key=lambda x: x[0]):
+            accumulated -= req_duration
+            if accumulated <= target:
+                # 이 요청이 만료될 때까지 대기
+                wait = (timestamp + 3600) - now
+                return max(wait, 0) + 10  # 10초 버퍼
+        
+        # 모든 요청이 만료되어야 함
+        oldest_time = self.requests[0][0]
+        return max((oldest_time + 3600) - now, 0) + 10
+    
+    def record(self, duration: int):
+        """처리한 오디오 duration 기록"""
+        self.requests.append((time.time(), duration))
+    
+    def get_stats(self) -> Dict:
+        """현재 상태 통계"""
+        current = self.get_current_ash()
+        return {
+            'current_ash': current,
+            'limit_ash': self.limit_ash,
+            'remaining_ash': self.limit_ash - current,
+            'usage_percent': (current / self.limit_ash) * 100,
+            'requests_in_window': len(self.requests)
+        }
+
+
 # 중간 저장 파일 경로
 CHECKPOINT_DIR = "checkpoints"
 VIDEOS_CHECKPOINT = os.path.join(CHECKPOINT_DIR, "collected_videos.json")
@@ -41,8 +125,60 @@ TRANSCRIPTS_CHECKPOINT = os.path.join(CHECKPOINT_DIR, "transcripts.csv")
 # 오디오 저장 디렉토리
 AUDIO_DIR = "audio"
 
-# Whisper 모델 캐시
+# Whisper 모델 캐시 (로컬 폴백용)
 _WHISPER_MODEL = None
+
+
+def get_whisper_model(model_size: str = "small"):
+    """Whisper 로컬 모델 로드 (폴백용)"""
+    global _WHISPER_MODEL
+    if _WHISPER_MODEL is None:
+        if not WHISPER_AVAILABLE:
+            raise Exception("faster-whisper가 설치되지 않았습니다")
+        print(f"   🧠 Whisper 로컬 모델 로딩... (size={model_size})")
+        _WHISPER_MODEL = WhisperModel(model_size, device="cpu", compute_type="int8")
+        print(f"   ✅ 모델 로딩 완료")
+    return _WHISPER_MODEL
+
+
+def transcribe_with_local_whisper(audio_path: str) -> str:
+    """
+    로컬 Whisper STT (Groq 폴백용)
+    느리지만 제한 없음
+    """
+    print(f"   🔄 로컬 Whisper STT 사용 (Groq 폴백)")
+    
+    model = get_whisper_model(model_size="small")
+    
+    file_size_mb = os.path.getsize(audio_path) / (1024 * 1024)
+    print(f"   📦 파일 크기: {file_size_mb:.1f}MB")
+    
+    start_time = time.time()
+    segments, info = model.transcribe(
+        audio_path,
+        language="ko",
+        beam_size=5
+    )
+    
+    print(f"   ⏳ 음성 길이: {info.duration:.0f}초")
+    
+    texts = []
+    for seg in segments:
+        texts.append(seg.text.strip())
+    
+    transcript = " ".join(texts)
+    elapsed = time.time() - start_time
+    
+    print(f"   ✅ 로컬 STT 완료 ({len(transcript)}자, {elapsed:.1f}초 소요)")
+    
+    # 오디오 파일 삭제
+    try:
+        os.remove(audio_path)
+        print(f"   🗑️  오디오 파일 삭제")
+    except Exception as e:
+        print(f"   ⚠️  파일 삭제 실패: {e}")
+    
+    return transcript
 
 
 def ensure_checkpoint_dir():
@@ -186,6 +322,7 @@ def download_audio_for_video(video_info: Dict) -> str:
         "no_warnings": True,
         "format": "bestaudio/best",
         "outtmpl": os.path.join(AUDIO_DIR, f"{video_id}.%(ext)s"),
+        "noprogress": True,  # 진행바 숨기기
     }
     
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -196,56 +333,107 @@ def download_audio_for_video(video_info: Dict) -> str:
     return filename
 
 
-def get_whisper_model(model_size: str = "small") -> WhisperModel:
-    """Whisper 모델 로드 (1회만)"""
-    global _WHISPER_MODEL
-    if _WHISPER_MODEL is None:
-        print(f"   🧠 Whisper 모델 로딩... (size={model_size})")
-        _WHISPER_MODEL = WhisperModel(model_size, device="cpu", compute_type="int8")
-        print(f"   ✅ 모델 로딩 완료")
-    return _WHISPER_MODEL
+def transcribe_with_groq(audio_path: str) -> str:
+    """
+    Groq Whisper API로 초고속 STT
+    - 파일 크기 제한: 25MB
+    - Rate Limit 발생 시 retry-after 기반 대기
+    """
+    print(f"   📝 Groq Whisper API 호출 중...")
+    
+    groq_api_key = os.getenv('GROQ_API_KEY')
+    if not groq_api_key:
+        raise Exception("GROQ_API_KEY 환경변수가 설정되지 않았습니다")
+    
+    # 파일 크기 확인
+    file_size_mb = os.path.getsize(audio_path) / (1024 * 1024)
+    print(f"   📦 파일 크기: {file_size_mb:.1f}MB")
+    
+    # 25MB 초과 시 에러
+    if file_size_mb > 25:
+        raise Exception(f"파일 크기 초과 ({file_size_mb:.1f}MB > 25MB). 영상이 너무 깁니다.")
+    
+    client = Groq(api_key=groq_api_key)
+    
+    # Rate Limit 대응: 최대 3회 재시도
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            with open(audio_path, "rb") as audio_file:
+                start_time = time.time()
+                transcription = client.audio.transcriptions.create(
+                    file=audio_file,
+                    model="whisper-large-v3-turbo",
+                    language="ko",
+                    response_format="text"
+                )
+                elapsed = time.time() - start_time
+            
+            transcript = transcription
+            print(f"   ✅ STT 완료 ({len(transcript)}자, {elapsed:.1f}초 소요)")
+            
+            # 오디오 파일 삭제
+            try:
+                os.remove(audio_path)
+                print(f"   🗑️  오디오 파일 삭제")
+            except Exception as e:
+                print(f"   ⚠️  파일 삭제 실패: {e}")
+            
+            return transcript
+            
+        except Exception as e:
+            error_str = str(e)
+            
+            # Rate Limit 에러인 경우
+            if "429" in error_str or "rate limit" in error_str.lower():
+                # 에러 메시지 전체 출력 (디버깅용)
+                print(f"   ⚠️  Rate Limit 발생")
+                
+                # retry 시간 파싱
+                wait_time = parse_retry_time(error_str)
+                
+                if attempt < max_retries - 1:
+                    print(f"   ⏳ {wait_time}초 ({wait_time/60:.1f}분) 대기 후 재시도... ({attempt+1}/{max_retries})")
+                    time.sleep(wait_time)
+                    continue
+                else:
+                    raise Exception(f"Rate Limit 초과 ({max_retries}회 재시도 실패). 나중에 다시 시도하세요.")
+            else:
+                # 다른 에러는 바로 raise
+                raise
 
 
-def transcribe_with_whisper(audio_path: str, model_size: str = "small") -> str:
-    """Whisper STT"""
-    print(f"   📝 STT 진행 중...")
-    model = get_whisper_model(model_size=model_size)
-
-    segments, info = model.transcribe(
-        audio_path,
-        language="ko",
-        beam_size=5
-    )
-
-    # 진행률 표시를 위해 segments를 리스트로 변환
-    print(f"   ⏳ 음성 길이: 약 {info.duration:.0f}초")
+def parse_retry_time(error_msg: str) -> int:
+    """
+    Groq 에러 메시지에서 정확한 대기 시간 파싱
+    실제 형식: "Please try again in 7m36.5s"
+    """
+    import re
     
-    texts = []
-    segment_count = 0
-    last_progress = 0
+    # 모든 시간 패턴 찾기 (분과 초 조합)
+    # 7m36.5s, 52m3s, 7m36s 등 모두 매칭
+    pattern = r'(\d+)m([\d.]+)s'
+    match = re.search(pattern, error_msg)
     
-    for seg in segments:
-        texts.append(seg.text.strip())
-        segment_count += 1
-        
-        # 대략적인 진행률 표시 (10% 단위)
-        if info.duration > 0:
-            current_progress = int((seg.end / info.duration) * 100)
-            if current_progress >= last_progress + 10:
-                print(f"      진행: {current_progress}% ({seg.end:.0f}/{info.duration:.0f}초)")
-                last_progress = current_progress
+    if match:
+        minutes = int(match.group(1))
+        seconds = float(match.group(2))
+        total = minutes * 60 + int(seconds) + 10  # 10초 버퍼
+        print(f"   🔍 대기 시간 파싱: {minutes}분 {seconds:.1f}초 → {total}초 대기")
+        return total
     
-    transcript = " ".join(texts)
-    print(f"   ✅ STT 완료 ({len(transcript)}자, {segment_count}개 세그먼트)")
+    # 초만 있는 경우: "45s"
+    pattern2 = r'(\d+)s'
+    match = re.search(pattern2, error_msg)
+    if match:
+        seconds = int(match.group(1)) + 10
+        print(f"   🔍 대기 시간 파싱: {seconds-10}초 → {seconds}초 대기")
+        return seconds
     
-    # 오디오 파일 삭제 (용량 절약)
-    try:
-        os.remove(audio_path)
-        print(f"   🗑️  오디오 파일 삭제")
-    except Exception as e:
-        print(f"   ⚠️  파일 삭제 실패: {e}")
-    
-    return transcript
+    # 파싱 실패 (발생하면 안 됨)
+    print(f"   ⚠️  파싱 실패! 기본 10분 대기")
+    print(f"   📄 에러 메시지: {error_msg[:200]}")
+    return 600
 
 
 def summarize_video_with_gemini(video_info: Dict, transcript: str) -> str:
@@ -343,7 +531,7 @@ def main():
     start_time = datetime.now().timestamp()
     
     print("=" * 80)
-    print("🎬 YouTube 약사 채널 분석 시스템 (Whisper + Gemini)")
+    print("🎬 YouTube 약사 채널 분석 시스템 (Groq Whisper + Gemini)")
     print("=" * 80)
     
     days_back = 30
@@ -404,13 +592,37 @@ def main():
     print(f"\n완료: {len(summaries)}, 대기: {len(videos_to_summarize)}")
     
     if videos_to_summarize:
-        print(f"⏱️  예상 시간: 영상당 2-5분")
-        print(f"🔧 Whisper(로컬) + Gemini(텍스트 요약)")
+        # 총 오디오 길이 계산
+        total_audio_seconds = sum(v['duration'] for v in videos_to_summarize)
+        estimated_hours = total_audio_seconds / 3600
+        
+        print(f"⏱️  총 오디오 길이: {total_audio_seconds:,}초 ({estimated_hours:.1f}시간)")
+        print(f"🔧 Groq Whisper API + Gemini")
+        print(f"📊 ASH 제한: 시간당 7,200초")
+        
+        # Rate Limit Tracker 초기화
+        rate_tracker = RateLimitTracker(limit_ash=7000)
         
         for i, video in enumerate(videos_to_summarize, 1):
             video_id = video['video_id']
-            current_index = len(summaries) + i
-            print(f"\n[{current_index}/{len(all_videos)}] {video['title'][:50]}")
+            duration = video['duration']
+            
+            # all_videos에서의 실제 인덱스 찾기
+            actual_index = next((idx for idx, v in enumerate(all_videos, 1) if v['video_id'] == video_id), i)
+            
+            print(f"\n[{actual_index}/{len(all_videos)}] {video['title'][:50]}")
+            print(f"   ⏱️  영상 길이: {duration}초 ({duration/60:.1f}분)")
+            
+            # Rate Limit 체크 및 대기
+            if not rate_tracker.can_process(duration):
+                wait_time = rate_tracker.wait_time_needed(duration)
+                stats = rate_tracker.get_stats()
+                
+                print(f"   ⚠️  ASH 제한 근접 ({stats['current_ash']}/{stats['limit_ash']}초)")
+                print(f"   ⏳ {wait_time}초 ({wait_time/60:.1f}분) 대기 중...")
+                
+                time.sleep(wait_time)
+                print(f"   ✅ 대기 완료")
             
             try:
                 # STT: 기존 transcript 있으면 재사용
@@ -419,14 +631,19 @@ def main():
                     transcript = transcripts[video_id]
                 else:
                     audio_path = download_audio_for_video(video)
-                    transcript = transcribe_with_whisper(audio_path)
+                    transcript = transcribe_with_groq(audio_path)
                     transcripts[video_id] = transcript
                     save_transcripts_checkpoint(transcripts)
+                    
+                    # STT 성공 시 duration 기록
+                    rate_tracker.record(duration)
                 
                 # 요약
                 summary = summarize_video_with_gemini(video, transcript)
+                
             except Exception as e:
-                summary = f"요약 실패: {e}"
+                print(f"   ❌ 오류: {str(e)[:200]}")
+                summary = f"처리 실패: {str(e)[:200]}"
             
             summaries.append({
                 'video_info': video,
@@ -435,6 +652,14 @@ def main():
             })
             
             save_summaries_checkpoint(summaries)
+            
+            # 진행 상황 표시
+            stats = rate_tracker.get_stats()
+            print(f"   📊 ASH: {stats['current_ash']}/{stats['limit_ash']}초 ({stats['usage_percent']:.1f}%)")
+            
+            # 영상 간 짧은 대기
+            if i < len(videos_to_summarize):
+                time.sleep(2)
     
     # 결과 저장
     excel_file = f'youtube_analysis_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'

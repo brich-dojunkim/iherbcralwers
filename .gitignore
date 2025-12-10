@@ -40,7 +40,7 @@ updater/temp_images
 *.bin
 EOF
 
-keys
+keys.txt
 loginner-sale-*.json
 *.secrets.json
 coupang2/config/google_credentials.json
