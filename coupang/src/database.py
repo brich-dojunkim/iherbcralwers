@@ -33,13 +33,14 @@ class IntegratedDatabase:
                 rocket_category_url_1 TEXT,
                 rocket_category_url_2 TEXT,
                 rocket_category_url_3 TEXT,
+                rocket_category_url_4 TEXT,
+                rocket_category_url_5 TEXT,
                 price_file_name       TEXT,
                 insights_file_name    TEXT,
                 reco_file_name        TEXT
             )
         """
         )
-
         # products 테이블
         conn.execute(
             """
@@ -109,6 +110,16 @@ class IntegratedDatabase:
         except Exception:
             pass
 
+        try:
+            conn.execute("ALTER TABLE snapshots ADD COLUMN rocket_category_url_4 TEXT")
+        except Exception:
+            pass
+        
+        try:
+            conn.execute("ALTER TABLE snapshots ADD COLUMN rocket_category_url_5 TEXT")
+        except Exception:
+            pass
+
         # 이미 sqlite에서 RENAME 해서 존재할 수도 있음 → try/except
         try:
             conn.execute(
@@ -154,7 +165,7 @@ class IntegratedDatabase:
 
         Args:
             snapshot_date: 'YYYY-MM-DD'
-            rocket_urls: {'url_1': url, 'url_2': url, 'url_3': url}
+            rocket_urls: {'url_1': url, 'url_2': url, 'url_3': url, 'url_4': url, 'url_5': url}
             file_names: {'price': name, 'insights': name, 'reco': name}
         """
         conn = sqlite3.connect(self.db_path)
@@ -166,15 +177,18 @@ class IntegratedDatabase:
         cursor = conn.execute(
             """
             INSERT INTO snapshots 
-               (snapshot_date, rocket_category_url_1, rocket_category_url_2, rocket_category_url_3,
+            (snapshot_date, rocket_category_url_1, rocket_category_url_2, rocket_category_url_3,
+                rocket_category_url_4, rocket_category_url_5,
                 price_file_name, insights_file_name, reco_file_name)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 snapshot_date,
                 rocket_urls.get("url_1"),
                 rocket_urls.get("url_2"),
                 rocket_urls.get("url_3"),
+                rocket_urls.get("url_4"),  # 🔥 추가
+                rocket_urls.get("url_5"),  # 🔥 추가
                 file_names.get("price"),
                 file_names.get("insights"),
                 file_names.get("reco"),
@@ -186,7 +200,7 @@ class IntegratedDatabase:
         conn.close()
 
         return snapshot_id
-
+    
     def get_latest_snapshot_id(self) -> Optional[int]:
         """최신 snapshot ID 조회"""
         conn = sqlite3.connect(self.db_path)

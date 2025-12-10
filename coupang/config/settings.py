@@ -54,7 +54,7 @@ class Config:
             'name': '헬스/건강식품',
             'category_id': '305433',
             'url_path': '?category=305433&platform=p&brandId=0',
-            'url_column': 'rocket_category_url_1'  # DB 컬럼명
+            'url_column': 'rocket_category_url_1'
         },
         {
             'name': '출산유아동',
@@ -67,6 +67,18 @@ class Config:
             'category_id': '317675',
             'url_path': '?category=317675&platform=p&brandId=0',
             'url_column': 'rocket_category_url_3'
+        },
+        {
+            'name': '식품',
+            'category_id': '189408',
+            'url_path': '?category=189408&platform=p',
+            'url_column': 'rocket_category_url_4'
+        },
+        {
+            'name': '뷰티',
+            'category_id': '174637',
+            'url_path': '?category=174637&platform=p&brandId=0',
+            'url_column': 'rocket_category_url_5'
         }
     ]
     
