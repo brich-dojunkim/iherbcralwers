@@ -57,7 +57,7 @@ def check_api_key():
     
     # 5. 실제 요청 테스트
     print("\n[5/5] 실제 요청 테스트")
-    model = genai.GenerativeModel("gemini-2.0-flash")
+    model = genai.GenerativeModel("gemini-2.5-flash")
     
     try:
         start = time.time()

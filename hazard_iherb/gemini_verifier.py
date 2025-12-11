@@ -6,6 +6,8 @@ Google 검색 결과 썸네일로 제품 검증
 
 import os
 import base64
+import requests
+from io import BytesIO
 from dotenv import load_dotenv
 import google.generativeai as genai
 
@@ -43,38 +45,73 @@ def verify_with_gemini(
     try:
         model = genai.GenerativeModel('gemini-2.5-flash')
         
-        # 로컬 이미지 읽기
+        # 로컬 이미지 읽기 (IMAGE 1)
         with open(hazard_image_path, 'rb') as f:
             image_data = f.read()
         
+        # 썸네일 처리 (IMAGE 2)
+        if search_thumbnail_url.startswith('data:image'):
+            # base64 data URI인 경우
+            try:
+                header, encoded = search_thumbnail_url.split(',', 1)
+                thumb_data = base64.b64decode(encoded)
+            except Exception as e:
+                print(f"  [WARN] base64 디코딩 실패: {e}")
+                return False, "Base64 decode failed"
+        else:
+            # 일반 URL인 경우
+            try:
+                thumb_response = requests.get(search_thumbnail_url, timeout=10)
+                thumb_response.raise_for_status()
+                thumb_data = thumb_response.content
+            except Exception as e:
+                print(f"  [WARN] 썸네일 다운로드 실패: {e}")
+                return False, "Thumbnail download failed"
+        
         prompt = f"""Compare these two product images:
 
-LEFT: {hazard_brand} - {hazard_name}
-RIGHT: Search result
+IMAGE 1: Official product - {hazard_brand} {hazard_name}
+IMAGE 2: Search result thumbnail
 
-Answer format:
-- First line: YES or NO
-- Second line: One short reason (brand/product/packaging match or mismatch)
+Are they the SAME product?
+- Same brand name?
+- Same product name?
+- Similar packaging?
 
-Example:
-YES
-Same brand and product name visible
-or
-NO
-Different brand logos"""
+Answer format: Start with YES or NO, then explain in one sentence.
+Example: "YES: Same brand and product visible on packaging"
+Example: "NO: Different brand logos"
+"""
         
-        # Gemini 호출
+        # Gemini 호출 - 두 이미지 모두 명시적으로 전달
         response = model.generate_content([
             prompt,
             {
                 'mime_type': 'image/jpeg',
                 'data': base64.b64encode(image_data).decode()
             },
-            search_thumbnail_url
+            {
+                'mime_type': 'image/jpeg',
+                'data': base64.b64encode(thumb_data).decode()
+            }
         ])
         
-        result = response.text.strip().upper()
-        is_match = 'YES' in result
+        result = response.text.strip()
+        
+        # 첫 단어로 판단 (콜론이나 공백 전까지)
+        first_word = result.split()[0].upper().rstrip(':,.')
+        
+        if first_word == 'YES':
+            is_match = True
+        elif first_word == 'NO':
+            is_match = False
+        else:
+            # 첫 단어가 명확하지 않으면 전체 텍스트에서 판단
+            result_lower = result.lower()
+            if result_lower.startswith('yes'):
+                is_match = True
+            else:
+                is_match = False
         
         return is_match, result
         

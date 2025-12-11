@@ -375,7 +375,7 @@ def find_iherb_url_by_image(driver, image_path: Path) -> tuple:
             
             # 첫 번째 유효한 링크 찾기
             first_valid_url = None
-            thumbnail_url = None  # ← 추가
+            thumbnail_url = None
             
             for a in links:
                 href = a.get_attribute("href")
@@ -400,13 +400,53 @@ def find_iherb_url_by_image(driver, image_path: Path) -> tuple:
                 # 첫 번째 유효한 링크 발견
                 first_valid_url = real_url
                 
-                # ===== [추가] 썸네일 추출 =====
+                # ===== [개선된 썸네일 추출] =====
                 try:
+                    # 1. img 태그 찾기
                     img = a.find_element(By.TAG_NAME, "img")
-                    thumbnail_url = img.get_attribute("src")
-                except:
-                    pass
-                # =============================
+                    
+                    # 2. JavaScript로 실제 로딩된 이미지 URL 가져오기
+                    # (naturalWidth > 0 이면 실제 이미지 로딩 완료)
+                    driver.execute_script("""
+                        const img = arguments[0];
+                        // 이미지가 lazy loading 중이면 강제 로드
+                        if (img.loading === 'lazy') {
+                            img.loading = 'eager';
+                        }
+                        // viewport로 스크롤하여 로딩 트리거
+                        img.scrollIntoView({block: 'center'});
+                    """, img)
+                    
+                    # 3. 이미지 로딩 대기 (최대 2초)
+                    for _ in range(10):
+                        natural_width = driver.execute_script(
+                            "return arguments[0].naturalWidth", img
+                        )
+                        current_src = img.get_attribute("src")
+                        
+                        # 실제 이미지가 로딩되었는지 확인
+                        if natural_width > 0 and current_src and not current_src.startswith("data:image"):
+                            thumbnail_url = current_src
+                            break
+                        
+                        time.sleep(0.2)
+                    
+                    # 4. 그래도 안되면 data URI라도 사용
+                    if not thumbnail_url or thumbnail_url.startswith("data:image"):
+                        # 다른 속성들 체크
+                        thumbnail_url = (
+                            img.get_attribute("data-src") or
+                            img.get_attribute("data-original") or
+                            img.get_attribute("data-lazy-src") or
+                            img.get_attribute("src")  # 최후의 수단으로 data URI
+                        )
+                    
+                    print(f"  [DEBUG] 썸네일 추출: {thumbnail_url[:100] if thumbnail_url else 'None'}...")
+                    
+                except Exception as e:
+                    print(f"  [WARN] 썸네일 추출 실패: {e}")
+                    thumbnail_url = None
+                # ================================
                 
                 break
             
@@ -568,8 +608,8 @@ def process_hazard_items(
                 "IMAGE_URL_MFDS": image_url,
                 "IHERB_URL": iherb_url,
                 "STATUS": "FOUND" if iherb_url else "NOT_FOUND",
-                "GEMINI_VERIFIED": gemini_verified,  # ← 추가
-                "GEMINI_REASON": gemini_reason       # ← 추가
+                "GEMINI_VERIFIED": gemini_verified,
+                "GEMINI_REASON": gemini_reason
             })
             processed_seqs.add(self_import_seq)
             processed_count += 1
