@@ -20,6 +20,7 @@ env/
 
 # Data artifacts
 *.csv
+*.json
 *.parquet
 *.xlsx
 *.feather

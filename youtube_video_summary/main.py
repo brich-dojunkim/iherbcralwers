@@ -333,11 +333,10 @@ def download_audio_for_video(video_info: Dict) -> str:
     return filename
 
 
-def transcribe_with_groq(audio_path: str) -> str:
+def transcribe_with_groq(audio_path: str, use_fallback: bool = True) -> str:
     """
     Groq Whisper API로 초고속 STT
-    - 파일 크기 제한: 25MB
-    - Rate Limit 발생 시 retry-after 기반 대기
+    Rate Limit 발생 시 즉시 로컬 Whisper 폴백
     """
     print(f"   📝 Groq Whisper API 호출 중...")
     
@@ -349,58 +348,55 @@ def transcribe_with_groq(audio_path: str) -> str:
     file_size_mb = os.path.getsize(audio_path) / (1024 * 1024)
     print(f"   📦 파일 크기: {file_size_mb:.1f}MB")
     
-    # 25MB 초과 시 에러
+    # 25MB 초과 시 즉시 폴백
     if file_size_mb > 25:
-        raise Exception(f"파일 크기 초과 ({file_size_mb:.1f}MB > 25MB). 영상이 너무 깁니다.")
+        if use_fallback and WHISPER_AVAILABLE:
+            print(f"   ⚠️  파일 크기 초과 ({file_size_mb:.1f}MB > 25MB)")
+            print(f"   🔄 로컬 Whisper로 폴백")
+            return transcribe_with_local_whisper(audio_path)
+        else:
+            raise Exception(f"파일 크기 초과 ({file_size_mb:.1f}MB > 25MB)")
     
     client = Groq(api_key=groq_api_key)
     
-    # Rate Limit 대응: 최대 3회 재시도
-    max_retries = 3
-    for attempt in range(max_retries):
+    try:
+        with open(audio_path, "rb") as audio_file:
+            start_time = time.time()
+            transcription = client.audio.transcriptions.create(
+                file=audio_file,
+                model="whisper-large-v3-turbo",
+                language="ko",
+                response_format="text"
+            )
+            elapsed = time.time() - start_time
+        
+        transcript = transcription
+        print(f"   ✅ Groq STT 완료 ({len(transcript)}자, {elapsed:.1f}초 소요)")
+        
+        # 오디오 파일 삭제
         try:
-            with open(audio_path, "rb") as audio_file:
-                start_time = time.time()
-                transcription = client.audio.transcriptions.create(
-                    file=audio_file,
-                    model="whisper-large-v3-turbo",
-                    language="ko",
-                    response_format="text"
-                )
-                elapsed = time.time() - start_time
-            
-            transcript = transcription
-            print(f"   ✅ STT 완료 ({len(transcript)}자, {elapsed:.1f}초 소요)")
-            
-            # 오디오 파일 삭제
-            try:
-                os.remove(audio_path)
-                print(f"   🗑️  오디오 파일 삭제")
-            except Exception as e:
-                print(f"   ⚠️  파일 삭제 실패: {e}")
-            
-            return transcript
-            
+            os.remove(audio_path)
+            print(f"   🗑️  오디오 파일 삭제")
         except Exception as e:
-            error_str = str(e)
-            
-            # Rate Limit 에러인 경우
-            if "429" in error_str or "rate limit" in error_str.lower():
-                # 에러 메시지 전체 출력 (디버깅용)
-                print(f"   ⚠️  Rate Limit 발생")
-                
-                # retry 시간 파싱
-                wait_time = parse_retry_time(error_str)
-                
-                if attempt < max_retries - 1:
-                    print(f"   ⏳ {wait_time}초 ({wait_time/60:.1f}분) 대기 후 재시도... ({attempt+1}/{max_retries})")
-                    time.sleep(wait_time)
-                    continue
-                else:
-                    raise Exception(f"Rate Limit 초과 ({max_retries}회 재시도 실패). 나중에 다시 시도하세요.")
+            print(f"   ⚠️  파일 삭제 실패: {e}")
+        
+        return transcript
+        
+    except Exception as e:
+        error_str = str(e)
+        
+        # Rate Limit 에러 → 즉시 Whisper 폴백
+        if "429" in error_str or "rate limit" in error_str.lower():
+            if use_fallback and WHISPER_AVAILABLE:
+                print(f"   ⚠️  Groq Rate Limit 발생")
+                print(f"   🔄 즉시 로컬 Whisper로 폴백")
+                return transcribe_with_local_whisper(audio_path)
             else:
-                # 다른 에러는 바로 raise
-                raise
+                raise Exception("Rate Limit 발생. faster-whisper를 설치하거나 나중에 시도하세요.")
+        else:
+            # 다른 에러는 그대로 raise
+            raise
+
 
 
 def parse_retry_time(error_msg: str) -> int:
@@ -472,7 +468,7 @@ def summarize_video_with_gemini(video_info: Dict, transcript: str) -> str:
     
     try:
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemini-2.0-flash-exp",
             contents=prompt
         )
         return response.text
