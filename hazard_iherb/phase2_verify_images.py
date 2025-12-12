@@ -1,12 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Phase 2: 이미지 검증
+Phase 2: Gemini Web 이미지 검증 (디버깅 버전)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-1. CSV에서 STATUS='FOUND' 필터링
-2. iHerb 상세페이지 크롤링
-3. Gemini Vision으로 이미지 비교
-4. 결과 업데이트
+HTML 덤프 및 스크린샷을 통한 디버깅 지원
 """
 
 import os
@@ -19,146 +16,129 @@ from typing import Optional
 
 import pandas as pd
 import undetected_chromedriver as uc
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.support.ui import WebDriverWait
 
-from config import (
-    OUTPUT_CSV, IMG_DIR, Status, CSV_COLUMNS, GEMINI_API_KEY
-)
-from iherb_scraper import IHerbScraper
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 설정
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-# Gemini 설정
-if GEMINI_API_KEY:
-    import google.generativeai as genai
-    genai.configure(api_key=GEMINI_API_KEY)
-    GEMINI_ENABLED = True
-else:
-    GEMINI_ENABLED = False
-    print("[WARN] GEMINI_API_KEY 없음 - 검증 비활성화")
+OUTPUT_CSV = "/Users/brich/Desktop/iherb_price/hazard_iherb/csv/hazard_iherb_matched_final.csv"
+DEBUG_DIR = Path("/Users/brich/Desktop/iherb_price/hazard_iherb/debug")
+GEMINI_WEB_URL = "https://gemini.google.com/app"
+
+# 디버그 디렉토리 생성
+DEBUG_DIR.mkdir(exist_ok=True)
+
+class Status:
+    FOUND = "FOUND"
+    NOT_FOUND = "NOT_FOUND"
+    NO_IMAGE = "NO_IMAGE"
+    DOWNLOAD_FAILED = "DOWNLOAD_FAILED"
+    VERIFIED_MATCH = "VERIFIED_MATCH"
+    VERIFIED_MISMATCH = "VERIFIED_MISMATCH"
+    VERIFICATION_FAILED = "VERIFICATION_FAILED"
+
+CSV_COLUMNS = [
+    'SELF_IMPORT_SEQ', 'PRDT_NM', 'MUFC_NM', 'MUFC_CNTRY_NM', 
+    'INGR_NM_LST', 'CRET_DTM', 'IMAGE_URL_MFDS', 'IHERB_URL', 
+    'STATUS', 'IHERB_PRODUCT_IMAGES', 'GEMINI_VERIFIED', 
+    'GEMINI_REASON', 'VERIFIED_DTM'
+]
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# Gemini 검증
+# 디버깅 유틸리티
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-def verify_with_gemini(
-    hazard_image_url: str,
-    iherb_image_url: str,
-    hazard_name: str,
-    hazard_brand: str,
-    iherb_name: str,
-    iherb_brand: str
-) -> tuple:
-    """
-    Gemini Vision으로 두 이미지 URL 비교
+def save_debug_info(driver, step_name: str, seq: str = "unknown"):
+    """디버그 정보 저장 (HTML + 스크린샷)"""
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    prefix = f"{timestamp}_{seq}_{step_name}"
     
-    Returns:
-        (is_match: bool, reason: str)
-    """
-    if not GEMINI_ENABLED:
-        return False, "API key not configured"
-    
+    # HTML 저장
     try:
-        import base64
-        import requests
-        
-        model = genai.GenerativeModel('gemini-2.5-flash')
-        
-        # 이미지 다운로드 및 base64 인코딩
-        def download_and_encode(url: str) -> tuple:
-            """이미지 다운로드 후 base64로 인코딩"""
-            try:
-                resp = requests.get(url, timeout=10, headers={
-                    'User-Agent': 'Mozilla/5.0'
-                })
-                resp.raise_for_status()
-                
-                # MIME type 결정
-                content_type = resp.headers.get('content-type', 'image/jpeg')
-                if 'image' not in content_type:
-                    content_type = 'image/jpeg'
-                
-                # base64 인코딩
-                encoded = base64.b64encode(resp.content).decode('utf-8')
-                return content_type, encoded
-            except Exception as e:
-                raise Exception(f"Image download failed: {e}")
-        
-        # 두 이미지 다운로드
-        hazard_mime, hazard_data = download_and_encode(hazard_image_url)
-        iherb_mime, iherb_data = download_and_encode(iherb_image_url)
-        
-        prompt = f"""Compare these two product images and metadata:
-
-IMAGE 1 (Hazard Product):
-- Name: {hazard_name}
-- Brand: {hazard_brand}
-
-IMAGE 2 (iHerb Product):
-- Name: {iherb_name}
-- Brand: {iherb_brand}
-
-Are they the SAME product?
-- Same brand name (consider variations like "NOW Foods" vs "NOW")?
-- Same product name (consider translations)?
-- Similar packaging/design?
-
-Answer format: Start with YES or NO, then explain briefly.
-Example: "YES: Same brand 'NOW Foods' and product name visible"
-Example: "NO: Different brand logos - Jarrow vs NOW"
-"""
-        
-        # Gemini API 호출 - base64 데이터 사용
-        response = model.generate_content([
-            prompt,
-            {
-                'mime_type': hazard_mime,
-                'data': hazard_data
-            },
-            {
-                'mime_type': iherb_mime,
-                'data': iherb_data
-            }
-        ])
-        
-        result = response.text.strip()
-        first_word = result.split()[0].upper().rstrip(':,.')
-        
-        if first_word == 'YES':
-            is_match = True
-        elif first_word == 'NO':
-            is_match = False
-        else:
-            result_lower = result.lower()
-            is_match = result_lower.startswith('yes')
-        
-        return is_match, result
-        
+        html_path = DEBUG_DIR / f"{prefix}.html"
+        html_content = driver.page_source
+        html_path.write_text(html_content, encoding='utf-8')
+        print(f"  [DEBUG] HTML 저장: {html_path.name}")
     except Exception as e:
-        error_msg = str(e)
-        print(f"  [GEMINI ERROR] {error_msg}")
+        print(f"  [DEBUG ERROR] HTML 저장 실패: {e}")
+    
+    # 스크린샷 저장
+    try:
+        screenshot_path = DEBUG_DIR / f"{prefix}.png"
+        driver.save_screenshot(str(screenshot_path))
+        print(f"  [DEBUG] 스크린샷 저장: {screenshot_path.name}")
+    except Exception as e:
+        print(f"  [DEBUG ERROR] 스크린샷 저장 실패: {e}")
+    
+    # 페이지 정보 저장
+    try:
+        info_path = DEBUG_DIR / f"{prefix}_info.txt"
+        info = f"""
+=== 페이지 정보 ===
+URL: {driver.current_url}
+Title: {driver.title}
+Window Size: {driver.get_window_size()}
+Cookies: {len(driver.get_cookies())} 개
+
+=== 모든 Input 요소 ===
+"""
+        # 모든 input 요소 찾기
+        inputs = driver.find_elements(By.TAG_NAME, "input")
+        for i, inp in enumerate(inputs):
+            try:
+                info += f"\nInput {i+1}:"
+                info += f"\n  - type: {inp.get_attribute('type')}"
+                info += f"\n  - id: {inp.get_attribute('id')}"
+                info += f"\n  - class: {inp.get_attribute('class')}"
+                info += f"\n  - placeholder: {inp.get_attribute('placeholder')}"
+                info += f"\n  - name: {inp.get_attribute('name')}"
+                info += f"\n  - aria-label: {inp.get_attribute('aria-label')}"
+            except:
+                pass
         
-        # API 할당량/속도 제한 에러 감지
-        error_keywords = [
-            '429',
-            'quota',
-            'rate limit',
-            'resource_exhausted',
-            'too many requests',
-            'quota exceeded'
-        ]
+        info += "\n\n=== 모든 Textarea 요소 ===\n"
+        textareas = driver.find_elements(By.TAG_NAME, "textarea")
+        for i, ta in enumerate(textareas):
+            try:
+                info += f"\nTextarea {i+1}:"
+                info += f"\n  - id: {ta.get_attribute('id')}"
+                info += f"\n  - class: {ta.get_attribute('class')}"
+                info += f"\n  - placeholder: {ta.get_attribute('placeholder')}"
+                info += f"\n  - aria-label: {ta.get_attribute('aria-label')}"
+            except:
+                pass
         
-        if any(keyword in error_msg.lower() for keyword in error_keywords):
-            print(f"\n{'='*70}")
-            print(f"[CRITICAL] API 할당량 초과 또는 Rate Limit 감지")
-            print(f"에러 내용: {error_msg[:200]}")
-            print(f"")
-            print(f"해결 방법:")
-            print(f"1. 잠시 대기 후 재실행 (자동으로 이어서 실행됩니다)")
-            print(f"2. Gemini API 할당량 확인: https://aistudio.google.com/")
-            print(f"3. 유료 플랜 업그레이드 고려")
-            print(f"{'='*70}\n")
-            raise SystemExit("API quota/rate limit - 프로그램 종료")
+        info += "\n\n=== 모든 Rich-Textarea 요소 ===\n"
+        rich_textareas = driver.find_elements(By.TAG_NAME, "rich-textarea")
+        for i, rt in enumerate(rich_textareas):
+            try:
+                info += f"\nRich-Textarea {i+1}:"
+                info += f"\n  - id: {rt.get_attribute('id')}"
+                info += f"\n  - class: {rt.get_attribute('class')}"
+                info += f"\n  - placeholder: {rt.get_attribute('placeholder')}"
+            except:
+                pass
         
-        return False, error_msg
+        info += "\n\n=== 모든 Button 요소 ===\n"
+        buttons = driver.find_elements(By.TAG_NAME, "button")
+        for i, btn in enumerate(buttons):
+            try:
+                info += f"\nButton {i+1}:"
+                info += f"\n  - type: {btn.get_attribute('type')}"
+                info += f"\n  - class: {btn.get_attribute('class')}"
+                info += f"\n  - aria-label: {btn.get_attribute('aria-label')}"
+                info += f"\n  - text: {btn.text[:50]}"
+            except:
+                pass
+        
+        info_path.write_text(info, encoding='utf-8')
+        print(f"  [DEBUG] 페이지 정보 저장: {info_path.name}")
+    except Exception as e:
+        print(f"  [DEBUG ERROR] 페이지 정보 저장 실패: {e}")
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -169,6 +149,12 @@ def create_driver(headless: bool = False):
     """undetected-chromedriver 생성"""
     options = uc.ChromeOptions()
     
+    # Chrome 프로필 경로 (로그인 정보 저장)
+    profile_dir = Path.home() / "Library/Application Support/Google/Chrome/GeminiBot"
+    profile_dir.mkdir(parents=True, exist_ok=True)
+    
+    options.add_argument(f"--user-data-dir={profile_dir}")
+    
     if headless:
         options.add_argument("--headless=new")
     
@@ -176,12 +162,444 @@ def create_driver(headless: bool = False):
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--no-sandbox")
     options.add_argument("--window-size=1400,1000")
-    options.add_argument("--lang=en-US")
     
     driver = uc.Chrome(options=options, version_main=None)
     driver.set_page_load_timeout(60)
     
     return driver
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# iHerb 스크래퍼
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+def scrape_iherb_simple(driver, url: str) -> tuple:
+    """
+    iHerb에서 메인 이미지와 제품명, 브랜드 추출
+    
+    Returns:
+        (image_url, product_name, brand)
+    """
+    try:
+        print(f"  [SCRAPER] iHerb 방문 중...")
+        driver.get(url)
+        time.sleep(2)
+        
+        # 메인 이미지
+        image_url = None
+        try:
+            img = driver.find_element(By.CSS_SELECTOR, "#iherb-product-image")
+            src = img.get_attribute("src")
+            if src and "cloudinary.images-iherb.com" in src:
+                image_url = src.replace("/v/", "/l/")
+        except:
+            pass
+        
+        # 제품명
+        product_name = "Unknown"
+        try:
+            element = driver.find_element(By.CSS_SELECTOR, "h1#name")
+            product_name = element.text.strip()
+        except:
+            pass
+        
+        # 브랜드
+        brand = "Unknown"
+        try:
+            element = driver.find_element(By.CSS_SELECTOR, "#brand a")
+            brand = element.text.strip()
+        except:
+            pass
+        
+        if image_url:
+            print(f"  [SCRAPER] ✓ 추출 완료: {brand} - {product_name}")
+        
+        return image_url, product_name, brand
+        
+    except Exception as e:
+        print(f"  [SCRAPER ERROR] {e}")
+        return None, "Unknown", "Unknown"
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Gemini Web 인터페이스
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+class GeminiWebInterface:
+    """Gemini 웹 인터페이스 자동화"""
+    
+    def __init__(self, driver):
+        self.driver = driver
+        self.wait = WebDriverWait(driver, 15)
+    
+    def verify_images(
+        self,
+        hazard_image_url: str,
+        iherb_image_url: str,
+        hazard_name: str,
+        hazard_brand: str,
+        iherb_name: str,
+        iherb_brand: str,
+        seq: str = "unknown"
+    ) -> tuple:
+        """
+        Gemini로 두 이미지 비교
+        
+        Returns:
+            (is_match: bool, reason: str)
+        """
+        try:
+            prompt = f"""Compare these two product images:
+
+IMAGE 1 (Korean Hazard Product):
+{hazard_image_url}
+- Product: {hazard_name}
+- Brand: {hazard_brand}
+
+IMAGE 2 (iHerb Product):
+{iherb_image_url}
+- Product: {iherb_name}
+- Brand: {iherb_brand}
+
+Are they the SAME product? Answer with YES or NO first, then explain briefly.
+Example: "YES: Both show NOW Foods Vitamin D3"
+Example: "NO: Different brands - Jarrow vs NOW"
+
+Your answer:"""
+            
+            # 디버그: 입력 전 상태 저장
+            print(f"  [DEBUG] 입력 전 페이지 상태 저장 중...")
+            save_debug_info(self.driver, "before_input", seq)
+            
+            # 입력창 찾기
+            print(f"  [VERIFY] 입력창 찾는 중...")
+            input_box = self._find_input_box()
+            
+            if not input_box:
+                print(f"  [ERROR] 입력창을 찾을 수 없습니다")
+                save_debug_info(self.driver, "input_not_found", seq)
+                raise Exception("입력창 없음")
+            
+            print(f"  [GEMINI] ✓ 입력창 발견")
+            
+            # 디버그: 입력창 정보 출력
+            try:
+                print(f"  [DEBUG] 입력창 정보:")
+                print(f"    - tag: {input_box.tag_name}")
+                print(f"    - id: {input_box.get_attribute('id')}")
+                print(f"    - class: {input_box.get_attribute('class')}")
+                print(f"    - displayed: {input_box.is_displayed()}")
+                print(f"    - enabled: {input_box.is_enabled()}")
+            except Exception as e:
+                print(f"  [DEBUG] 입력창 정보 출력 실패: {e}")
+            
+            # 텍스트 입력 (여러 방법 시도)
+            success = self._input_text(input_box, prompt, seq)
+            
+            if not success:
+                save_debug_info(self.driver, "input_failed", seq)
+                raise Exception("텍스트 입력 실패")
+            
+            print(f"  [GEMINI] ✓ 텍스트 입력 완료")
+            
+            # 디버그: 입력 후 상태 저장
+            save_debug_info(self.driver, "after_input", seq)
+            
+            # 전송
+            print(f"  [GEMINI] 전송 시도 중...")
+            success = self._submit_message(input_box, seq)
+            
+            if not success:
+                save_debug_info(self.driver, "submit_failed", seq)
+                raise Exception("전송 실패")
+            
+            print(f"  [GEMINI] ✓ 전송 완료")
+            
+            # 디버그: 전송 후 상태 저장
+            save_debug_info(self.driver, "after_submit", seq)
+            
+            # 응답 대기
+            print(f"  [GEMINI] 응답 대기 중...")
+            is_match, reason = self._wait_for_response(seq)
+            
+            return is_match, reason
+            
+        except Exception as e:
+            error_msg = str(e)
+            print(f"  [GEMINI ERROR] {error_msg}")
+            return False, error_msg
+    
+    def _find_input_box(self):
+        """입력창 찾기 - Quill 에디터 내부 찾기"""
+        selectors = [
+            "rich-textarea .ql-editor",
+            ".ql-editor[contenteditable='true']",
+            "div[contenteditable='true'].ql-editor",
+            "rich-textarea div[contenteditable='true']",
+            "div[contenteditable='true'][role='textbox']",
+            "textarea[placeholder*='Ask']"
+        ]
+        
+        for selector in selectors:
+            try:
+                elements = self.driver.find_elements(By.CSS_SELECTOR, selector)
+                for element in elements:
+                    if element.is_displayed():
+                        print(f"  [DEBUG] 입력창 발견 (selector: {selector})")
+                        return element
+            except:
+                continue
+        
+        return None
+    
+    def _input_text(self, element, text: str, seq: str) -> bool:
+        """텍스트 입력 - Quill 에디터용"""
+        
+        # 방법 1: JavaScript로 innerText 설정 (Quill 에디터에 최적)
+        try:
+            print(f"  [DEBUG] 방법 1: JavaScript innerText 설정")
+            self.driver.execute_script("""
+                var element = arguments[0];
+                var text = arguments[1];
+                
+                // innerText로 설정 (Quill 에디터 호환)
+                element.innerText = text;
+                element.textContent = text;
+                
+                // input 이벤트 발생
+                element.dispatchEvent(new Event('input', { bubbles: true }));
+                element.dispatchEvent(new Event('change', { bubbles: true }));
+                
+                // Quill 에디터 업데이트 (있다면)
+                if (element.closest('rich-textarea')) {
+                    var richTextarea = element.closest('rich-textarea');
+                    if (richTextarea.__ngContext__) {
+                        // Angular 컴포넌트 업데이트 트리거
+                    }
+                }
+            """, element, text)
+            time.sleep(2)
+            
+            # 값이 입력되었는지 확인
+            value = element.get_attribute('innerText') or element.get_attribute('textContent') or element.text
+            if value and len(value) > 10:
+                print(f"  [DEBUG] 방법 1 성공 (입력된 길이: {len(value)})")
+                return True
+        except Exception as e:
+            print(f"  [DEBUG] 방법 1 실패: {e}")
+        
+        # 방법 2: 클릭 후 JavaScript 설정
+        try:
+            print(f"  [DEBUG] 방법 2: 클릭 후 JavaScript 설정")
+            element.click()
+            time.sleep(0.5)
+            
+            self.driver.execute_script("""
+                var element = arguments[0];
+                var text = arguments[1];
+                element.innerText = text;
+                element.focus();
+            """, element, text)
+            time.sleep(2)
+            
+            value = element.get_attribute('innerText') or element.text
+            if value and len(value) > 10:
+                print(f"  [DEBUG] 방법 2 성공 (입력된 길이: {len(value)})")
+                return True
+        except Exception as e:
+            print(f"  [DEBUG] 방법 2 실패: {e}")
+        
+        # 방법 3: 일반 send_keys
+        try:
+            print(f"  [DEBUG] 방법 3: send_keys 시도")
+            element.clear()
+            element.send_keys(text)
+            time.sleep(1)
+            
+            value = element.text or element.get_attribute('innerText')
+            if value and len(value) > 10:
+                print(f"  [DEBUG] 방법 3 성공 (입력된 길이: {len(value)})")
+                return True
+        except Exception as e:
+            print(f"  [DEBUG] 방법 3 실패: {e}")
+        
+        # 방법 4: 클릭 후 send_keys
+        try:
+            print(f"  [DEBUG] 방법 4: 클릭 후 send_keys")
+            element.click()
+            time.sleep(0.5)
+            element.send_keys(text)
+            time.sleep(1)
+            
+            value = element.text or element.get_attribute('innerText')
+            if value and len(value) > 10:
+                print(f"  [DEBUG] 방법 4 성공 (입력된 길이: {len(value)})")
+                return True
+        except Exception as e:
+            print(f"  [DEBUG] 방법 4 실패: {e}")
+        
+        print(f"  [DEBUG] 모든 입력 방법 실패")
+        return False
+    
+    def _submit_message(self, input_element, seq: str) -> bool:
+        """메시지 전송 - 전송 버튼 직접 클릭"""
+        
+        # 방법 1: aria-label로 전송 버튼 찾기 (가장 확실)
+        try:
+            print(f"  [DEBUG] 전송 방법 1: aria-label='메시지 보내기' 버튼")
+            button = self.driver.find_element(By.CSS_SELECTOR, "button[aria-label='메시지 보내기']")
+            if button.is_displayed() and button.is_enabled():
+                print(f"  [DEBUG] 전송 버튼 발견, 클릭 시도...")
+                button.click()
+                time.sleep(3)
+                print(f"  [DEBUG] 방법 1 성공!")
+                return True
+        except Exception as e:
+            print(f"  [DEBUG] 방법 1 실패: {e}")
+        
+        # 방법 2: send-button 클래스로 찾기
+        try:
+            print(f"  [DEBUG] 전송 방법 2: button.send-button")
+            buttons = self.driver.find_elements(By.CSS_SELECTOR, "button.send-button")
+            for btn in buttons:
+                if btn.is_displayed() and btn.is_enabled():
+                    aria = btn.get_attribute('aria-label')
+                    print(f"  [DEBUG] 버튼 발견: aria-label='{aria}'")
+                    btn.click()
+                    time.sleep(3)
+                    print(f"  [DEBUG] 방법 2 성공!")
+                    return True
+        except Exception as e:
+            print(f"  [DEBUG] 방법 2 실패: {e}")
+        
+        # 방법 3: JavaScript로 버튼 클릭
+        try:
+            print(f"  [DEBUG] 전송 방법 3: JavaScript 클릭")
+            self.driver.execute_script("""
+                var button = document.querySelector("button[aria-label='메시지 보내기']");
+                if (!button) {
+                    button = document.querySelector("button.send-button");
+                }
+                if (button) {
+                    button.click();
+                    return true;
+                }
+                return false;
+            """)
+            time.sleep(3)
+            print(f"  [DEBUG] 방법 3 시도 완료")
+            return True
+        except Exception as e:
+            print(f"  [DEBUG] 방법 3 실패: {e}")
+        
+        # 방법 4: 모든 submit 버튼 순회
+        try:
+            print(f"  [DEBUG] 전송 방법 4: submit 버튼 전체 검색")
+            buttons = self.driver.find_elements(By.CSS_SELECTOR, "button[type='submit']")
+            for btn in buttons:
+                try:
+                    aria = btn.get_attribute('aria-label')
+                    if '보내기' in str(aria) or 'Send' in str(aria):
+                        print(f"  [DEBUG] 전송 버튼 발견: {aria}")
+                        btn.click()
+                        time.sleep(3)
+                        print(f"  [DEBUG] 방법 4 성공!")
+                        return True
+                except:
+                    continue
+        except Exception as e:
+            print(f"  [DEBUG] 방법 4 실패: {e}")
+        
+        print(f"  [DEBUG] 모든 전송 방법 실패")
+        save_debug_info(self.driver, "all_submit_failed", seq)
+        
+        # 수동 입력 안내
+        print(f"\n" + "="*70)
+        print(f"  [MANUAL] 자동 전송 실패 - 수동으로 전송 버튼을 눌러주세요")
+        print(f"  [MANUAL] 브라우저에서 전송 버튼을 클릭한 후 10초 대기합니다...")
+        print(f"="*70 + "\n")
+        time.sleep(10)
+        
+        return True
+    
+    def _wait_for_response(self, seq: str) -> tuple:
+        """Gemini 응답 대기 및 파싱"""
+        print(f"  [GEMINI] 응답 대기 (최대 60초)...")
+        
+        max_wait = 60
+        start_time = time.time()
+        last_length = 0
+        stable_count = 0
+        
+        # 먼저 로딩 인디케이터가 사라질 때까지 대기
+        loading_wait = 0
+        while loading_wait < 10:
+            try:
+                # 로딩 중인지 확인
+                loading_elements = self.driver.find_elements(By.CSS_SELECTOR, 
+                    ".loading, .spinner, [aria-busy='true']")
+                if not loading_elements:
+                    break
+            except:
+                pass
+            time.sleep(1)
+            loading_wait += 1
+        
+        while time.time() - start_time < max_wait:
+            try:
+                # 응답 메시지 찾기 - 더 구체적인 selector들
+                response_selectors = [
+                    "message-content",  # Gemini의 메시지 컨텐츠
+                    ".model-response-text",
+                    ".response-container",
+                    "[data-test-id*='conversation-turn']",
+                    ".conversation-container message-content",
+                    "model-response",
+                    ".markdown-content"
+                ]
+                
+                for selector in response_selectors:
+                    try:
+                        messages = self.driver.find_elements(By.CSS_SELECTOR, selector)
+                        if messages and len(messages) > 0:
+                            # 마지막 메시지 (가장 최근 응답)
+                            last_message = messages[-1]
+                            response_text = last_message.text.strip()
+                            
+                            # 응답이 충분히 길고 유의미한지
+                            if response_text and len(response_text) > 20:
+                                # "YES" 또는 "NO"가 포함되어 있는지 확인
+                                first_line = response_text.split('\n')[0].upper()
+                                if 'YES' in first_line or 'NO' in first_line:
+                                    # 길이 안정화 확인
+                                    if len(response_text) == last_length:
+                                        stable_count += 1
+                                        if stable_count >= 3:
+                                            print(f"  [GEMINI] ✓ 응답 완료 ({len(response_text)} chars)")
+                                            
+                                            # YES/NO 파싱
+                                            first_word = response_text.split()[0].upper().rstrip(':,.')
+                                            is_match = first_word == 'YES' or response_text.upper().startswith('YES')
+                                            
+                                            # 디버그: 응답 저장
+                                            save_debug_info(self.driver, "response_received", seq)
+                                            
+                                            return is_match, response_text
+                                    else:
+                                        stable_count = 0
+                                        last_length = len(response_text)
+                                        print(f"  [GEMINI] 응답 수신 중... ({len(response_text)} chars)")
+                    except Exception as e:
+                        continue
+            except:
+                pass
+            
+            time.sleep(2)
+        
+        # 타임아웃
+        print(f"  [GEMINI] 응답 타임아웃")
+        save_debug_info(self.driver, "response_timeout", seq)
+        raise Exception("응답 타임아웃 (60초)")
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -191,8 +609,8 @@ def create_driver(headless: bool = False):
 def process_verification(
     input_csv: str = OUTPUT_CSV,
     headless: bool = False,
-    revalidate_all: bool = False,
-    specific_seq: Optional[str] = None
+    start_seq: Optional[str] = None,
+    limit: Optional[int] = None
 ):
     """이미지 검증 처리"""
     
@@ -200,33 +618,66 @@ def process_verification(
         print(f"[ERROR] CSV 파일 없음: {input_csv}")
         return
     
+    print(f"\n{'='*70}")
+    print(f"Gemini Web 이미지 검증 (디버깅 버전)")
+    print(f"{'='*70}\n")
+    print(f"[INFO] 디버그 파일 저장 위치: {DEBUG_DIR}\n")
+    
     # CSV 로드
-    df = pd.read_csv(input_csv, encoding="utf-8-sig")
+    dtype_dict = {col: str for col in CSV_COLUMNS}
+    df = pd.read_csv(input_csv, encoding="utf-8-sig", dtype=dtype_dict)
     print(f"[INFO] 전체 데이터: {len(df)}건")
     
-    # 필터링
-    if specific_seq:
-        df = df[df['SELF_IMPORT_SEQ'].astype(str) == str(specific_seq)]
-        print(f"[INFO] 특정 SEQ 필터링: {len(df)}건")
-    elif revalidate_all:
-        df = df[df['STATUS'] == Status.FOUND]
-        print(f"[INFO] 전체 재검증: {len(df)}건")
-    else:
-        # 미검증 항목만
-        df = df[
-            (df['STATUS'] == Status.FOUND) &
-            (df['GEMINI_VERIFIED'].isna())
-        ]
-        print(f"[INFO] 미검증 항목: {len(df)}건")
+    # 미검증 항목만
+    df = df[
+        (df['STATUS'] == Status.FOUND) &
+        ((df['GEMINI_VERIFIED'].isna()) | (df['GEMINI_VERIFIED'] == '') | (df['GEMINI_VERIFIED'] == 'nan'))
+    ]
+    print(f"[INFO] 미검증 항목: {len(df)}건")
+    
+    # 특정 SEQ부터 시작
+    if start_seq:
+        start_idx = df[df['SELF_IMPORT_SEQ'] == str(start_seq)].index
+        if len(start_idx) > 0:
+            df = df.loc[start_idx[0]:]
+            print(f"[INFO] SEQ {start_seq}부터 시작: {len(df)}건")
+    
+    # 개수 제한
+    if limit:
+        df = df.head(limit)
+        print(f"[INFO] {limit}건으로 제한")
     
     if df.empty:
         print("[INFO] 검증할 항목 없음")
         return
     
+    # 드라이버 생성
     driver = create_driver(headless=headless)
-    scraper = IHerbScraper(driver)
     
     try:
+        # Gemini 페이지 열기
+        print(f"[LOGIN] Gemini 페이지 열기...\n")
+        driver.get(GEMINI_WEB_URL)
+        time.sleep(3)
+        
+        # 디버그: 초기 페이지 상태
+        save_debug_info(driver, "initial_page", "login")
+        
+        # 로그인 확인
+        print(f"{'='*70}")
+        print(f"[LOGIN] 로그인 확인")
+        print(f"{'='*70}\n")
+        print(f"열린 Chrome 브라우저에서:")
+        print(f"1. 이미 로그인되어 있으면 → 바로 Enter")
+        print(f"2. 로그인 필요하면 → Google 계정으로 로그인 → Enter\n")
+        input(f"준비되면 Enter를 눌러주세요...")
+        print(f"{'='*70}\n")
+        
+        print(f"[LOGIN] ✓ 계속 진행합니다\n")
+        
+        # Gemini 인터페이스 초기화
+        gemini = GeminiWebInterface(driver)
+        
         total = len(df)
         processed = 0
         success = 0
@@ -238,59 +689,47 @@ def process_verification(
             iherb_url = row['IHERB_URL']
             hazard_image_url = row['IMAGE_URL_MFDS']
             
-            # 쉼표로 구분된 여러 URL 중 첫 번째만 사용
+            # 쉼표로 구분된 여러 URL 중 첫 번째만
             if pd.notna(hazard_image_url) and ',' in str(hazard_image_url):
                 hazard_image_url = str(hazard_image_url).split(',')[0].strip()
-                print(f"  [INFO] 여러 이미지 중 첫 번째 URL 사용")
             
             print(f"\n{'='*70}")
             print(f"[{processed+1}/{total}] {prdt_nm}")
             print(f"SEQ: {seq}")
-            print(f"iHerb: {iherb_url}")
             print(f"{'='*70}")
             
-            # iHerb 페이지 크롤링
-            scraped_data = scraper.scrape_product_page(iherb_url)
+            # iHerb 이미지 추출
+            iherb_image, iherb_name, iherb_brand = scrape_iherb_simple(driver, iherb_url)
             
-            if not scraped_data:
-                print("  [ERROR] 크롤링 실패")
+            # Gemini로 돌아가기
+            print(f"  [SCRAPER] Gemini로 복귀 중...")
+            driver.get(GEMINI_WEB_URL)
+            time.sleep(2)
+            
+            if not iherb_image:
+                print("  [ERROR] iHerb 이미지 없음")
                 df.at[idx, 'STATUS'] = Status.VERIFICATION_FAILED
-                df.at[idx, 'GEMINI_REASON'] = str("Scraping failed")
+                df.at[idx, 'GEMINI_REASON'] = "No iHerb image"
                 processed += 1
                 save_dataframe(df, input_csv)
                 continue
             
-            # 이미지 URL 저장
-            images_json = json.dumps(scraped_data['all_images'])
-            df.at[idx, 'IHERB_PRODUCT_IMAGES'] = str(images_json)
-            
-            # Gemini 검증
-            comparison_image = scraper.get_best_comparison_image(scraped_data)
-            
-            if not comparison_image:
-                print("  [ERROR] 비교 이미지 없음")
-                df.at[idx, 'STATUS'] = Status.VERIFICATION_FAILED
-                df.at[idx, 'GEMINI_REASON'] = str("No comparison image")
-                processed += 1
-                save_dataframe(df, input_csv)
-                continue
-            
-            print(f"  [VERIFY] 식약처: {hazard_image_url[:80]}...")
-            print(f"  [VERIFY] iHerb: {comparison_image[:80]}...")
-            
-            is_match, reason = verify_with_gemini(
+            # Gemini로 비교
+            is_match, reason = gemini.verify_images(
                 hazard_image_url=hazard_image_url,
-                iherb_image_url=comparison_image,
+                iherb_image_url=iherb_image,
                 hazard_name=prdt_nm,
                 hazard_brand=mufc_nm,
-                iherb_name=scraped_data['product_name'],
-                iherb_brand=scraped_data['brand']
+                iherb_name=iherb_name,
+                iherb_brand=iherb_brand,
+                seq=seq
             )
             
-            # 결과 저장 - 모든 값을 명시적으로 타입 변환
-            df.at[idx, 'GEMINI_VERIFIED'] = bool(is_match)
+            # 결과 저장
+            df.at[idx, 'IHERB_PRODUCT_IMAGES'] = str(json.dumps([iherb_image]))
+            df.at[idx, 'GEMINI_VERIFIED'] = str(is_match)
             df.at[idx, 'GEMINI_REASON'] = str(reason)
-            df.at[idx, 'VERIFIED_DTM'] = str(datetime.now().strftime("%Y%m%d%H%M%S"))
+            df.at[idx, 'VERIFIED_DTM'] = datetime.now().strftime("%Y%m%d%H%M%S")
             
             if is_match:
                 df.at[idx, 'STATUS'] = Status.VERIFIED_MATCH
@@ -305,7 +744,7 @@ def process_verification(
             processed += 1
             save_dataframe(df, input_csv)
             
-            time.sleep(2)  # Rate limiting
+            time.sleep(2)
         
         print(f"\n{'='*70}")
         print(f"[DONE] 검증 완료!")
@@ -313,13 +752,6 @@ def process_verification(
         print(f"매칭 성공: {success}건")
         print(f"매칭 실패: {processed - success}건")
         print(f"{'='*70}")
-    
-    except SystemExit as e:
-        # API quota/rate limit 에러
-        print(f"\n[API LIMIT] {e}")
-        save_dataframe(df, input_csv)
-        print(f"현재까지 처리: {processed}건 저장됨")
-        raise  # 종료
     
     except KeyboardInterrupt:
         print("\n\n[INTERRUPTED] 중단")
@@ -333,20 +765,21 @@ def process_verification(
 
 
 def save_dataframe(df: pd.DataFrame, output_path: str):
-    """DataFrame 저장 - 타입 명시적 변환"""
-    # 컬럼 순서 정렬
-    for col in CSV_COLUMNS:
-        if col not in df.columns:
-            df[col] = None
+    """DataFrame 저장"""
+    dtype_dict = {col: str for col in CSV_COLUMNS}
+    full_df = pd.read_csv(output_path, encoding="utf-8-sig", dtype=dtype_dict)
     
-    # 타입 명시적 변환 (경고 방지)
-    df['IHERB_PRODUCT_IMAGES'] = df['IHERB_PRODUCT_IMAGES'].astype(str)
-    df['GEMINI_VERIFIED'] = df['GEMINI_VERIFIED'].astype(object)
-    df['GEMINI_REASON'] = df['GEMINI_REASON'].astype(str)
-    df['VERIFIED_DTM'] = df['VERIFIED_DTM'].astype(str)
+    # 업데이트된 행만 반영
+    for idx, row in df.iterrows():
+        if idx in full_df.index:
+            for col in row.index:
+                value = row[col]
+                if pd.notna(value) and value != '':
+                    full_df.at[idx, col] = str(value)
     
-    df = df[CSV_COLUMNS]
-    df.to_csv(output_path, index=False, encoding="utf-8-sig")
+    # 저장
+    full_df = full_df[CSV_COLUMNS]
+    full_df.to_csv(output_path, index=False, encoding="utf-8-sig")
     print(f"  [SAVE] 저장 완료")
 
 
@@ -355,44 +788,19 @@ def save_dataframe(df: pd.DataFrame, output_path: str):
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 def main():
-    parser = argparse.ArgumentParser(description="Phase 2: iHerb 이미지 검증")
-    parser.add_argument(
-        "--csv",
-        default=OUTPUT_CSV,
-        help="입력 CSV 파일 경로"
-    )
-    parser.add_argument(
-        "--headless",
-        action="store_true",
-        help="헤드리스 모드"
-    )
-    parser.add_argument(
-        "--revalidate-all",
-        action="store_true",
-        help="전체 재검증 (STATUS=FOUND 모두)"
-    )
-    parser.add_argument(
-        "--seq",
-        type=str,
-        help="특정 SELF_IMPORT_SEQ만 검증"
-    )
+    parser = argparse.ArgumentParser(description="Phase 2: Gemini Web 검증 (디버깅)")
+    parser.add_argument("--csv", default=OUTPUT_CSV, help="입력 CSV 파일")
+    parser.add_argument("--headless", action="store_true", help="헤드리스 모드")
+    parser.add_argument("--start-seq", type=str, help="시작 SEQ")
+    parser.add_argument("--limit", type=int, help="처리 개수 제한")
     
     args = parser.parse_args()
-    
-    print("\n" + "="*70)
-    print("Phase 2: iHerb 이미지 검증")
-    print("="*70 + "\n")
-    
-    if not GEMINI_ENABLED:
-        print("[ERROR] GEMINI_API_KEY 설정 필요")
-        print("export GEMINI_API_KEY='your-key'")
-        return
     
     process_verification(
         input_csv=args.csv,
         headless=args.headless,
-        revalidate_all=args.revalidate_all,
-        specific_seq=args.seq
+        start_seq=args.start_seq,
+        limit=args.limit
     )
 
 
