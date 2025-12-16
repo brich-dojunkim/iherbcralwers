@@ -16,6 +16,7 @@ import time
 import argparse
 import requests
 import tempfile
+import csv
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -231,61 +232,6 @@ class GeminiWebInterface:
             
         except Exception as e:
             print(f"  [DOM-WAIT] 오류: {e}")
-            return False
-    
-    def _verify_image_uploaded(self, seq: str, img_num: str) -> bool:
-        """이미지가 실제로 업로드되었는지 확인"""
-        try:
-            # Gemini UI에서 업로드된 이미지 미리보기 찾기
-            time.sleep(2)
-            
-            preview_selectors = [
-                # Gemini 전용 selectors
-                "user-query-file-preview",
-                "uploaded-file-preview",
-                "file-preview-thumbnail",
-                
-                # 일반적인 미리보기 selectors
-                ".preview-image",
-                ".thumbnail",
-                ".file-thumbnail",
-                "img[data-test-id='uploaded-img']",
-                ".file-preview-container img",
-                
-                # attachment 관련
-                ".attachment-preview",
-                ".uploaded-attachment",
-                "[class*='upload'][class*='preview']",
-                
-                # 범용
-                "img[src*='blob:']",  # blob URL로 표시되는 이미지
-                "img[src*='data:image']"  # base64 이미지
-            ]
-            
-            for selector in preview_selectors:
-                try:
-                    elements = self.driver.find_elements(By.CSS_SELECTOR, selector)
-                    if elements and len(elements) > 0:
-                        # 실제로 보이는지 확인
-                        visible_count = sum(1 for el in elements if el.is_displayed())
-                        if visible_count > 0:
-                            print(f"  [VERIFY] ✓ {img_num} 미리보기 확인됨 (총 {len(elements)}개, 보임 {visible_count}개)")
-                            return True
-                except:
-                    continue
-            
-            print(f"  [VERIFY] ⚠️ {img_num} 미리보기 없음 (모든 selector 시도 완료)")
-            
-            # 디버깅: 미리보기 없을 때 HTML 저장
-            try:
-                save_debug_info(self.driver, f"no_preview_{img_num}", seq)
-            except:
-                pass
-            
-            return False
-            
-        except Exception as e:
-            print(f"  [VERIFY] 오류: {e}")
             return False
     
     def start_new_chat(self):
@@ -592,40 +538,6 @@ Your answer:"""
             file_input.send_keys(image_path)
             print(f"  [UPLOAD] ✓ 파일 경로 전달: {Path(image_path).name}")
             
-            # 3-1. 이벤트 트리거 (미리보기 활성화)
-            try:
-                self.driver.execute_script("""
-                    var input = arguments[0];
-                    
-                    // input 이벤트
-                    var inputEvent = new Event('input', { 
-                        bubbles: true, 
-                        cancelable: true 
-                    });
-                    input.dispatchEvent(inputEvent);
-                    
-                    // change 이벤트
-                    var changeEvent = new Event('change', { 
-                        bubbles: true, 
-                        cancelable: true 
-                    });
-                    input.dispatchEvent(changeEvent);
-                    
-                    // 추가: Angular 관련 이벤트 (Gemini가 Angular 사용하는 경우)
-                    if (window.angular) {
-                        var scope = window.angular.element(input).scope();
-                        if (scope) {
-                            scope.$apply();
-                        }
-                    }
-                """, file_input)
-                print(f"  [UPLOAD] ✓ 이벤트 트리거 완료")
-            except Exception as e:
-                print(f"  [UPLOAD] ⚠️ 이벤트 트리거 실패 (무시): {e}")
-            
-            # 이벤트 처리 대기
-            time.sleep(1)
-            
             # 4. URL 변경 감지
             time.sleep(2)
             url_after = self.driver.current_url
@@ -634,25 +546,8 @@ Your answer:"""
                 print(f"  [UPLOAD] URL 변경 감지, DOM 안정화 대기...")
                 self._wait_for_dom_stability(timeout=5)
             
-            # 5. 업로드 검증 (재시도 포함)
+            # 5. 업로드 검증
             time.sleep(WAIT_AFTER_UPLOAD)
-            
-            # 최대 3번 재시도
-            upload_verified = False
-            for attempt in range(3):
-                if self._verify_image_uploaded(seq, img_num):
-                    print(f"  [UPLOAD] ✓ {img_num} 업로드 성공")
-                    upload_verified = True
-                    break
-                else:
-                    if attempt < 2:
-                        print(f"  [UPLOAD] 미리보기 대기 중... ({attempt + 1}/3)")
-                        time.sleep(2)
-            
-            if not upload_verified:
-                print(f"  [UPLOAD] ⚠️ {img_num} 미리보기 미확인 (백그라운드 처리 중일 수 있음)")
-            
-            return True  # 파일 전달은 성공했으므로 계속 진행
             
         except Exception as e:
             print(f"  [UPLOAD ERROR] {img_num}: {e}")
@@ -731,172 +626,72 @@ Your answer:"""
         return False
     
     def _wait_for_response(self, seq: str) -> tuple:
-        """Gemini 응답 대기 - 실제 DOM 구조 기반"""
+        """Gemini 응답 대기"""
         print(f"  [RESPONSE] 응답 대기 (최대 60초)...")
-        
-        # ===== 정확한 DOM 구조 =====
-        # <message-content>
-        #   <div class="markdown" aria-live="polite|off">
-        #     <p data-path-to-node="0">응답</p>
-        #   </div>
-        # </message-content>
         
         max_wait = 60
         start_time = time.time()
         
-        # ===== 1단계: 초기 message-content 개수 확인 =====
-        initial_count = len(self.driver.find_elements(By.TAG_NAME, "message-content"))
-        print(f"  [RESPONSE] 초기 메시지 수: {initial_count}")
-        
-        # ===== 2단계: 새 응답(message-content) 감지 - 40초 =====
+        # ===== 1단계: 새 메시지 텍스트 감지 =====
         new_message_timeout = 40
-        new_message_detected = False
         
         while time.time() - start_time < new_message_timeout:
-            current_count = len(self.driver.find_elements(By.TAG_NAME, "message-content"))
-            
-            if current_count > initial_count:
-                print(f"  [RESPONSE] ✓ 새 메시지 감지 ({initial_count} → {current_count})")
-                new_message_detected = True
-                break
+            try:
+                all_messages = self.driver.find_elements(By.TAG_NAME, "message-content")
+                if not all_messages:
+                    time.sleep(1)
+                    continue
+                
+                last_message = all_messages[-1]
+                markdown_div = last_message.find_element(By.CSS_SELECTOR, ".markdown")
+                
+                # textContent로 전체 텍스트 확인
+                response_text = markdown_div.get_attribute("textContent") or ""
+                response_text = response_text.strip()
+                
+                if len(response_text) > 10:
+                    print(f"  [RESPONSE] ✓ 새 메시지 감지 (길이: {len(response_text)})")
+                    break
+            except:
+                pass
             
             time.sleep(1)
-        
-        if not new_message_detected:
+        else:
             raise Exception("새 응답 감지 타임아웃 (40초)")
         
-        # ===== 3단계: 응답 완료 대기 - aria-live="polite" 감지 =====
+        # ===== 2단계: 응답 완료 대기 (aria-live="polite") =====
         print(f"  [RESPONSE] 응답 완료 대기 중...")
-        
-        debug_interval = 0
-        last_aria_live = None
         
         while time.time() - start_time < max_wait:
             try:
-                # 모든 message-content 찾기
                 all_messages = self.driver.find_elements(By.TAG_NAME, "message-content")
-                
-                if len(all_messages) == 0:
-                    time.sleep(1)
-                    continue
-                
-                # 마지막 메시지 (가장 최근 응답)
                 last_message = all_messages[-1]
+                markdown_div = last_message.find_element(By.CSS_SELECTOR, ".markdown")
                 
-                # markdown div 찾기
-                try:
-                    markdown_div = last_message.find_element(By.CSS_SELECTOR, ".markdown")
-                except:
-                    time.sleep(1)
-                    continue
-                
-                # aria-live 속성 확인
                 aria_live = markdown_div.get_attribute("aria-live")
-                aria_busy = markdown_div.get_attribute("aria-busy")
                 
-                # 10초마다 상태 로깅
-                debug_interval += 1
-                if debug_interval % 5 == 0 or aria_live != last_aria_live:
-                    print(f"  [ARIA] aria-live={aria_live}, aria-busy={aria_busy}")
-                    last_aria_live = aria_live
-                
-                # p[data-path-to-node="0"] 에서 텍스트 읽기
-                try:
-                    p_elem = markdown_div.find_element(By.CSS_SELECTOR, 'p[data-path-to-node="0"]')
-                except:
-                    # data-path-to-node 없으면 일반 p 시도
-                    try:
-                        p_elem = markdown_div.find_element(By.TAG_NAME, "p")
-                    except:
-                        time.sleep(1)
-                        continue
-                
-                # 텍스트 추출 (우선순위: text → innerText → textContent)
-                response_text = p_elem.text.strip()
-                if not response_text or len(response_text) < 10:
-                    response_text = p_elem.get_attribute("innerText") or ""
-                    response_text = response_text.strip()
-                if not response_text or len(response_text) < 10:
-                    response_text = p_elem.get_attribute("textContent") or ""
-                    response_text = response_text.strip()
-                
-                if debug_interval % 5 == 0:
-                    print(f"  [TEXT] 길이: {len(response_text)}, 샘플: {response_text[:60]}...")
-                
-                # 응답 유효성 확인 (YES/NO 포함)
-                if not response_text or len(response_text) < 20:
-                    time.sleep(1)
-                    continue
-                
-                has_yes_no = False
-                for line in response_text.split('\n')[:5]:
-                    if 'YES' in line.upper() or 'NO' in line.upper():
-                        has_yes_no = True
-                        break
-                
-                if not has_yes_no:
-                    if 'YES:' not in response_text.upper() and 'NO:' not in response_text.upper():
-                        time.sleep(1)
-                        continue
-                
-                # ===== 완료 조건: aria-live="polite" =====
                 if aria_live == "polite":
-                    print(f"  [RESPONSE] ✓ 응답 완료 (aria-live=polite)")
-                    print(f"  [RESPONSE] ✓ 텍스트 길이: {len(response_text)} chars")
+                    # 전체 텍스트 추출
+                    response_text = markdown_div.get_attribute("textContent") or ""
+                    response_text = response_text.strip()
                     
-                    clean_response = self._extract_first_sentence(response_text)
+                    print(f"  [RESPONSE] ✓ 응답 완료 (길이: {len(response_text)} chars)")
                     
                     # YES/NO 판정
-                    first_word = clean_response.split()[0].upper().rstrip(':,.')
-                    is_match = first_word == 'YES' or clean_response.upper().startswith('YES')
+                    first_word = response_text.split()[0].upper().rstrip(':,.')
+                    is_match = first_word == 'YES' or response_text.upper().startswith('YES')
                     
-                    print(f"  [RESPONSE] 판정: {'YES (매칭)' if is_match else 'NO (불일치)'}")
-                    print(f"  [RESPONSE] 이유: {clean_response[:100]}...")
+                    print(f"  [RESPONSE] 판정: {'YES' if is_match else 'NO'}")
+                    print(f"  [RESPONSE] 이유: {response_text[:200]}...")
                     
-                    return is_match, clean_response
+                    return is_match, response_text
                 
-                # aria-live="off"면 계속 대기
                 time.sleep(2)
                 
-            except Exception as e:
-                if debug_interval % 5 == 0:
-                    print(f"  [ERROR] {str(e)[:50]}")
+            except:
                 time.sleep(1)
         
-        # 타임아웃
         raise Exception("응답 완료 타임아웃 (60초)")
-    
-    def _extract_first_sentence(self, text: str) -> str:
-        """응답에서 YES/NO 포함 문장 추출"""
-        lines = text.split('\n')
-        
-        # YES/NO로 시작하는 줄 찾기
-        for line in lines:
-            line = line.strip()
-            if line.upper().startswith('YES') or line.upper().startswith('NO'):
-                # 해당 줄에서 첫 문장만 추출
-                for end_marker in ['. ', '! ', '? ']:
-                    if end_marker in line:
-                        first_sentence = line.split(end_marker)[0] + '.'
-                        return first_sentence
-                return line
-        
-        # YES: 또는 NO:를 포함하는 줄 찾기
-        for line in lines:
-            line = line.strip()
-            if 'YES:' in line.upper() or 'NO:' in line.upper():
-                # YES: 또는 NO: 이후 부분 추출
-                for pattern in ['YES:', 'NO:']:
-                    if pattern in line.upper():
-                        start_idx = line.upper().index(pattern)
-                        sentence = line[start_idx:].strip()
-                        for end_marker in ['. ', '! ', '? ']:
-                            if end_marker in sentence:
-                                return sentence.split(end_marker)[0] + '.'
-                        return sentence
-        
-        # fallback: 첫 줄 반환
-        return lines[0][:200] if lines else text[:200]
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1114,7 +909,14 @@ def save_dataframe(df: pd.DataFrame, output_path: str):
                     full_df.at[idx, col] = str(value)
     
     full_df = full_df[CSV_COLUMNS]
-    full_df.to_csv(output_path, index=False, encoding="utf-8-sig")
+    
+    # ===== 수정: quoting 옵션 추가 =====
+    full_df.to_csv(
+        output_path, 
+        index=False, 
+        encoding="utf-8-sig",
+        quoting=csv.QUOTE_NONNUMERIC  # 숫자 외 모든 값을 따옴표로 감싸기
+    )
     print(f"  [SAVE] 저장 완료")
 
 
