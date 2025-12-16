@@ -240,48 +240,22 @@ class GeminiWebInterface:
             time.sleep(2)
             
             preview_selectors = [
-                # Gemini 전용 selectors
                 "user-query-file-preview",
-                "uploaded-file-preview",
-                "file-preview-thumbnail",
-                
-                # 일반적인 미리보기 selectors
                 ".preview-image",
-                ".thumbnail",
-                ".file-thumbnail",
                 "img[data-test-id='uploaded-img']",
-                ".file-preview-container img",
-                
-                # attachment 관련
-                ".attachment-preview",
-                ".uploaded-attachment",
-                "[class*='upload'][class*='preview']",
-                
-                # 범용
-                "img[src*='blob:']",  # blob URL로 표시되는 이미지
-                "img[src*='data:image']"  # base64 이미지
+                ".file-preview-container img"
             ]
             
             for selector in preview_selectors:
                 try:
                     elements = self.driver.find_elements(By.CSS_SELECTOR, selector)
-                    if elements and len(elements) > 0:
-                        # 실제로 보이는지 확인
-                        visible_count = sum(1 for el in elements if el.is_displayed())
-                        if visible_count > 0:
-                            print(f"  [VERIFY] ✓ {img_num} 미리보기 확인됨 (총 {len(elements)}개, 보임 {visible_count}개)")
-                            return True
+                    if elements:
+                        print(f"  [VERIFY] ✓ {img_num} 미리보기 확인됨 ({len(elements)}개)")
+                        return True
                 except:
                     continue
             
-            print(f"  [VERIFY] ⚠️ {img_num} 미리보기 없음 (모든 selector 시도 완료)")
-            
-            # 디버깅: 미리보기 없을 때 HTML 저장
-            try:
-                save_debug_info(self.driver, f"no_preview_{img_num}", seq)
-            except:
-                pass
-            
+            print(f"  [VERIFY] ⚠️ {img_num} 미리보기 없음")
             return False
             
         except Exception as e:
@@ -592,40 +566,6 @@ Your answer:"""
             file_input.send_keys(image_path)
             print(f"  [UPLOAD] ✓ 파일 경로 전달: {Path(image_path).name}")
             
-            # 3-1. 이벤트 트리거 (미리보기 활성화)
-            try:
-                self.driver.execute_script("""
-                    var input = arguments[0];
-                    
-                    // input 이벤트
-                    var inputEvent = new Event('input', { 
-                        bubbles: true, 
-                        cancelable: true 
-                    });
-                    input.dispatchEvent(inputEvent);
-                    
-                    // change 이벤트
-                    var changeEvent = new Event('change', { 
-                        bubbles: true, 
-                        cancelable: true 
-                    });
-                    input.dispatchEvent(changeEvent);
-                    
-                    // 추가: Angular 관련 이벤트 (Gemini가 Angular 사용하는 경우)
-                    if (window.angular) {
-                        var scope = window.angular.element(input).scope();
-                        if (scope) {
-                            scope.$apply();
-                        }
-                    }
-                """, file_input)
-                print(f"  [UPLOAD] ✓ 이벤트 트리거 완료")
-            except Exception as e:
-                print(f"  [UPLOAD] ⚠️ 이벤트 트리거 실패 (무시): {e}")
-            
-            # 이벤트 처리 대기
-            time.sleep(1)
-            
             # 4. URL 변경 감지
             time.sleep(2)
             url_after = self.driver.current_url
@@ -634,25 +574,15 @@ Your answer:"""
                 print(f"  [UPLOAD] URL 변경 감지, DOM 안정화 대기...")
                 self._wait_for_dom_stability(timeout=5)
             
-            # 5. 업로드 검증 (재시도 포함)
+            # 5. 업로드 검증
             time.sleep(WAIT_AFTER_UPLOAD)
             
-            # 최대 3번 재시도
-            upload_verified = False
-            for attempt in range(3):
-                if self._verify_image_uploaded(seq, img_num):
-                    print(f"  [UPLOAD] ✓ {img_num} 업로드 성공")
-                    upload_verified = True
-                    break
-                else:
-                    if attempt < 2:
-                        print(f"  [UPLOAD] 미리보기 대기 중... ({attempt + 1}/3)")
-                        time.sleep(2)
-            
-            if not upload_verified:
-                print(f"  [UPLOAD] ⚠️ {img_num} 미리보기 미확인 (백그라운드 처리 중일 수 있음)")
-            
-            return True  # 파일 전달은 성공했으므로 계속 진행
+            if self._verify_image_uploaded(seq, img_num):
+                print(f"  [UPLOAD] ✓ {img_num} 업로드 성공")
+                return True
+            else:
+                print(f"  [UPLOAD] ⚠️ {img_num} 미리보기 미확인 (백그라운드 처리 중)")
+                return True  # 업로드는 성공했을 가능성 높음
             
         except Exception as e:
             print(f"  [UPLOAD ERROR] {img_num}: {e}")
