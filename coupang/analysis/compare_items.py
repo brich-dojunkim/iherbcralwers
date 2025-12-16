@@ -29,7 +29,7 @@ def main():
     print("1. 엑셀 파일에서 itemId 추출")
     print("=" * 60)
     
-    df = pd.read_excel('/Users/brich/Desktop/iherb_price/compare_item/쿠팡_아이허브 베스트 가격 조사_1208.xlsx', header=1)
+    df = pd.read_excel('/Users/brich/Desktop/iherb_price/coupang/data/compare_item/쿠팡_아이허브 베스트 가격 조사_1208.xlsx', header=1)
     
     # itemId 추출
     df['extracted_item_id'] = df['쿠팡 상품 URL'].apply(extract_item_id)
@@ -138,7 +138,7 @@ def main():
     print("4. 상세 결과 저장")
     print("=" * 60)
     
-    output_path = '/Users/brich/Desktop/iherb_price/compare_item/item_comparison_result.xlsx'
+    output_path = '/Users/brich/Desktop/iherb_price/coupang/data/compare_item/item_comparison_result.xlsx'
     with pd.ExcelWriter(output_path, engine='openpyxl') as writer:
         # 전체 요약 시트
         results_df.to_excel(writer, sheet_name='전체요약', index=False)
@@ -190,7 +190,7 @@ def main():
     
     if len(latest_matched_items) > 0:
         # 원본 엑셀 파일 그대로 로드 (헤더 포함)
-        df_original = pd.read_excel('/Users/brich/Desktop/iherb_price/compare_item/쿠팡_아이허브 베스트 가격 조사_1208.xlsx', header=None)
+        df_original = pd.read_excel('/Users/brich/Desktop/iherb_price/coupang/data/compare_item/쿠팡_아이허브 베스트 가격 조사_1208.xlsx', header=None)
         
         # DB에서 최신 스냅샷의 정보 가져오기
         conn = sqlite3.connect(db_path)
@@ -265,7 +265,7 @@ def main():
         df_result = df_original.iloc[matched_rows].reset_index(drop=True)
         
         # 파일명 생성
-        matched_output_path = f'/Users/brich/Desktop/iherb_price/compare_item/matched_latest_{latest_snapshot_date}.xlsx'
+        matched_output_path = f'/Users/brich/Desktop/iherb_price/coupang/data/compare_item/matched_latest_{latest_snapshot_date}.xlsx'
         
         # 저장
         df_result.to_excel(matched_output_path, index=False, header=False)
