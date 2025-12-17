@@ -56,7 +56,7 @@ def get_unprocessed_items(stage: str) -> Tuple[pd.DataFrame, Set[str]]:
         # hazard_base와 조인 (이미지 URL 필요)
         df_base = load_csv(HAZARD_BASE_CSV)
         df_todo = df_todo.merge(
-            df_base[['SELF_IMPORT_SEQ', 'PRDT_NM', 'MUFC_NM', 'IMAGE_URL_MFDS']],
+            df_base[['SELF_IMPORT_SEQ', 'PRDT_NM', 'MUFC_NM', 'IMAGE_URL']],
             on='SELF_IMPORT_SEQ',
             how='left'
         )

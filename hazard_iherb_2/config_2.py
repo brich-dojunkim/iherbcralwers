@@ -23,11 +23,8 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 # 경로 설정
 PROJECT_DIR = Path(__file__).parent
 IMG_DIR = PROJECT_DIR / "hazard_images"
-
-# 정규화된 CSV 경로
-HAZARD_BASE_CSV = PROJECT_DIR / "csv" / "hazard_base.csv"
-IHERB_SCRAPED_CSV = PROJECT_DIR / "csv" / "iherb_scraped.csv"
-GEMINI_VERIFICATIONS_CSV = PROJECT_DIR / "csv" / "gemini_verifications.csv"
+OUTPUT_CSV = PROJECT_DIR / "csv" / "hazard_iherb_matched_final.csv"
+API_CACHE_CSV = PROJECT_DIR / "csv" / "api_cache_hazard_data.csv"
 
 # 디렉토리 생성
 IMG_DIR.mkdir(exist_ok=True)
@@ -35,37 +32,34 @@ IMG_DIR.mkdir(exist_ok=True)
 
 # 상태 상수
 class Status:
+    # Google 검색 단계
     FOUND = "FOUND"
     NOT_FOUND = "NOT_FOUND"
     NO_IMAGE = "NO_IMAGE"
     DOWNLOAD_FAILED = "DOWNLOAD_FAILED"
+    
+    # 스크래핑 단계
     SCRAPE_FAILED = "SCRAPE_FAILED"
+    
+    # 검증 단계
+    VERIFIED_MATCH = "VERIFIED_MATCH"
+    VERIFIED_MISMATCH = "VERIFIED_MISMATCH"
+    VERIFICATION_FAILED = "VERIFICATION_FAILED"
 
-# CSV 컬럼 정의
-HAZARD_BASE_COLUMNS = [
+# CSV 컬럼 정의 (통합 Phase용)
+CSV_COLUMNS = [
     'SELF_IMPORT_SEQ',
     'PRDT_NM',
     'MUFC_NM',
     'MUFC_CNTRY_NM',
     'INGR_NM_LST',
     'CRET_DTM',
-    'IMAGE_URL'  # ✅ 수정: IMAGE_URL_MFDS → IMAGE_URL
-]
-
-IHERB_SCRAPED_COLUMNS = [
-    'SELF_IMPORT_SEQ',
+    'IMAGE_URL',
     'IHERB_URL',
-    'product_code',
-    'IHERB_제품명',
-    'IHERB_제조사',
-    'IHERB_PRODUCT_IMAGES',
+    'IHERB_BRAND',
+    'IHERB_NAME',
     'STATUS',
-    'SCRAPED_AT'
-]
-
-GEMINI_VERIFICATIONS_COLUMNS = [
-    'SELF_IMPORT_SEQ',
     'GEMINI_VERIFIED',
     'GEMINI_REASON',
-    'VERIFIED_AT'
+    'VERIFIED_DTM'
 ]

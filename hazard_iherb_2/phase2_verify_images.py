@@ -81,7 +81,7 @@ def main(headless: bool = False, limit: int = None, start_seq: str = None):
             prdt_nm = row['PRDT_NM']
             
             # 데이터 준비
-            hazard_image = row['IMAGE_URL_MFDS']
+            hazard_image = row['IMAGE_URL']
             if ',' in str(hazard_image):
                 hazard_image = hazard_image.split(',')[0].strip()
             
