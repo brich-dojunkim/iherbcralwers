@@ -7,7 +7,6 @@ Google Images 역검색
 import time
 from pathlib import Path
 from typing import Optional, Dict
-from collections import Counter
 from urllib.parse import urlparse, parse_qs, unquote
 
 from selenium.webdriver.common.by import By
@@ -22,6 +21,16 @@ class GoogleImageSearch:
     def __init__(self, driver):
         self.driver = driver
         self.wait = WebDriverWait(driver, 25)
+    
+    def clear_session(self):
+        """세션 초기화 (브라우저는 유지)"""
+        try:
+            self.driver.delete_all_cookies()
+            self.driver.execute_script("window.localStorage.clear();")
+            self.driver.execute_script("window.sessionStorage.clear();")
+            print(f"  [CLEAN] ✓ 세션 클리어 완료")
+        except Exception as e:
+            print(f"  [CLEAN] ⚠ 세션 클리어 실패: {e}")
     
     def find_iherb_url(self, image_path: Path) -> Optional[str]:
         """
@@ -96,69 +105,55 @@ class GoogleImageSearch:
     
     def _select_best_url(self) -> Optional[str]:
         """
-        최고 iHerb URL 선택 (투표 방식)
+        단순 선택 방식: 상위 8개 검색 결과에서
+        첫 번째 iherb.com /pr/ 링크 반환
         
         Returns:
             선택된 URL or None
         """
-        # 모든 링크 수집
-        links = self.driver.find_elements(By.CSS_SELECTOR, "a")
-        
-        print(f"  [LINKS] 발견된 링크 수: {len(links)}")
-        
-        # /pr/ 경로만 수집
-        pr_urls = []
-        
-        for link in links:
-            href = link.get_attribute("href")
-            if not href:
-                continue
+        # 검색 결과 아이템 수집 (상위 8개만)
+        try:
+            # 이미지 검색 결과용 셀렉터
+            search_items = self.driver.find_elements(By.CSS_SELECTOR, "div.kb0PBd.cvP2Ce")
             
-            # 실제 URL 추출
-            real_url = self._extract_real_url(href)
+            # fallback: 일반 검색 결과
+            if not search_items:
+                search_items = self.driver.find_elements(By.CSS_SELECTOR, "div.g")
             
-            # iHerb 도메인 체크
-            if "iherb.com" not in real_url.lower():
-                continue
-            
-            # /pr/ 경로만 (제품 페이지)
-            if "/pr/" in real_url:
-                pr_urls.append(real_url)
-        
-        if not pr_urls:
-            print(f"  [CANDIDATES] /pr/ 제품 페이지 없음")
+            search_items = search_items[:8]  # 상위 8개만
+            print(f"  [ITEMS] 상위 {len(search_items)}개 검색 결과 확인")
+        except:
+            print(f"  [ERROR] 검색 결과 항목을 찾을 수 없음")
             return None
         
-        print(f"  [CANDIDATES] /pr/ 제품 페이지 {len(pr_urls)}개 수집")
-        
-        # Product Code 투표
-        code_votes = Counter()
-        url_by_code = {}
-        
-        for url in pr_urls:
-            code = self._extract_product_code(url)
-            if code:
-                code_votes[code] += 1
-                # kr.iherb.com 우선
-                if code not in url_by_code or "kr.iherb.com" in url:
-                    url_by_code[code] = url
-        
-        if not code_votes:
+        if not search_items:
+            print(f"  [CANDIDATES] 검색 결과 없음")
             return None
         
-        # 최다 득표
-        winner_code, votes = code_votes.most_common(1)[0]
-        winner_url = url_by_code[winner_code]
+        # 상위 8개 항목에서 링크 추출
+        for idx, item in enumerate(search_items, 1):
+            try:
+                # 각 항목 내의 모든 링크
+                links = item.find_elements(By.CSS_SELECTOR, "a")
+                
+                for link in links:
+                    href = link.get_attribute("href")
+                    if not href:
+                        continue
+                    
+                    # 실제 URL 추출
+                    real_url = self._extract_real_url(href)
+                    
+                    # iHerb /pr/ 링크 발견 시 즉시 반환
+                    if "iherb.com/pr/" in real_url.lower():
+                        domain = "kr.iherb.com" if "kr.iherb.com" in real_url.lower() else "www.iherb.com"
+                        print(f"  [SELECT] {domain} 선택 (항목 {idx}/8)")
+                        return real_url
+            except:
+                continue
         
-        print(f"  [VOTE] Product Code: {winner_code} ({votes}표)")
-        
-        # 도메인 표시
-        if "kr.iherb.com" in winner_url:
-            print(f"  [SELECT] kr.iherb.com 선택")
-        else:
-            print(f"  [SELECT] www.iherb.com 선택")
-        
-        return winner_url
+        print(f"  [CANDIDATES] 상위 8개 항목에서 /pr/ 제품 페이지 없음")
+        return None
     
     def _extract_real_url(self, google_url: str) -> str:
         """

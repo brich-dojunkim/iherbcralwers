@@ -86,6 +86,11 @@ class UnifiedMatcher:
         Returns:
             결과 딕셔너리
         """
+        # ✅ 매 상품마다 세션 클리어 (첫 번째 제외)
+        if idx > 1:
+            self.google_search.clear_session()
+            time.sleep(2)
+        
         # 새 채팅 시작 (5개마다)
         if self.chat_count >= MAX_MESSAGES_PER_CHAT and self.chat_count > 0:
             print(f"\n[CHAT] {self.chat_count}개 처리 → 새 채팅 시작\n")
@@ -143,7 +148,9 @@ class UnifiedMatcher:
             pass
         
         if not iherb_url:
-            print(f"  [STEP 2] ✗ NOT_FOUND\n")
+            print(f"  [STEP 2] ✗ NOT_FOUND")
+            self.google_search.clear_session()
+            print()
             return self._create_result(row, Status.NOT_FOUND)
         
         print(f"  [STEP 2] ✓ URL 발견: {iherb_url}")
@@ -159,7 +166,9 @@ class UnifiedMatcher:
         scraped = self.iherb_scraper.scrape_product(iherb_url)
         
         if not scraped['image_url'] or not scraped['product_name'] or not scraped['brand']:
-            print(f"  [STEP 3] ⚠ SCRAPE_FAILED\n")
+            print(f"  [STEP 3] ⚠ SCRAPE_FAILED")
+            self.google_search.clear_session()
+            print()
             return self._create_result(
                 row,
                 Status.SCRAPE_FAILED,
@@ -202,6 +211,9 @@ class UnifiedMatcher:
                 print(f"           이유: {reason[:80]}...")
                 status = Status.VERIFIED_MISMATCH
             
+            # 세션 클리어 (다음 검색 준비)
+            self.google_search.clear_session()
+            
             return self._create_result(
                 row,
                 status,
@@ -215,7 +227,9 @@ class UnifiedMatcher:
             )
             
         except Exception as e:
-            print(f"  [STEP 4] ⚠ 검증 실패: {e}\n")
+            print(f"  [STEP 4] ⚠ 검증 실패: {e}")
+            self.google_search.clear_session()
+            print()
             return self._create_result(
                 row,
                 Status.FOUND,  # URL은 찾았지만 검증 실패
@@ -380,8 +394,11 @@ def main():
             # 결과 즉시 저장
             save_result_to_unified_csv(result)
             
-            # Rate limit 대응
-            time.sleep(WAIT_AFTER_VERIFY)
+            # Rate limit 대응 (Gemini 사용한 경우만 15초 대기)
+            if result['STATUS'] in [Status.VERIFIED_MATCH, Status.VERIFIED_MISMATCH]:
+                time.sleep(WAIT_AFTER_VERIFY)
+            else:
+                time.sleep(1)  # NOT_FOUND, NO_IMAGE 등은 1초만
         
         # 최종 통계
         print_final_stats()
