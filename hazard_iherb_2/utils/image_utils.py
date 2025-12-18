@@ -21,9 +21,16 @@ def download_image(url: str, save_path: Path = None, save_dir: Path = None) -> O
         save_path: 저장 경로 (지정 시)
         save_dir: 저장 디렉토리 (save_path 없을 때)
     """
-    if ',' in url:
+    # ★★★ 수정: URL 파라미터의 쉼표와 구분자 쉼표 구분 ★★★
+    # http로 시작하지 않는 부분이 있으면 여러 URL
+    if ',' in url and ' http' in url.lower():
+        # 여러 URL이 쉼표로 구분된 경우 (예: "url1, url2, url3")
         urls = [u.strip() for u in url.split(',')]
-        url = urls[0]
+        # http로 시작하는 첫 번째 URL 사용
+        for u in urls:
+            if u.startswith('http'):
+                url = u
+                break
     
     if save_path is None:
         if save_dir is None:
@@ -55,7 +62,7 @@ def download_image(url: str, save_path: Path = None, save_dir: Path = None) -> O
     except Exception as e:
         print(f"  [ERROR] 이미지 다운로드 실패: {e}")
         return None
-
+    
 
 def extract_product_code(url: str) -> Optional[str]:
     """URL에서 상품코드 추출"""

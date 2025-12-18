@@ -60,13 +60,39 @@ class IHerbScraper:
     
     def _extract_main_image(self) -> Optional[str]:
         """메인 이미지 URL 추출"""
+        # 방법 1: src 속성
         try:
             img = self.driver.find_element(By.CSS_SELECTOR, "#iherb-product-image")
             src = img.get_attribute("src")
-            if src and "cloudinary.images-iherb.com" in src:
-                return src.replace("/v/", "/l/")
+            if src and "cloudinary.images-iherb.com" in src and len(src) > 100:
+                return src
         except:
             pass
+        
+        # 방법 2: srcset 속성에서 1.5x 버전 추출
+        try:
+            img = self.driver.find_element(By.CSS_SELECTOR, "#iherb-product-image")
+            srcset = img.get_attribute("srcset")
+            if srcset:
+                parts = srcset.split(',')
+                for part in parts:
+                    part = part.strip()
+                    if '1.5x' in part or '2x' in part:
+                        url = part.split()[0]
+                        if "cloudinary.images-iherb.com" in url:
+                            return url
+        except:
+            pass
+        
+        # 방법 3: JavaScript로 currentSrc 가져오기
+        try:
+            img = self.driver.find_element(By.CSS_SELECTOR, "#iherb-product-image")
+            current_src = self.driver.execute_script("return arguments[0].currentSrc;", img)
+            if current_src and "cloudinary.images-iherb.com" in current_src:
+                return current_src
+        except:
+            pass
+        
         return None
     
     def _extract_product_name(self) -> Optional[str]:

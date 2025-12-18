@@ -36,8 +36,6 @@ class GeminiVerifier:
         """DOM 안정화 대기 (URL 변경 감지)"""
         try:
             initial_url = self.driver.current_url
-            print(f"  [DOM-WAIT] 초기 URL: {initial_url[:60]}...")
-            
             stable_count = 0
             start_time = time.time()
             
@@ -47,19 +45,15 @@ class GeminiVerifier:
                 
                 if current_url == initial_url:
                     stable_count += 1
-                    if stable_count >= 3:  # 1.5초 동안 안정적
-                        print(f"  [DOM-WAIT] ✓ DOM 안정화 완료")
+                    if stable_count >= 3:
                         return True
                 else:
-                    print(f"  [DOM-WAIT] URL 변경 감지: {current_url[:60]}...")
                     initial_url = current_url
                     stable_count = 0
             
-            print(f"  [DOM-WAIT] ⚠️ 타임아웃")
             return False
             
         except Exception as e:
-            print(f"  [DOM-WAIT] 오류: {e}")
             return False
     
     def start_new_chat(self):
@@ -134,10 +128,9 @@ class GeminiVerifier:
         """이미지 검증"""
         
         try:
-            # 브라우저 체크 및 초기 URL 저장
+            # 브라우저 체크
             try:
-                initial_url = self.driver.current_url
-                print(f"  [VERIFY] 시작 URL: {initial_url[:60]}...")
+                _ = self.driver.current_url
             except Exception as e:
                 raise Exception(f"브라우저가 닫혀 있습니다: {e}")
             
@@ -157,22 +150,10 @@ class GeminiVerifier:
             print(f"  [UPLOAD] 이미지 업로드 중...")
             
             self._upload_image(str(hazard_img_path), seq, "image1")
-            print(f"  [UPLOAD] ✓ image1 업로드 완료")
-            
             time.sleep(2)
-            
             self._upload_image(str(iherb_img_path), seq, "image2")
-            print(f"  [UPLOAD] ✓ image2 업로드 완료")
             
-            # URL 변경 체크
-            try:
-                current_url = self.driver.current_url
-                if current_url != initial_url:
-                    print(f"  [URL-CHANGE] 업로드 중 URL 변경됨")
-                    print(f"  [URL-CHANGE]    전: {initial_url[:60]}...")
-                    print(f"  [URL-CHANGE]    후: {current_url[:60]}...")
-            except:
-                pass
+            print(f"  [UPLOAD] ✓ 업로드 완료")
             
             # 3. 프롬프트 입력 및 전송
             prompt = f"""Compare these two supplement product images carefully:
@@ -199,29 +180,14 @@ Your answer:"""
                 raise Exception("입력창 없음")
             
             self._input_text(input_box, prompt)
-            print(f"  [TEXT] ✓ 텍스트 입력 완료")
             
             print(f"  [SUBMIT] 전송 중...")
             self._submit_message()
             print(f"  [SUBMIT] ✓ 전송 완료")
             
-            # URL 체크 (전송 후)
-            try:
-                current_url = self.driver.current_url
-                print(f"  [URL-CHECK] 전송 후: {current_url[:50]}...")
-            except:
-                pass
-            
             # 4. 응답 대기
             print(f"  [RESPONSE] 응답 대기 중...")
             is_match, reason = self._wait_for_response()
-            
-            # URL 체크 (응답 후)
-            try:
-                current_url = self.driver.current_url
-                print(f"  [URL-CHECK] 응답 후: {current_url[:50]}...")
-            except:
-                pass
             
             # 임시 파일 삭제
             try:
@@ -245,8 +211,6 @@ Your answer:"""
         
         finally:
             try:
-                print(f"  [CLEANUP] UI 초기화 중...")
-                
                 # JavaScript로 오버레이 제거
                 self.driver.execute_script("""
                     document.querySelectorAll('.cdk-overlay-backdrop, .cdk-overlay-pane, .cdk-overlay-container, [role="menu"], [role="dialog"]').forEach(el => {
@@ -272,25 +236,12 @@ Your answer:"""
                 
                 time.sleep(0.5)
                 
-                print(f"  [CLEANUP] ✓ 최종 정리 완료")
-                
-                # URL 체크 (cleanup 후)
-                try:
-                    current_url = self.driver.current_url
-                    print(f"  [URL-CHECK] cleanup 후: {current_url[:50]}...")
-                except:
-                    pass
-                
             except Exception as cleanup_error:
-                print(f"  [CLEANUP] 정리 시도 중 오류: {cleanup_error}")
+                pass
     
     def _upload_image(self, image_path: str, seq: str, img_num: str):
         """이미지 업로드"""
         try:
-            print(f"  [UPLOAD] {img_num} 백그라운드 업로드 시작...")
-            
-            url_before = self.driver.current_url
-            
             file_input = None
             
             # 기존 file input 찾기
@@ -299,12 +250,10 @@ Your answer:"""
                 accept = inp.get_attribute('accept')
                 if not accept or 'image' in accept:
                     file_input = inp
-                    print(f"  [UPLOAD] 기존 file input 발견")
                     break
             
             # 없으면 생성
             if not file_input:
-                print(f"  [UPLOAD] file input 생성 중...")
                 self.driver.execute_script("""
                     var input = document.createElement('input');
                     input.type = 'file';
@@ -317,23 +266,16 @@ Your answer:"""
                 inputs = self.driver.find_elements(By.CSS_SELECTOR, "input[id^='upload-']")
                 if inputs:
                     file_input = inputs[-1]
-                    print(f"  [UPLOAD] ✓ file input 생성 완료")
             
             if not file_input:
                 raise Exception("file input을 찾거나 생성할 수 없습니다")
             
             # 파일 경로 전달
             file_input.send_keys(image_path)
-            print(f"  [UPLOAD] ✓ 파일 경로 전달: {Path(image_path).name}")
             
-            # URL 변경 감지
+            # DOM 안정화 대기
             time.sleep(2)
-            url_after = self.driver.current_url
-            
-            if url_before != url_after:
-                print(f"  [UPLOAD] URL 변경 감지, DOM 안정화 대기...")
-                self._wait_for_dom_stability(timeout=5)
-            
+            self._wait_for_dom_stability(timeout=5)
             time.sleep(self.WAIT_AFTER_UPLOAD)
             
         except Exception as e:
@@ -399,8 +341,6 @@ Your answer:"""
     
     def _wait_for_response(self) -> Tuple[bool, str]:
         """응답 대기"""
-        print(f"  [RESPONSE] 응답 대기 (최대 60초)...")
-        
         max_wait = 60
         start_time = time.time()
         
@@ -421,7 +361,6 @@ Your answer:"""
                 text = text.strip()
                 
                 if len(text) > 10:
-                    print(f"  [RESPONSE] ✓ 새 메시지 감지 (길이: {len(text)})")
                     break
             except:
                 pass
@@ -431,8 +370,6 @@ Your answer:"""
             raise Exception("새 응답 감지 타임아웃 (40초)")
         
         # 응답 완료 대기
-        print(f"  [RESPONSE] 응답 완료 대기 중...")
-        
         while time.time() - start_time < max_wait:
             try:
                 messages = self.driver.find_elements(By.TAG_NAME, "message-content")
@@ -451,7 +388,6 @@ Your answer:"""
                     is_match = first_word == 'YES' or text.upper().startswith('YES')
                     
                     print(f"  [RESPONSE] 판정: {'YES' if is_match else 'NO'}")
-                    print(f"  [RESPONSE] 이유: {text[:200]}...")
                     
                     return is_match, text
                 
