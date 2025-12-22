@@ -209,44 +209,59 @@ class NaverPriceCrawler:
                 self.driver.get(url)
                 time.sleep(2)
             
-            # 스크롤하여 판매처 선택보기 버튼 찾기
+            # 페이지 하단으로 스크롤 (헤더 피하기)
             self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight/2);")
             time.sleep(1)
             
-            # 판매처 선택보기 버튼 클릭
+            # 판매처 선택보기 버튼 찾기 및 클릭
             try:
+                # 올바른 선택자 사용
                 select_mall_btn = self.wait.until(
-                    EC.element_to_be_clickable(
-                        (By.CSS_SELECTOR, '.filter_check_mall__IK03K, a[role="checkbox"]')
+                    EC.presence_of_element_located(
+                        (By.CSS_SELECTOR, '.filter_check_mall__IK03K')
                     )
                 )
-                self.scroll_to_element(select_mall_btn)
-                select_mall_btn.click()
+                
+                # 요소가 보이도록 추가 스크롤
+                self.driver.execute_script(
+                    "arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});", 
+                    select_mall_btn
+                )
                 time.sleep(1)
                 
-                # 판매처 목록 확인
+                # JavaScript로 클릭 (헤더 간섭 방지)
+                self.driver.execute_script("arguments[0].click();", select_mall_btn)
+                print("  판매처 선택 레이어 열림")
+                time.sleep(2)
+                
+                # 판매처 목록에서 아이허브 검색
                 soup = BeautifulSoup(self.driver.page_source, 'html.parser')
                 
-                # 아이허브 관련 키워드 검색
-                iherb_keywords = ['아이허브', 'iherb', 'iHerb']
+                # 아이허브 키워드
+                iherb_keywords = ['아이허브', 'iherb', 'iHerb', '아이허브 공식']
                 
-                mall_list = soup.select('.filter_text__yBa_v')
-                for mall in mall_list:
-                    mall_text = mall.get_text(strip=True).lower()
+                # 판매처 목록 검색
+                mall_labels = soup.select('.filter_text__yBa_v')
+                
+                for mall in mall_labels:
+                    mall_text = mall.get_text(strip=True)
                     for keyword in iherb_keywords:
-                        if keyword.lower() in mall_text:
-                            print(f"  ✓ 아이허브 판매처 발견: {mall.get_text(strip=True)}")
+                        if keyword.lower() in mall_text.lower():
+                            print(f"  ✓ 아이허브 판매처 발견: {mall_text}")
                             
-                            # 레이어 닫기
+                            # 레이어 닫기 (취소 버튼 클릭)
                             try:
-                                close_btn = self.driver.find_element(
+                                cancel_btn = self.driver.find_element(
                                     By.CSS_SELECTOR, 
-                                    '.filter_btn_close__iTFEC, .filter_btn_cancel__wIx02'
+                                    '.filter_btn_cancel__wIx02'
                                 )
-                                close_btn.click()
+                                self.driver.execute_script("arguments[0].click();", cancel_btn)
                                 time.sleep(0.5)
                             except:
-                                pass
+                                # ESC 키로 닫기 시도
+                                from selenium.webdriver.common.action_chains import ActionChains
+                                ActionChains(self.driver).send_keys(Keys.ESCAPE).perform()
+                                time.sleep(0.5)
                             
                             return True
                 
@@ -254,21 +269,23 @@ class NaverPriceCrawler:
                 
                 # 레이어 닫기
                 try:
-                    close_btn = self.driver.find_element(
+                    cancel_btn = self.driver.find_element(
                         By.CSS_SELECTOR, 
-                        '.filter_btn_close__iTFEC, .filter_btn_cancel__wIx02'
+                        '.filter_btn_cancel__wIx02'
                     )
-                    close_btn.click()
+                    self.driver.execute_script("arguments[0].click();", cancel_btn)
                     time.sleep(0.5)
                 except:
-                    pass
+                    from selenium.webdriver.common.action_chains import ActionChains
+                    ActionChains(self.driver).send_keys(Keys.ESCAPE).perform()
+                    time.sleep(0.5)
                 
                 return False
                 
             except TimeoutException:
                 print("  ! 판매처 선택보기 버튼을 찾을 수 없음")
                 
-                # 페이지 소스에서 직접 검색
+                # 페이지 전체에서 아이허브 키워드 검색 (대안)
                 soup = BeautifulSoup(self.driver.page_source, 'html.parser')
                 page_text = soup.get_text().lower()
                 
@@ -281,10 +298,10 @@ class NaverPriceCrawler:
         except Exception as e:
             print(f"✗ 아이허브 확인 실패: {e}")
             return False
-    
+        
     def process_urls(self):
         """
-        URL 일괄 처리 (실제 데이터가 있는 모든 행 자동 처리)
+        URL 일괄 처리 (날짜별 누적 + 날짜 행 병합)
         """
         try:
             # 모든 데이터 가져오기
@@ -294,9 +311,12 @@ class NaverPriceCrawler:
                 print("스프레드시트에 데이터가 없습니다.")
                 return
             
-            # 헤더는 2행 (인덱스 1)
-            headers = all_data[1]
-            print(f"헤더: {headers}")
+            # 1행: 날짜 (병합용)
+            # 2행: 항목명 (아이허브, 최저가)
+            date_row = all_data[0] if len(all_data) > 0 else []
+            headers = all_data[1] if len(all_data) > 1 else []
+            
+            print(f"현재 헤더 개수: {len(headers)}개")
             
             # URL 컬럼 찾기 (D 컬럼)
             url_col_idx = None
@@ -307,75 +327,67 @@ class NaverPriceCrawler:
             
             if url_col_idx is None:
                 print("URL 컬럼을 찾을 수 없습니다.")
-                print(f"사용 가능한 헤더: {headers}")
                 return
             
             print(f"URL 컬럼 위치: {chr(65+url_col_idx)} (인덱스 {url_col_idx})")
             
-            # 기존 컬럼 확인 및 신규 컬럼 추가
-            # E: 아이허브 여부 (기존)
-            # F: 최저가 (기존 "1등 가격")
-            # G: 배송비 (신규)
-            # H: 판매처 (신규)
-            # I: 업데이트시간 (신규)
+            # 오늘 날짜
+            today = datetime.now().strftime('%Y-%m-%d')
+            print(f"\n📅 처리 날짜: {today}")
             
-            iherb_col_idx = None
-            price_col_idx = None
+            # 오늘 날짜의 컬럼이 이미 있는지 확인 (1행의 날짜 확인)
+            today_start_col = None
+            for idx in range(len(date_row)):
+                if date_row[idx] and today in date_row[idx]:
+                    today_start_col = idx
+                    print(f"⚠️  같은 날짜 컬럼 발견 → 덮어쓰기 모드")
+                    break
             
-            for idx, header in enumerate(headers):
-                if header and '아이허브' in header:
-                    iherb_col_idx = idx
-                if header and ('가격' in header or 'price' in header.lower()):
-                    price_col_idx = idx
-            
-            # 헤더가 충분하지 않으면 추가
-            if len(headers) < url_col_idx + 6:
-                # 필요한 컬럼 추가
+            # 오늘 날짜 컬럼이 없으면 새로 추가
+            if today_start_col is None:
+                # 마지막 컬럼 다음에 추가
+                today_start_col = len(headers)
+                
+                # 1행에 날짜 추가 (병합용)
+                new_date_row = date_row.copy()
+                while len(new_date_row) < today_start_col:
+                    new_date_row.append('')
+                new_date_row.append(today)  # E열에 날짜
+                new_date_row.append('')      # F열은 비움 (병합될 부분)
+                
+                # 2행에 항목명 추가
                 new_headers = headers.copy()
-                
-                # E열: 아이허브 여부
-                if iherb_col_idx is None:
-                    while len(new_headers) <= url_col_idx + 1:
-                        new_headers.append('')
-                    new_headers[url_col_idx + 1] = '아이허브 여부'
-                    iherb_col_idx = url_col_idx + 1
-                
-                # F열: 최저가
-                if price_col_idx is None:
-                    while len(new_headers) <= url_col_idx + 2:
-                        new_headers.append('')
-                    new_headers[url_col_idx + 2] = '최저가'
-                    price_col_idx = url_col_idx + 2
-                
-                # G열: 배송비
-                while len(new_headers) <= url_col_idx + 3:
+                while len(new_headers) < today_start_col:
                     new_headers.append('')
-                new_headers[url_col_idx + 3] = '배송비'
+                new_headers.append('아이허브')
+                new_headers.append('최저가')
                 
-                # H열: 판매처
-                while len(new_headers) <= url_col_idx + 4:
-                    new_headers.append('')
-                new_headers[url_col_idx + 4] = '판매처'
+                # 1행과 2행 업데이트
+                update_range = f'A1:{chr(65+len(new_date_row)-1)}2'
+                self.sheet.update([new_date_row, new_headers], update_range)
                 
-                # I열: 업데이트시간
-                while len(new_headers) <= url_col_idx + 5:
-                    new_headers.append('')
-                new_headers[url_col_idx + 5] = '업데이트시간'
+                # 셀 병합 (E1:F1 병합)
+                merge_range = f'{chr(65+today_start_col)}1:{chr(65+today_start_col+1)}1'
+                self.sheet.merge_cells(merge_range, merge_type='MERGE_ALL')
                 
-                # 헤더 업데이트
-                self.sheet.update([new_headers], f'A2:{chr(65+len(new_headers)-1)}2')
+                print(f"✓ 새로운 날짜 컬럼 추가: {chr(65+today_start_col)}~{chr(65+today_start_col+1)}열")
+                print(f"✓ 날짜 병합: {merge_range}")
+                
+                date_row = new_date_row
                 headers = new_headers
-                print("결과 컬럼 추가 완료")
+            else:
+                print(f"✓ 기존 컬럼 사용: {chr(65+today_start_col)}열부터")
             
-            print(f"아이허브 여부 컬럼: {chr(65+iherb_col_idx)}")
-            print(f"최저가 컬럼: {chr(65+price_col_idx)}")
-            print(f"배송비 컬럼: {chr(65+url_col_idx+3)}")
-            print(f"판매처 컬럼: {chr(65+url_col_idx+4)}")
-            print(f"업데이트시간 컬럼: {chr(65+url_col_idx+5)}")
+            # 컬럼 위치
+            iherb_col = today_start_col
+            price_col = today_start_col + 1
             
-            # 실제 URL이 있는 행 찾기 (3행부터 시작 - 인덱스 2)
+            print(f"  📍 아이허브: {chr(65+iherb_col)}열")
+            print(f"  📍 최저가: {chr(65+price_col)}열")
+            
+            # 실제 URL이 있는 행 찾기 (3행부터 - 1행 날짜, 2행 헤더)
             url_rows = []
-            for row_idx in range(2, len(all_data)):  # 1행 제목, 2행 헤더 제외
+            for row_idx in range(2, len(all_data)):
                 row_data = all_data[row_idx]
                 
                 if len(row_data) > url_col_idx:
@@ -387,9 +399,9 @@ class NaverPriceCrawler:
                 print("\n처리할 URL이 없습니다.")
                 return
             
-            print(f"\n총 {len(url_rows)}개의 URL 발견")
-            print(f"시작 행: {url_rows[0] + 1}")
-            print(f"종료 행: {url_rows[-1] + 1}")
+            print(f"\n📊 총 {len(url_rows)}개의 URL 발견")
+            print(f"   시작 행: {url_rows[0] + 1}")
+            print(f"   종료 행: {url_rows[-1] + 1}")
             
             # URL 처리
             for idx, row_idx in enumerate(url_rows):
@@ -406,58 +418,36 @@ class NaverPriceCrawler:
                 # 아이허브 판매 확인
                 has_iherb = self.check_iherb_available(url)
                 
-                # 현재 시간
-                update_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                
                 # 스프레드시트 업데이트
                 result_row = row_idx + 1
                 
-                # 각 컬럼별로 업데이트
-                # E: 아이허브 여부 (O/X)
-                iherb_col = chr(65 + iherb_col_idx)
-                iherb_value = 'O' if has_iherb else 'X'
-                self.sheet.update([[iherb_value]], f'{iherb_col}{result_row}')
+                # 배치 업데이트 (2개 셀만)
+                update_range = f'{chr(65+iherb_col)}{result_row}:{chr(65+price_col)}{result_row}'
+                update_values = [[
+                    'O' if has_iherb else 'X',
+                    price_info['price']
+                ]]
                 
-                # F: 최저가
-                price_col = chr(65 + price_col_idx)
-                self.sheet.update([[price_info['price']]], f'{price_col}{result_row}')
+                self.sheet.update(update_values, update_range)
                 
-                # G: 배송비
-                shipping_col = chr(65 + url_col_idx + 3)
-                self.sheet.update([[price_info['shipping']]], f'{shipping_col}{result_row}')
-                
-                # H: 판매처
-                mall_col = chr(65 + url_col_idx + 4)
-                self.sheet.update([[price_info['mall']]], f'{mall_col}{result_row}')
-                
-                # I: 업데이트시간
-                time_col = chr(65 + url_col_idx + 5)
-                self.sheet.update([[update_time]], f'{time_col}{result_row}')
-                
-                print(f"\n✓ 행 {result_row} 업데이트 완료")
-                print(f"  - 최저가: {price_info['price']}")
-                print(f"  - 배송비: {price_info['shipping']}")
-                print(f"  - 판매처: {price_info['mall']}")
-                print(f"  - 아이허브: {iherb_value}")
+                print(f"\n✅ 행 {result_row} 업데이트 완료")
+                print(f"   아이허브: {'O' if has_iherb else 'X'}")
+                print(f"   최저가: {price_info['price']}원")
                 
                 # 요청 간 딜레이
                 time.sleep(2)
             
             print(f"\n{'='*60}")
-            print(f"✓ 전체 처리 완료!")
-            print(f"처리된 URL: {len(url_rows)}개")
+            print(f"✅ 전체 처리 완료!")
+            print(f"   처리된 URL: {len(url_rows)}개")
+            print(f"   저장 위치: {chr(65+iherb_col)}~{chr(65+price_col)}열")
             print(f"{'='*60}")
             
         except Exception as e:
             print(f"✗ URL 처리 중 오류 발생: {e}")
+            import traceback
+            traceback.print_exc()
             raise
-    
-    def close(self):
-        """브라우저 종료"""
-        if self.driver:
-            self.driver.quit()
-            print("\n✓ 브라우저 종료")
-
 
 def main():
     """메인 함수"""
