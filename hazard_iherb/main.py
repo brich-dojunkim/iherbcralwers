@@ -39,7 +39,7 @@ TEMP_DIR = Path(__file__).parent / "temp_images"
 MAX_MESSAGES_PER_CHAT = 5
 WAIT_AFTER_GOOGLE = 2
 WAIT_AFTER_SCRAPE = 2
-WAIT_AFTER_VERIFY = 15
+WAIT_AFTER_VERIFY = 5
 
 
 class UnifiedMatcher:
@@ -86,11 +86,6 @@ class UnifiedMatcher:
         Returns:
             결과 딕셔너리
         """
-        # ✅ 매 상품마다 세션 클리어 (첫 번째 제외)
-        if idx > 1:
-            self.google_search.clear_session()
-            time.sleep(2)
-        
         # 새 채팅 시작 (5개마다)
         if self.chat_count >= MAX_MESSAGES_PER_CHAT and self.chat_count > 0:
             print(f"\n[CHAT] {self.chat_count}개 처리 → 새 채팅 시작\n")

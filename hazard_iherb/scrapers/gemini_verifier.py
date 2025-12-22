@@ -31,6 +31,9 @@ class GeminiVerifier:
         # 설정
         self.WAIT_AFTER_UPLOAD = 3
         self.WAIT_RETRY_BASE = 30
+        
+        # 대화 추적
+        self.conv_count_before = 0
     
     def _wait_for_dom_stability(self, timeout: int = 5) -> bool:
         """DOM 안정화 대기 (URL 변경 감지)"""
@@ -316,7 +319,15 @@ Your answer:"""
         time.sleep(1)
     
     def _submit_message(self):
-        """전송"""
+        """전송 - 전송 전 대화 개수 저장"""
+        # 전송 전 현재 대화 개수 저장
+        try:
+            convs = self.driver.find_elements(By.CSS_SELECTOR, ".conversation-container")
+            self.conv_count_before = len(convs)
+            print(f"  [SUBMIT] 전송 전 대화 개수: {self.conv_count_before}")
+        except:
+            self.conv_count_before = 0
+        
         try:
             button = self.driver.find_element(By.CSS_SELECTOR, 
                 "button[aria-label='메시지 보내기'], button[aria-label*='Send']")
@@ -340,59 +351,135 @@ Your answer:"""
             pass
     
     def _wait_for_response(self) -> Tuple[bool, str]:
-        """응답 대기"""
-        max_wait = 60
+        """응답 대기 - 새 대화 생성 감지 + 응답 완료 대기 + 텍스트 안정화"""
         start_time = time.time()
         
-        # 새 메시지 텍스트 감지
-        new_message_timeout = 40
+        # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        # 1단계: 새 대화 컨테이너 생성 대기 (40초)
+        # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        new_conversation_timeout = 10
+        print(f"  [WAIT] 새 대화 생성 대기...")
         
-        while time.time() - start_time < new_message_timeout:
+        while time.time() - start_time < new_conversation_timeout:
             try:
-                messages = self.driver.find_elements(By.TAG_NAME, "message-content")
-                if not messages:
-                    time.sleep(1)
-                    continue
+                convs = self.driver.find_elements(By.CSS_SELECTOR, ".conversation-container")
+                current_count = len(convs)
                 
-                last_message = messages[-1]
-                markdown = last_message.find_element(By.CSS_SELECTOR, ".markdown")
-                
-                text = markdown.get_attribute("textContent") or ""
-                text = text.strip()
-                
-                if len(text) > 10:
+                if current_count > self.conv_count_before:
+                    print(f"  [NEW] ✓ 새 대화 생성됨 ({current_count}번째 대화)")
                     break
             except:
                 pass
             
-            time.sleep(1)
+            time.sleep(0.5)
         else:
-            raise Exception("새 응답 감지 타임아웃 (40초)")
+            raise Exception("새 대화 생성 타임아웃 (40초)")
         
-        # 응답 완료 대기
-        while time.time() - start_time < max_wait:
+        # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        # 2단계: 응답 완료 대기 (60초)
+        # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        response_complete_timeout = 60
+        print(f"  [WAIT] 응답 완료 대기...")
+        
+        while time.time() - start_time < response_complete_timeout:
             try:
-                messages = self.driver.find_elements(By.TAG_NAME, "message-content")
-                last_message = messages[-1]
-                markdown = last_message.find_element(By.CSS_SELECTOR, ".markdown")
+                # 마지막 대화 컨테이너 찾기
+                convs = self.driver.find_elements(By.CSS_SELECTOR, ".conversation-container")
+                if not convs:
+                    time.sleep(1)
+                    continue
                 
+                last_conv = convs[-1]
+                
+                # 마지막 대화의 markdown 찾기
+                markdown = last_conv.find_element(By.CSS_SELECTOR, ".markdown")
+                
+                # aria-live="polite" 확인 (응답 완료)
                 aria_live = markdown.get_attribute("aria-live")
                 
                 if aria_live == "polite":
-                    text = markdown.get_attribute("textContent").strip()
+                    # aria-live="polite" 감지 후 텍스트 안정화 대기
+                    print(f"  [POLITE] aria-live=polite 감지, 텍스트 안정화 대기 중...")
                     
-                    print(f"  [RESPONSE] ✓ 응답 완료 (길이: {len(text)} chars)")
+                    stable_text = self._wait_for_text_stability(markdown, timeout=10)
+                    
+                    if not stable_text or len(stable_text) < 10:
+                        print(f"  [WARN] 텍스트가 너무 짧음 ({len(stable_text) if stable_text else 0} chars), 재시도...")
+                        time.sleep(2)
+                        continue
+                    
+                    print(f"  [COMPLETE] ✓ 응답 완료 ({len(stable_text)} chars)")
                     
                     # YES/NO 판정
-                    first_word = text.split()[0].upper().rstrip(':,.')
-                    is_match = first_word == 'YES' or text.upper().startswith('YES')
+                    first_word = stable_text.split()[0].upper().rstrip(':,.')
+                    is_match = first_word == 'YES' or stable_text.upper().startswith('YES')
                     
-                    print(f"  [RESPONSE] 판정: {'YES' if is_match else 'NO'}")
+                    print(f"  [RESULT] 판정: {'YES' if is_match else 'NO'}")
                     
-                    return is_match, text
+                    return is_match, stable_text
                 
-                time.sleep(2)
             except:
-                time.sleep(1)
+                pass
+            
+            time.sleep(1)
         
         raise Exception("응답 완료 타임아웃 (60초)")
+    
+    def _wait_for_text_stability(self, markdown_element, timeout: int = 10) -> str:
+        """
+        텍스트가 더 이상 변하지 않을 때까지 대기
+        
+        Args:
+            markdown_element: markdown DOM 요소
+            timeout: 최대 대기 시간 (초)
+        
+        Returns:
+            안정화된 텍스트
+        """
+        start_time = time.time()
+        prev_text = ""
+        stable_count = 0
+        
+        while time.time() - start_time < timeout:
+            try:
+                current_text = markdown_element.get_attribute("textContent")
+                if current_text:
+                    current_text = current_text.strip()
+                else:
+                    current_text = ""
+                
+                # 텍스트가 변하지 않으면 stable_count 증가
+                if current_text == prev_text:
+                    stable_count += 1
+                    
+                    # 3번 연속 같으면 안정화됨
+                    if stable_count >= 3:
+                        # 마지막 문자 체크 (완결된 문장인지)
+                        if len(current_text) > 0:
+                            last_char = current_text[-1]
+                            
+                            # 문장이 완결되었거나, 질문으로 끝나는 경우
+                            if last_char in ['.', '?', '!']:
+                                print(f"  [STABLE] 텍스트 안정화 완료 ('{last_char}'로 끝남)")
+                                return current_text
+                            
+                            # 비정상적으로 끝난 경우 (전치사, 접속사 등)
+                            # 조금 더 대기
+                            if stable_count >= 5:
+                                print(f"  [WARN] 텍스트가 '{current_text[-20:]}'로 끝남 (비정상)")
+                                # 그래도 반환 (타임아웃 방지)
+                                return current_text
+                else:
+                    # 텍스트가 변했으면 초기화
+                    prev_text = current_text
+                    stable_count = 0
+                
+                time.sleep(0.5)
+                
+            except Exception as e:
+                print(f"  [ERROR] 안정화 대기 중 오류: {e}")
+                break
+        
+        # 타임아웃
+        print(f"  [TIMEOUT] 텍스트 안정화 타임아웃, 현재 텍스트 반환")
+        return prev_text if prev_text else ""

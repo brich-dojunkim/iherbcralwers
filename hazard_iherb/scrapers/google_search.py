@@ -23,14 +23,22 @@ class GoogleImageSearch:
         self.wait = WebDriverWait(driver, 25)
     
     def clear_session(self):
-        """세션 초기화 (브라우저는 유지)"""
+        """세션 초기화 (캐시 포함 - 완전 클리어)"""
         try:
+            # Chrome DevTools Protocol로 캐시 완전 클리어
+            self.driver.execute_cdp_cmd('Network.clearBrowserCache', {})
+            self.driver.execute_cdp_cmd('Network.clearBrowserCookies', {})
+            
+            # 쿠키 클리어
             self.driver.delete_all_cookies()
+            
+            # localStorage/sessionStorage 클리어
             self.driver.execute_script("window.localStorage.clear();")
             self.driver.execute_script("window.sessionStorage.clear();")
-            print(f"  [CLEAN] ✓ 세션 클리어 완료")
+            
+            print(f"  [CLEAN] ✓ 세션+캐시 완전 클리어")
         except Exception as e:
-            print(f"  [CLEAN] ⚠ 세션 클리어 실패: {e}")
+            print(f"  [CLEAN] ⚠ 클리어 실패: {e}")
     
     def find_iherb_url(self, image_path: Path) -> Optional[str]:
         """
@@ -43,9 +51,13 @@ class GoogleImageSearch:
             iHerb URL or None
         """
         try:
+            # 세션 클리어 (검색 직전)
+            self.clear_session()
+            time.sleep(1)
+            
             print(f"  [GOOGLE] 이미지 업로드 중...")
             self.driver.get("https://images.google.com/")
-            time.sleep(2)
+            time.sleep(3)  # 페이지 완전 로딩 대기
             
             # 카메라 버튼 클릭
             camera_btn = self.wait.until(
@@ -86,7 +98,7 @@ class GoogleImageSearch:
             
             # 결과 대기
             self.wait.until(EC.presence_of_element_located((By.TAG_NAME, "a")))
-            time.sleep(5)  # 검색 결과 로드 대기
+            time.sleep(7)  # 검색 결과 로드 대기 (캐시 방지)
             
             print(f"  [SEARCH] ✓ 검색 완료")
             
