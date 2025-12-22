@@ -23,20 +23,62 @@ class GoogleImageSearch:
         self.wait = WebDriverWait(driver, 25)
     
     def clear_session(self):
-        """세션 초기화 (캐시 포함 - 완전 클리어)"""
+        """완전한 세션 클리어 - 순서가 핵심"""
         try:
-            # Chrome DevTools Protocol로 캐시 완전 클리어
+            # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            # 1단계: Google origin에서 클리어할 것들
+            # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            self.driver.get("https://www.google.com")
+            time.sleep(1)
+            
+            # JavaScript Storage 클리어 (Google origin에서만 가능)
+            self.driver.execute_script("""
+                localStorage.clear();
+                sessionStorage.clear();
+            """)
+            
+            # Service Worker 제거 (Google origin에서)
+            self.driver.execute_script("""
+                if ('serviceWorker' in navigator) {
+                    navigator.serviceWorker.getRegistrations().then(registrations => {
+                        registrations.forEach(r => r.unregister());
+                    });
+                }
+            """)
+            
+            # Cache Storage 삭제 (Google origin에서)
+            self.driver.execute_script("""
+                if ('caches' in window) {
+                    caches.keys().then(names => {
+                        names.forEach(name => caches.delete(name));
+                    });
+                }
+            """)
+            
+            time.sleep(2)  # Service Worker 제거 완료 대기
+            
+            # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            # 2단계: CDP로 확실하게 삭제 (origin 무관)
+            # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            self.driver.execute_cdp_cmd('Storage.clearDataForOrigin', {
+                'origin': 'https://www.google.com',
+                'storageTypes': 'all'
+            })
+            
             self.driver.execute_cdp_cmd('Network.clearBrowserCache', {})
             self.driver.execute_cdp_cmd('Network.clearBrowserCookies', {})
             
             # 쿠키 클리어
             self.driver.delete_all_cookies()
             
-            # localStorage/sessionStorage 클리어
-            self.driver.execute_script("window.localStorage.clear();")
-            self.driver.execute_script("window.sessionStorage.clear();")
+            # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            # 3단계: 메모리 정리
+            # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            self.driver.get("about:blank")
+            time.sleep(1)
             
-            print(f"  [CLEAN] ✓ 세션+캐시 완전 클리어")
+            print(f"  [CLEAN] ✓ 세션 완전 클리어")
+            
         except Exception as e:
             print(f"  [CLEAN] ⚠ 클리어 실패: {e}")
     
@@ -51,10 +93,6 @@ class GoogleImageSearch:
             iHerb URL or None
         """
         try:
-            # 세션 클리어 (검색 직전)
-            self.clear_session()
-            time.sleep(1)
-            
             print(f"  [GOOGLE] 이미지 업로드 중...")
             self.driver.get("https://images.google.com/")
             time.sleep(3)  # 페이지 완전 로딩 대기
@@ -98,7 +136,7 @@ class GoogleImageSearch:
             
             # 결과 대기
             self.wait.until(EC.presence_of_element_located((By.TAG_NAME, "a")))
-            time.sleep(7)  # 검색 결과 로드 대기 (캐시 방지)
+            time.sleep(7)  # 검색 결과 로드 대기
             
             print(f"  [SEARCH] ✓ 검색 완료")
             

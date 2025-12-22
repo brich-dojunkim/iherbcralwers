@@ -78,6 +78,7 @@ class UnifiedMatcher:
         
         # 채팅 카운터
         self.chat_count = 0
+        self.headless = headless
     
     def process_item(self, row: pd.Series, idx: int, total: int) -> dict:
         """
@@ -134,6 +135,11 @@ class UnifiedMatcher:
         # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         
         print(f"  [STEP 2] Google 역검색 중...")
+        
+        # 세션 클리어 (검색 전에)
+        self.google_search.clear_session()
+        
+        # 검색 수행
         iherb_url = self.google_search.find_iherb_url(image_path)
         
         # 이미지 삭제
@@ -143,9 +149,7 @@ class UnifiedMatcher:
             pass
         
         if not iherb_url:
-            print(f"  [STEP 2] ✗ NOT_FOUND")
-            self.google_search.clear_session()
-            print()
+            print(f"  [STEP 2] ✗ NOT_FOUND\n")
             return self._create_result(row, Status.NOT_FOUND)
         
         print(f"  [STEP 2] ✓ URL 발견: {iherb_url}")
@@ -161,9 +165,7 @@ class UnifiedMatcher:
         scraped = self.iherb_scraper.scrape_product(iherb_url)
         
         if not scraped['image_url'] or not scraped['product_name'] or not scraped['brand']:
-            print(f"  [STEP 3] ⚠ SCRAPE_FAILED")
-            self.google_search.clear_session()
-            print()
+            print(f"  [STEP 3] ⚠ SCRAPE_FAILED\n")
             return self._create_result(
                 row,
                 Status.SCRAPE_FAILED,
@@ -206,9 +208,6 @@ class UnifiedMatcher:
                 print(f"           이유: {reason[:80]}...")
                 status = Status.VERIFIED_MISMATCH
             
-            # 세션 클리어 (다음 검색 준비)
-            self.google_search.clear_session()
-            
             return self._create_result(
                 row,
                 status,
@@ -222,9 +221,7 @@ class UnifiedMatcher:
             )
             
         except Exception as e:
-            print(f"  [STEP 4] ⚠ 검증 실패: {e}")
-            self.google_search.clear_session()
-            print()
+            print(f"  [STEP 4] ⚠ 검증 실패: {e}\n")
             return self._create_result(
                 row,
                 Status.FOUND,  # URL은 찾았지만 검증 실패
