@@ -4,7 +4,9 @@
 이미지 처리 유틸리티
 """
 
+import re
 import uuid
+import json
 import requests
 from pathlib import Path
 from typing import Optional
@@ -76,3 +78,36 @@ def extract_product_code(url: str) -> Optional[str]:
             return code if code else None
     except:
         return None
+
+
+def extract_iherb_code(image_url_json: str) -> Optional[str]:
+    """
+    iHerb 이미지 URL에서 상품 코드 추출
+    
+    Args:
+        image_url_json: JSON 형식의 이미지 URL 배열
+        예: ["https://cloudinary.images-iherb.com/image/upload/f_auto,q_auto:eco/images/rkt/rkt53032/g/8.jpg"]
+    
+    Returns:
+        상품 코드 (예: "rkt53032") 또는 None
+    """
+    if not image_url_json or pd.isna(image_url_json):
+        return None
+    
+    try:
+        # JSON 파싱
+        urls = json.loads(image_url_json)
+        if not urls or len(urls) == 0:
+            return None
+        
+        url = urls[0]
+        
+        # 패턴: /images/{brand}/{product_code}/
+        match = re.search(r'/images/[^/]+/([^/]+)/', url)
+        if match:
+            return match.group(1)
+        
+    except:
+        pass
+    
+    return None

@@ -46,7 +46,8 @@ UNIFIED_COLUMNS = [
     
     # iHerb 정보
     'IHERB_URL',            # iHerb 제품 URL
-    'product_code',         # iHerb 상품코드
+    'product_code',         # iHerb 상품코드 (URL에서 추출)
+    'IHERB_CODE',           # iHerb 상품코드 (이미지 URL에서 추출)
     'IHERB_제품명',          # iHerb 제품명
     'IHERB_제조사',          # iHerb 제조사
     'IHERB_PRODUCT_IMAGES', # iHerb 이미지 (JSON)

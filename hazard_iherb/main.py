@@ -26,7 +26,7 @@ from config import (
     UNIFIED_COLUMNS
 )
 from utils.selenium_utils import create_driver
-from utils.image_utils import download_image, extract_product_code
+from utils.image_utils import download_image, extract_product_code, extract_iherb_code
 from scrapers.google_search import GoogleImageSearch
 from scrapers.iherb_scraper import IHerbScraper
 from scrapers.gemini_verifier import GeminiVerifier
@@ -244,6 +244,7 @@ class UnifiedMatcher:
             'IMAGE_URL': row.get('IMAGE_URL', ''),
             'IHERB_URL': kwargs.get('iherb_url', ''),
             'product_code': kwargs.get('product_code', ''),
+            'IHERB_IMAGE_CODE': extract_iherb_code(kwargs.get('iherb_images', '')) or '',
             'IHERB_제품명': kwargs.get('iherb_name', ''),
             'IHERB_제조사': kwargs.get('iherb_brand', ''),
             'IHERB_PRODUCT_IMAGES': kwargs.get('iherb_images', ''),
@@ -253,6 +254,7 @@ class UnifiedMatcher:
             'GEMINI_REASON': str(kwargs.get('gemini_reason', '')),
             'VERIFIED_AT': datetime.now().strftime("%Y%m%d%H%M%S") if kwargs.get('gemini_verified') is not None else ''
         }
+
     
     
     def close(self):
