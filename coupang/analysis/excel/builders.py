@@ -6,11 +6,7 @@ Excel Config Builder (통합 버전)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 column_map → ExcelConfig + DataFrame 한 번에 생성
 
-🔥 통합 기능:
-  - DataFrame 변환 (기존 utils.py)
-  - ColumnSpec 자동 생성 (패턴 매칭)
-  - GroupSpec 자동 생성 (패턴 매칭)
-  - ConditionalRule 자동 생성 (패턴 매칭)
+🔥 핵심 수정: _infer_groups() - 원래 순서 완전 보존
 """
 
 import pandas as pd
@@ -27,7 +23,7 @@ from .constants import FORMATS, COLORS, COLOR_SCHEMES
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 FORMAT_PATTERNS = [
-    (r'(할인|비율|위너|점유)', FORMATS['percentage']),
+    (r'(할인|비율|위너|점유|비중)', FORMATS['percentage']),
     (r'(가격|매출|격차|정가|판매가|추천가)', FORMATS['currency']),
     (r'(판매량|재고|리뷰|수량)', FORMATS['integer']),
     (r'(평점|rating)', FORMATS['float']),
@@ -36,7 +32,7 @@ FORMAT_PATTERNS = [
 ]
 
 ALIGNMENT_PATTERNS = [
-    (r'(가격|할인|비율|판매량|매출|재고|순위|평점|리뷰|Δ)', 'right'),
+    (r'(가격|할인|비율|판매량|매출|재고|순위|평점|리뷰|비중|Δ)', 'right'),
     (r'(제품명|카테고리)', 'left'),
 ]
 
@@ -49,17 +45,17 @@ WIDTH_PATTERNS = [
 ]
 
 GROUP_PATTERNS = [
-    (r'(상태|품번|Product_ID|UPC)', 'info', '코어'),
+    (r'(상태|품번|Product_ID|UPC|신뢰)', 'info', '코어'),
     (r'(요청|추천|손익|할인|격차|유리)', 'primary', '할인전략'),
     (r'Δ$', 'secondary', '변화'),
     (r'(가격|정가|판매가|추천가)', 'tertiary', '가격상태'),
-    (r'(판매량|위너|재고|매출)', 'success', '판매/위너'),
+    (r'(판매량|위너|재고|매출|비중)', 'success', '판매/위너'),
     (r'제품명', 'info', '제품명'),
     (r'카테고리', 'info', '카테고리'),
     (r'링크', 'info', '링크'),
     (r'(Vendor|Item|ID)', 'info', 'ID'),
     (r'순위', 'info', '순위'),
-    (r'(평점|리뷰)', 'info', '평가'),
+    (r'(평점|리뷰|주문|전환|취소)', 'info', '평가'),
 ]
 
 
@@ -89,6 +85,12 @@ class ExcelConfigBuilder:
                 'Excel컬럼명': ('source_column', dtype),
                 'Excel컬럼명': ('source_column', dtype, default),
             }
+            
+            🆕 지원 dtype:
+                - 'share': 전체 대비 비중 (%) 자동 계산
+                - 'rank': 순위 (내림차순) 자동 계산
+                - 'Int64', float, str: 기본 타입 변환
+            
             auto_groups: 자동 그룹 생성
             auto_rules: 자동 조건부 서식
             freeze_panes: 틀 고정 위치
@@ -132,12 +134,11 @@ class ExcelConfigBuilder:
         source_df: pd.DataFrame,
         column_map: Dict[str, tuple]
     ) -> pd.DataFrame:
-        """column_map → DataFrame 변환 (기존 utils.build_output_dataframe)
-        
-        🔥 통합: utils.py의 build_output_dataframe 로직
-        """
+        """column_map → DataFrame 변환 + 🆕 동적 계산 지원"""
         
         output_data = {}
+        share_specs = []
+        rank_specs = []
         
         for excel_col, spec in column_map.items():
             # Tuple 파싱
@@ -148,13 +149,20 @@ class ExcelConfigBuilder:
             else:
                 source_col, dtype, default = spec
             
-            # 소스 컬럼이 None이면 스킵 (동적 계산 컬럼)
+            # 🆕 동적 계산 타입
+            if dtype == 'share':
+                share_specs.append((excel_col, source_col))
+                continue
+            
+            if dtype == 'rank':
+                rank_specs.append((excel_col, source_col))
+                continue
+            
+            # 기존 로직
             if source_col is None:
                 continue
             
-            # 컬럼 추출
             if source_col not in source_df.columns:
-                # 없으면 기본값
                 if dtype == 'Int64':
                     output_data[excel_col] = pd.Series([pd.NA] * len(source_df), dtype='Int64')
                 else:
@@ -162,7 +170,6 @@ class ExcelConfigBuilder:
             else:
                 series = source_df[source_col]
                 
-                # 타입 변환
                 if dtype == 'Int64':
                     output_data[excel_col] = pd.to_numeric(series, errors='coerce').astype('Int64')
                 elif dtype:
@@ -170,7 +177,29 @@ class ExcelConfigBuilder:
                 else:
                     output_data[excel_col] = series
         
-        return pd.DataFrame(output_data)
+        df = pd.DataFrame(output_data)
+        
+        # 비중 계산
+        for excel_col, source_col in share_specs:
+            if source_col in source_df.columns:
+                total = pd.to_numeric(source_df[source_col], errors='coerce').fillna(0).sum()
+                if total > 0:
+                    df[excel_col] = (
+                        pd.to_numeric(source_df[source_col], errors='coerce').fillna(0) / total * 100
+                    ).round(0).astype('Int64')
+                else:
+                    df[excel_col] = pd.Series([pd.NA] * len(df), dtype='Int64')
+            else:
+                df[excel_col] = pd.Series([pd.NA] * len(df), dtype='Int64')
+        
+        # 순위 계산
+        for excel_col, source_col in rank_specs:
+            if source_col in source_df.columns:
+                df[excel_col] = source_df[source_col].rank(method='min', ascending=False).astype('Int64')
+            else:
+                df[excel_col] = pd.Series([pd.NA] * len(df), dtype='Int64')
+        
+        return df
     
     @staticmethod
     def _build_columns(column_names: List[str]) -> List[ColumnSpec]:
@@ -211,45 +240,61 @@ class ExcelConfigBuilder:
     
     @staticmethod
     def _infer_groups(column_names: List[str]) -> List[GroupSpec]:
-        """컬럼명 패턴으로 GroupSpec 자동 생성"""
+        """컬럼명 패턴으로 GroupSpec 자동 생성 - 🔥 원래 순서 완전 보존
         
-        # 컬럼 → 그룹 매핑
-        col_to_group = {}
+        핵심: column_map 순서를 절대 변경하지 않음!
+        연속된 같은 그룹만 하나로 묶음
+        """
         
+        # 1단계: 각 컬럼의 그룹 결정 (순서 유지)
+        col_groups = []
         for col_name in column_names:
+            matched = False
             for pattern, scheme, group_name in GROUP_PATTERNS:
                 if re.search(pattern, col_name):
-                    col_to_group[col_name] = (scheme, group_name)
+                    col_groups.append((col_name, scheme, group_name))
+                    matched = True
                     break
             
-            if col_name not in col_to_group:
-                col_to_group[col_name] = ('info', '기타')
+            if not matched:
+                col_groups.append((col_name, 'info', '기타'))
         
-        # 그룹별로 묶기 (순서 유지)
-        groups_dict = {}
-        group_order = []
-        
-        for col_name in column_names:
-            scheme, group_name = col_to_group[col_name]
-            
-            if group_name not in groups_dict:
-                groups_dict[group_name] = {
-                    'scheme': scheme,
-                    'columns': []
-                }
-                group_order.append(group_name)
-            
-            groups_dict[group_name]['columns'].append(col_name)
-        
-        # GroupSpec 생성 (순서 보장)
+        # 2단계: 연속된 같은 그룹끼리만 묶음 (순서 유지)
         groups = []
-        for group_name in group_order:
-            info = groups_dict[group_name]
-            groups.append(GroupSpec(
-                name=group_name,
-                color_scheme=info['scheme'],
-                sub_groups=[SubGroup(name='', columns=info['columns'])]
-            ))
+        
+        if not col_groups:
+            return groups
+        
+        # 첫 번째 그룹 시작
+        current_group_name = col_groups[0][2]
+        current_scheme = col_groups[0][1]
+        current_columns = [col_groups[0][0]]
+        
+        for i in range(1, len(col_groups)):
+            col_name, scheme, group_name = col_groups[i]
+            
+            if group_name == current_group_name:
+                # 같은 그룹 → 추가
+                current_columns.append(col_name)
+            else:
+                # 다른 그룹 → 이전 그룹 저장하고 새 그룹 시작
+                groups.append(GroupSpec(
+                    name=current_group_name,
+                    color_scheme=current_scheme,
+                    sub_groups=[SubGroup(name='', columns=current_columns)]
+                ))
+                
+                # 새 그룹 시작
+                current_group_name = group_name
+                current_scheme = scheme
+                current_columns = [col_name]
+        
+        # 마지막 그룹 추가
+        groups.append(GroupSpec(
+            name=current_group_name,
+            color_scheme=current_scheme,
+            sub_groups=[SubGroup(name='', columns=current_columns)]
+        ))
         
         return groups
     
@@ -260,7 +305,6 @@ class ExcelConfigBuilder:
         rules = []
         
         for col_name in column_names:
-            # Δ 컬럼: 양수=초록, 음수=빨강
             if col_name.endswith('Δ'):
                 rules.extend([
                     ConditionalRule(
@@ -275,7 +319,6 @@ class ExcelConfigBuilder:
                     ),
                 ])
             
-            # 위너비율: >= 30% = 초록
             elif '위너' in col_name:
                 rules.append(ConditionalRule(
                     column=col_name,
@@ -283,7 +326,6 @@ class ExcelConfigBuilder:
                     fill_color=COLORS['GREEN']
                 ))
             
-            # 유리한곳: 아이허브=초록, 로켓직구=빨강
             elif '유리' in col_name:
                 rules.extend([
                     ConditionalRule(
@@ -298,7 +340,6 @@ class ExcelConfigBuilder:
                     ),
                 ])
             
-            # 가격격차: 음수(아이허브 저렴)=초록, 양수=빨강
             elif '격차' in col_name:
                 rules.extend([
                     ConditionalRule(
@@ -313,7 +354,6 @@ class ExcelConfigBuilder:
                     ),
                 ])
             
-            # 할인율 (손익/추천/요청): 양수=빨강
             elif any(k in col_name for k in ['손익', '추천', '요청']) and '할인' in col_name:
                 rules.append(ConditionalRule(
                     column=col_name,
@@ -321,7 +361,6 @@ class ExcelConfigBuilder:
                     fill_color=COLORS['RED']
                 ))
             
-            # 신뢰도: High=초록, Medium=노랑, Low=빨강
             elif '신뢰' in col_name:
                 rules.extend([
                     ConditionalRule(
@@ -344,27 +383,10 @@ class ExcelConfigBuilder:
         return rules
 
 
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# 헬퍼 함수
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
 def quick_build(
     source_df: pd.DataFrame,
     column_map: Dict[str, tuple],
     **kwargs
 ) -> Tuple[ExcelConfig, pd.DataFrame]:
-    """빠른 생성 헬퍼
-    
-    Args:
-        source_df: 원본 DataFrame
-        column_map: 컬럼 매핑
-        **kwargs: ExcelConfigBuilder.from_column_map 옵션
-    
-    Returns:
-        (ExcelConfig, output_df)
-    
-    Example:
-        config, output_df = quick_build(df, column_map)
-        renderer.render(output_df, config)
-    """
+    """빠른 생성 헬퍼"""
     return ExcelConfigBuilder.from_column_map(source_df, column_map, **kwargs)

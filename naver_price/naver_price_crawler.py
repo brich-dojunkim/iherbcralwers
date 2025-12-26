@@ -4,6 +4,7 @@
 - 네이버 로그인
 - 최저가 조사
 - 아이허브 판매처 확인
+- 봇 캡차 자동 감지 및 대기
 """
 
 import time
@@ -111,6 +112,9 @@ class NaverPriceCrawler:
             
             time.sleep(3)
             
+            # 로그인 시 캡차 확인
+            self._wait_for_captcha()
+            
             # 로그인 확인
             if 'nid.naver.com' not in self.driver.current_url:
                 print("✓ 네이버 로그인 성공")
@@ -132,6 +136,60 @@ class NaverPriceCrawler:
         )
         time.sleep(0.5)
     
+    def _wait_for_captcha(self):
+        """봇 캡차가 나타나면 사용자가 해결할 때까지 대기"""
+        try:
+            # 캡차 관련 요소들
+            captcha_selectors = [
+                '#captcha_wrap',
+                '#rcpt_form',
+                '.captcha_wrap',
+                '[data-component="rcpt_wrap"]',
+                '[data-component="vcpt_wrap"]',
+                '.captcha_img'
+            ]
+            
+            captcha_detected = False
+            for selector in captcha_selectors:
+                try:
+                    captcha = self.driver.find_element(By.CSS_SELECTOR, selector)
+                    if captcha.is_displayed():
+                        captcha_detected = True
+                        break
+                except:
+                    continue
+            
+            if captcha_detected:
+                print("\n" + "="*60)
+                print("⚠️  봇 캡차가 감지되었습니다!")
+                print("   브라우저에서 캡차를 해결해주세요.")
+                print("   (이미지에서 정답을 입력하고 확인 버튼 클릭)")
+                print("="*60)
+                
+                # 캡차가 사라질 때까지 대기
+                while True:
+                    captcha_exists = False
+                    for selector in captcha_selectors:
+                        try:
+                            captcha = self.driver.find_element(By.CSS_SELECTOR, selector)
+                            if captcha.is_displayed():
+                                captcha_exists = True
+                                break
+                        except:
+                            continue
+                    
+                    if not captcha_exists:
+                        break
+                    
+                    time.sleep(1)
+                
+                print("✓ 캡차 해결 완료")
+                time.sleep(2)
+                    
+        except Exception as e:
+            # 캡차가 없으면 그냥 진행
+            pass
+    
     def get_lowest_price(self, url):
         """
         최저가 조회
@@ -146,6 +204,9 @@ class NaverPriceCrawler:
             print(f"\n상품 URL 접속: {url}")
             self.driver.get(url)
             time.sleep(2)
+            
+            # 봇 캡차 확인
+            self._wait_for_captcha()
             
             # 페이지 스크롤 (판매처 선택보기 요소가 보이도록)
             self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight/2);")
@@ -208,6 +269,9 @@ class NaverPriceCrawler:
             if self.driver.current_url != url:
                 self.driver.get(url)
                 time.sleep(2)
+                
+                # 봇 캡차 확인
+                self._wait_for_captcha()
             
             # 페이지 하단으로 스크롤 (헤더 피하기)
             self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight/2);")
@@ -233,6 +297,9 @@ class NaverPriceCrawler:
                 self.driver.execute_script("arguments[0].click();", select_mall_btn)
                 print("  판매처 선택 레이어 열림")
                 time.sleep(2)
+                
+                # 레이어 오픈 후 캡차 확인
+                self._wait_for_captcha()
                 
                 # 판매처 목록에서 아이허브 검색
                 soup = BeautifulSoup(self.driver.page_source, 'html.parser')
@@ -298,6 +365,12 @@ class NaverPriceCrawler:
         except Exception as e:
             print(f"✗ 아이허브 확인 실패: {e}")
             return False
+    
+    def close(self):
+        """드라이버 종료"""
+        if self.driver:
+            self.driver.quit()
+            print("\n브라우저 종료")
         
     def process_urls(self):
         """

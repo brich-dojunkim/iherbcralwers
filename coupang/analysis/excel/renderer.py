@@ -11,6 +11,7 @@ Excel 렌더링 엔진 (컬럼-값 매핑 책임)
   - 3단 헤더 렌더링
   - 조건부 서식 적용
   - 하이퍼링크 처리
+  - 🆕 데이터바 자동 추가 (비중 컬럼)
 """
 
 import pandas as pd
@@ -18,6 +19,7 @@ from pathlib import Path
 from openpyxl import load_workbook
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 from openpyxl.utils import get_column_letter
+from openpyxl.formatting.rule import DataBarRule
 
 from .types import ExcelConfig
 from .constants import COLOR_SCHEMES
@@ -54,49 +56,54 @@ class ExcelRenderer:
             # config.columns 순서대로 재정렬 (Analysis 순서 무관)
             df = df[ordered_columns].copy()
             
-            print(f"[RENDERER] 0/8 컬럼 정렬 완료 (config 순서 보장)")
+            print(f"[RENDERER] 0/9 컬럼 정렬 완료 (config 순서 보장)")
             
-            print(f"[RENDERER] 1/8 데이터 쓰기... ({len(df):,}행)")
+            print(f"[RENDERER] 1/9 데이터 쓰기... ({len(df):,}행)")
             # 1. 데이터 쓰기
             with pd.ExcelWriter(self.output_path, engine='openpyxl') as writer:
                 df.to_excel(writer, sheet_name=self.sheet_name, index=False, header=False)
-            print(f"[RENDERER] 1/8 완료")
+            print(f"[RENDERER] 1/9 완료")
             
-            print(f"[RENDERER] 2/8 파일 로드...")
+            print(f"[RENDERER] 2/9 파일 로드...")
             # 2. 파일 로드
             self.wb = load_workbook(self.output_path)
             self.ws = self.wb[self.sheet_name]
             self.ws.insert_rows(1, 3)
-            print(f"[RENDERER] 2/8 완료")
+            print(f"[RENDERER] 2/9 완료")
             
-            print(f"[RENDERER] 3/8 헤더 렌더링...")
+            print(f"[RENDERER] 3/9 헤더 렌더링...")
             # 3. 헤더
             self._render_headers(config.groups)
-            print(f"[RENDERER] 3/8 완료")
+            print(f"[RENDERER] 3/9 완료")
             
-            print(f"[RENDERER] 4/8 컬럼 너비...")
+            print(f"[RENDERER] 4/9 컬럼 너비...")
             # 4. 컬럼 너비
             self._set_column_widths(config.columns)
-            print(f"[RENDERER] 4/8 완료")
+            print(f"[RENDERER] 4/9 완료")
             
-            print(f"[RENDERER] 5/8 데이터 영역 스타일...")
+            print(f"[RENDERER] 5/9 데이터 영역 스타일...")
             # 5. 데이터 영역
             self._style_data_area(config.columns)
-            print(f"[RENDERER] 5/8 완료")
+            print(f"[RENDERER] 5/9 완료")
             
-            print(f"[RENDERER] 6/8 조건부 서식... ({len(config.conditional_rules)}개 규칙)")
+            print(f"[RENDERER] 6/9 조건부 서식... ({len(config.conditional_rules)}개 규칙)")
             # 6. 조건부 서식
             if config.conditional_rules:
                 self._apply_conditional_rules(config.conditional_rules)
-            print(f"[RENDERER] 6/8 완료")
+            print(f"[RENDERER] 6/9 완료")
             
-            print(f"[RENDERER] 7/8 링크 처리...")
-            # 7. 링크
+            print(f"[RENDERER] 7/9 데이터바...")
+            # 7. 🆕 데이터바
+            self._apply_data_bars()
+            print(f"[RENDERER] 7/9 완료")
+            
+            print(f"[RENDERER] 8/9 링크 처리...")
+            # 8. 링크
             self._apply_links()
-            print(f"[RENDERER] 7/8 완료")
+            print(f"[RENDERER] 8/9 완료")
             
-            print(f"[RENDERER] 8/8 UI 설정...")
-            # 8. UI
+            print(f"[RENDERER] 9/9 UI 설정...")
+            # 9. UI
             if config.freeze_panes:
                 self.ws.freeze_panes = self.ws.cell(*config.freeze_panes)
             
@@ -107,7 +114,7 @@ class ExcelRenderer:
             
             # 저장
             self.wb.save(self.output_path)
-            print(f"[RENDERER] 8/8 완료")
+            print(f"[RENDERER] 9/9 완료")
             
             return {
                 'success': True,
@@ -258,6 +265,24 @@ class ExcelRenderer:
                             break  # 첫 매칭만
                     except:
                         pass
+    
+    def _apply_data_bars(self):
+        """🆕 데이터바 자동 적용 (비중 컬럼 감지)"""
+        # 3행에서 '비중' 포함 컬럼 찾기
+        for col_idx in range(1, self.ws.max_column + 1):
+            col_name = self.ws.cell(3, col_idx).value
+            
+            if col_name and '비중' in str(col_name):
+                col_letter = get_column_letter(col_idx)
+                rule = DataBarRule(
+                    start_type='num', start_value=0,
+                    end_type='num', end_value=100,
+                    color="63C384"
+                )
+                self.ws.conditional_formatting.add(
+                    f'{col_letter}4:{col_letter}{self.ws.max_row}',
+                    rule
+                )
     
     def _apply_links(self):
         """하이퍼링크 처리"""

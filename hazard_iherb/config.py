@@ -39,6 +39,10 @@ UNIFIED_COLUMNS = [
     'INGR_NM_LST',          # 성분
     'CRET_DTM',             # 등록일시
     'IMAGE_URL',            # 위해식품 이미지 URL
+    'STT_YMD',              # 적용시작일
+    'END_YMD',              # 적용종료일
+    'LAST_UPDT_DTM',        # 최종수정일
+    'BARCD_CTN',            # 바코드번호
     
     # iHerb 정보
     'IHERB_URL',            # iHerb 제품 URL
@@ -69,7 +73,11 @@ HAZARD_BASE_COLUMNS = [
     'MUFC_CNTRY_NM',
     'INGR_NM_LST',
     'CRET_DTM',
-    'IMAGE_URL'
+    'IMAGE_URL',
+    'STT_YMD',          # 적용시작일
+    'END_YMD',          # 적용종료일
+    'LAST_UPDT_DTM',    # 최종수정일
+    'BARCD_CTN'         # 바코드번호
 ]
 
 IHERB_SCRAPED_COLUMNS = [
