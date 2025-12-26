@@ -6,12 +6,11 @@ DataManager Core
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 통합 데이터 관리 - Product ID 기반 매칭 + 통합 뷰 생성
 
-역할:
-- 통합 DB에서 로켓 / 아이허브 데이터를 로드
-- Product ID 기반 매칭 수행
-- 가격 비교/할인율/손익분기 할인율 계산
-- (옵션) 아이허브 미매칭 상품까지 포함한 전체 뷰 생성
-- (신규) 여러 스냅샷(panel)을 한 번에 가져오는 기반 제공
+🔥 수정사항:
+  - 매칭상태를 "매칭", "로켓", "아이허브" 3가지로 구분
+  - 로켓+아이허브 = "매칭"
+  - 로켓만 = "로켓"
+  - 아이허브만 = "아이허브"
 """
 
 import pandas as pd
@@ -79,49 +78,7 @@ class DataManager:
             include_unmatched: 아이허브 미매칭 상품 포함 여부
 
         Returns:
-            통합 DataFrame (기존 get_integrated_df와 동일 구조)
-
-            [매칭 정보]
-            - matching_status: '로켓매칭' 또는 '미매칭'
-            - matching_method
-            - matching_confidence
-
-            [로켓직구]
-            - rocket_vendor_id, rocket_product_id, rocket_item_id
-            - rocket_product_name
-            - rocket_price, rocket_original_price
-            - rocket_rank, rocket_rating, rocket_reviews
-            - rocket_category
-            - rocket_url
-            - rocket_discount_rate
-
-            [아이허브 가격/재고]
-            - iherb_vendor_id, iherb_product_id, iherb_item_id
-            - iherb_product_name
-            - iherb_part_number, iherb_upc
-            - iherb_price (판매가), iherb_original_price (정가)
-            - iherb_recommended_price
-            - iherb_stock, iherb_stock_status
-            - iherb_category
-            - iherb_url
-
-            [아이허브 판매 성과]
-            - iherb_revenue                : 누적 매출 (전체 기간 또는 스냅샷 기준)
-            - iherb_sales_quantity         : 누적 판매 수량
-            - iherb_item_winner_ratio      : 아이템 위너 비율 (%)
-
-            [아이허브 최근 7일 성과]
-            - iherb_sales_quantity_last_7d : 최근 7일 판매 수량
-            - iherb_coupang_share_last_7d  : 최근 7일 '쿠팡' 채널 비중 (%)
-
-            [가격 비교/할인 전략]
-            - price_diff, price_diff_pct, cheaper_source
-            - breakeven_discount_rate
-            - recommended_discount_rate (판매가 기준)
-            - requested_discount_rate (정가 기준)
-
-            [공통 ID]
-            - product_id: rocket_product_id 우선, 없으면 iherb_product_id
+            통합 DataFrame
         """
 
         # 1. snapshot ID 결정
@@ -142,15 +99,15 @@ class DataManager:
         # 3. Product ID 기반 매칭 (로켓 기준)
         df_matched = self.matcher.match_products(df_rocket, df_iherb)
 
-        # 매칭된 행 기본 상태값 보정
+        # 🔥 매칭 상태 재정의: "매칭" / "로켓" / "아이허브"
         if not df_matched.empty:
-            if "matching_status" not in df_matched.columns:
-                df_matched["matching_status"] = "로켓매칭"
-            else:
-                df_matched["matching_status"] = df_matched["matching_status"].fillna("로켓매칭")
-
-        # 🔸 여기서는 아직 가격 계산(PriceCalculator)을 태우지 않는다
-        #    → 아래에서 미매칭까지 포함한 최종 df_final에 한 번만 적용
+            has_rocket = df_matched['rocket_vendor_id'].notna()
+            has_iherb = df_matched['iherb_vendor_id'].notna()
+            
+            df_matched["matching_status"] = "미분류"
+            df_matched.loc[has_rocket & has_iherb, "matching_status"] = "매칭"
+            df_matched.loc[has_rocket & ~has_iherb, "matching_status"] = "로켓"
+            df_matched.loc[~has_rocket & has_iherb, "matching_status"] = "아이허브"
 
         # 4. 미매칭 아이허브 상품 포함 여부
         if include_unmatched:
@@ -197,8 +154,8 @@ class DataManager:
                     if col not in df_unmatched.columns:
                         df_unmatched[col] = pd.NA
 
-                # 4-4. 매칭 상태 컬럼 세팅
-                df_unmatched["matching_status"] = "미매칭"
+                # 🔥 미매칭 상품은 "아이허브"로 표시
+                df_unmatched["matching_status"] = "아이허브"
                 df_unmatched["matching_method"] = "미매칭"
                 if "matching_confidence" not in df_unmatched.columns:
                     df_unmatched["matching_confidence"] = ""
@@ -221,10 +178,6 @@ class DataManager:
         else:
             # 미매칭 상품은 포함하지 않고, 로켓 매칭된 상품만 사용
             df_final = df_matched.copy()
-            if "matching_status" not in df_final.columns:
-                df_final["matching_status"] = "로켓매칭"
-            else:
-                df_final["matching_status"] = df_final["matching_status"].fillna("로켓매칭")
 
         if df_final.empty:
             return df_final
@@ -242,12 +195,13 @@ class DataManager:
             df_final["iherb_product_id"]
         )
 
-        # 7. 기본 정렬: 로켓매칭 우선, 그 안에서는 판매량(오늘) 기준 내림차순
+        # 7. 기본 정렬: 매칭 우선, 그 안에서는 판매량(오늘) 기준 내림차순
         if "matching_status" in df_final.columns:
+            # 🔥 정렬 순서: 매칭 > 로켓 > 아이허브
             sort_key = (
                 df_final["matching_status"]
-                .map({"로켓매칭": 0, "미매칭": 1})
-                .fillna(2)
+                .map({"매칭": 0, "로켓": 1, "아이허브": 2, "미분류": 3})
+                .fillna(4)
                 .astype(int)
             )
             df_final["_sort_key"] = sort_key

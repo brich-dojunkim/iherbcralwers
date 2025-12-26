@@ -6,12 +6,11 @@ Excel Renderer
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Excel 렌더링 엔진 (컬럼-값 매핑 책임)
 
-🔥 핵심 기능:
-  - config.columns 순서대로 DataFrame 자동 정렬 (컬럼-값 매핑 보장)
-  - 3단 헤더 렌더링
-  - 조건부 서식 적용
-  - 하이퍼링크 처리
-  - 🆕 데이터바 자동 추가 (비중 컬럼)
+🔥 수정사항:
+  - 3단 헤더 → 2단 헤더로 변경
+  - 1단: 그룹명
+  - 2단: 컬럼명 (서브그룹 제거)
+  - 모든 row 번호 -1 조정
 """
 
 import pandas as pd
@@ -65,14 +64,14 @@ class ExcelRenderer:
             print(f"[RENDERER] 1/9 완료")
             
             print(f"[RENDERER] 2/9 파일 로드...")
-            # 2. 파일 로드
+            # 2. 파일 로드 - 🔥 2행 삽입 (2단 헤더)
             self.wb = load_workbook(self.output_path)
             self.ws = self.wb[self.sheet_name]
-            self.ws.insert_rows(1, 3)
+            self.ws.insert_rows(1, 2)  # 🔥 수정: 3 → 2
             print(f"[RENDERER] 2/9 완료")
             
             print(f"[RENDERER] 3/9 헤더 렌더링...")
-            # 3. 헤더
+            # 3. 헤더 - 🔥 2단 헤더
             self._render_headers(config.groups)
             print(f"[RENDERER] 3/9 완료")
             
@@ -105,11 +104,12 @@ class ExcelRenderer:
             print(f"[RENDERER] 9/9 UI 설정...")
             # 9. UI
             if config.freeze_panes:
-                self.ws.freeze_panes = self.ws.cell(*config.freeze_panes)
+                row, col = config.freeze_panes
+                self.ws.freeze_panes = self.ws.cell(row, col)  # 🔥 그대로 사용 (price_comparison_2에서 조정됨)
             
             if config.auto_filter:
                 self.ws.auto_filter.ref = (
-                    f"A3:{get_column_letter(self.ws.max_column)}{self.ws.max_row}"
+                    f"A2:{get_column_letter(self.ws.max_column)}{self.ws.max_row}"  # 🔥 A3 → A2
                 )
             
             # 저장
@@ -140,7 +140,7 @@ class ExcelRenderer:
     # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     
     def _render_headers(self, groups):
-        """3단 헤더 렌더링"""
+        """🔥 2단 헤더 렌더링 (서브그룹 제거)"""
         border = Border(
             left=Side(style='thin'),
             right=Side(style='thin'),
@@ -152,9 +152,16 @@ class ExcelRenderer:
         
         for group in groups:
             colors = COLOR_SCHEMES[group.color_scheme]
-            total_span = sum(len(sg.columns) for sg in group.sub_groups)
             
+            # 전체 컬럼 수 계산 (서브그룹의 모든 컬럼 합치기)
+            all_columns = []
+            for sg in group.sub_groups:
+                all_columns.extend(sg.columns)
+            total_span = len(all_columns)
+            
+            # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
             # 1단: 그룹 헤더
+            # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
             for i in range(col_pos, col_pos + total_span):
                 cell = self.ws.cell(1, i)
                 cell.fill = PatternFill(start_color=colors["top"], end_color=colors["top"], fill_type="solid")
@@ -177,33 +184,18 @@ class ExcelRenderer:
                 top=Side(style='thin'), bottom=Side(style='thin')
             )
             
-            # 2단 & 3단
-            for sub in group.sub_groups:
-                sub_span = len(sub.columns)
-                
-                # 2단
-                for i in range(col_pos, col_pos + sub_span):
-                    cell = self.ws.cell(2, i)
-                    cell.fill = PatternFill(start_color=colors["mid"], end_color=colors["mid"], fill_type="solid")
-                    cell.font = Font(color="FFFFFF", bold=True, size=11)
-                    cell.alignment = Alignment(horizontal='center', vertical='center')
-                    cell.border = border
-                
-                if sub_span > 1:
-                    self.ws.merge_cells(start_row=2, start_column=col_pos, end_row=2, end_column=col_pos + sub_span - 1)
-                
-                self.ws.cell(2, col_pos).value = sub.name
-                
-                # 3단
-                for i, col_name in enumerate(sub.columns):
-                    cell = self.ws.cell(3, col_pos + i)
-                    cell.value = col_name
-                    cell.fill = PatternFill(start_color=colors["bottom"], end_color=colors["bottom"], fill_type="solid")
-                    cell.font = Font(color="000000", bold=True, size=10)
-                    cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
-                    cell.border = border
-                
-                col_pos += sub_span
+            # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            # 2단: 컬럼명 (서브그룹 건너뛰고 바로 컬럼)
+            # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            for i, col_name in enumerate(all_columns):
+                cell = self.ws.cell(2, col_pos + i)  # 🔥 3 → 2
+                cell.value = col_name
+                cell.fill = PatternFill(start_color=colors["bottom"], end_color=colors["bottom"], fill_type="solid")
+                cell.font = Font(color="000000", bold=True, size=10)
+                cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+                cell.border = border
+            
+            col_pos += total_span
     
     def _set_column_widths(self, columns):
         """컬럼 너비 설정"""
@@ -219,7 +211,8 @@ class ExcelRenderer:
             bottom=Side(style='thin')
         )
         
-        for row_idx in range(4, self.ws.max_row + 1):
+        # 🔥 수정: 4 → 3
+        for row_idx in range(3, self.ws.max_row + 1):
             for col_idx, col_spec in enumerate(columns, 1):
                 cell = self.ws.cell(row_idx, col_idx)
                 cell.border = border
@@ -245,8 +238,9 @@ class ExcelRenderer:
             if not col_idx:
                 continue
             
+            # 🔥 수정: 4 → 3
             # 해당 컬럼만 한 번 순회
-            for row_idx in range(4, self.ws.max_row + 1):
+            for row_idx in range(3, self.ws.max_row + 1):
                 cell = self.ws.cell(row_idx, col_idx)
                 value = cell.value
                 
@@ -268,9 +262,10 @@ class ExcelRenderer:
     
     def _apply_data_bars(self):
         """🆕 데이터바 자동 적용 (비중 컬럼 감지)"""
-        # 3행에서 '비중' 포함 컬럼 찾기
+        # 🔥 수정: 3행 → 2행 (컬럼명 위치)
+        # 2행에서 '비중' 포함 컬럼 찾기
         for col_idx in range(1, self.ws.max_column + 1):
-            col_name = self.ws.cell(3, col_idx).value
+            col_name = self.ws.cell(2, col_idx).value
             
             if col_name and '비중' in str(col_name):
                 col_letter = get_column_letter(col_idx)
@@ -279,23 +274,26 @@ class ExcelRenderer:
                     end_type='num', end_value=100,
                     color="63C384"
                 )
+                # 🔥 수정: 4 → 3
                 self.ws.conditional_formatting.add(
-                    f'{col_letter}4:{col_letter}{self.ws.max_row}',
+                    f'{col_letter}3:{col_letter}{self.ws.max_row}',
                     rule
                 )
     
     def _apply_links(self):
         """하이퍼링크 처리"""
-        # 3행에서 링크 컬럼 찾기
+        # 🔥 수정: 3행 → 2행 (컬럼명 위치)
+        # 2행에서 링크 컬럼 찾기
         link_columns = []
         for col_idx in range(1, self.ws.max_column + 1):
-            col_name = self.ws.cell(3, col_idx).value
+            col_name = self.ws.cell(2, col_idx).value
             if col_name and ('링크' in str(col_name) or 'url' in str(col_name).lower()):
                 link_columns.append(col_idx)
         
+        # 🔥 수정: 4 → 3
         # 링크 처리
         for col_idx in link_columns:
-            for row_idx in range(4, self.ws.max_row + 1):
+            for row_idx in range(3, self.ws.max_row + 1):
                 cell = self.ws.cell(row_idx, col_idx)
                 url = cell.value
                 
@@ -306,8 +304,9 @@ class ExcelRenderer:
                     cell.alignment = Alignment(horizontal='center', vertical='center')
     
     def _find_column(self, col_name: str) -> int:
-        """컬럼명으로 인덱스 찾기 (3행 기준)"""
+        """컬럼명으로 인덱스 찾기 (2행 기준)"""
+        # 🔥 수정: 3행 → 2행
         for col_idx in range(1, self.ws.max_column + 1):
-            if self.ws.cell(3, col_idx).value == col_name:
+            if self.ws.cell(2, col_idx).value == col_name:
                 return col_idx
         return None

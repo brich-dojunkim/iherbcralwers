@@ -5,6 +5,10 @@
 Excel Loader - 아이허브 엑셀 파일을 통합 DB에 적재
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 price_inventory, SELLER_INSIGHTS, Coupang_Price 3종 처리
+
+🔥 수정사항:
+  - UPC 로직 완전 제거 (load_upc_once.py로 분리)
+  - upc_file 파라미터 무시
 """
 
 import pandas as pd
@@ -52,9 +56,14 @@ class ExcelLoader:
         price_file: Optional[Path] = None,
         insights_file: Optional[Path] = None,
         reco_file: Optional[Path] = None,
-        upc_file: Optional[Path] = None,
+        upc_file: Optional[Path] = None,  # 🔥 무시됨 (호환성 유지)
     ) -> Dict[str, int]:
-        """모든 엑셀 파일 적재"""
+        """모든 엑셀 파일 적재
+        
+        🔥 변경사항:
+          - upc_file 파라미터는 무시됨
+          - UPC는 load_upc_once.py로 별도 관리
+        """
 
         print(f"\n{'='*80}")
         print(f"📥 엑셀 파일 적재 시작 (Snapshot ID: {snapshot_id})")
@@ -67,8 +76,10 @@ class ExcelLoader:
             insights_file = self._find_file(excel_dir, "*SELLER_INSIGHTS*.xlsx")
         if reco_file is None:
             reco_file = self._find_file(excel_dir, "Coupang_Price_*.xlsx")
-        if upc_file is None:
-            upc_file = self._find_file(excel_dir, "20251024_*.xlsx")
+        
+        # 🔥 UPC는 더 이상 찾지 않음
+        # if upc_file is None:
+        #     upc_file = self._find_file(excel_dir, "20251024_*.xlsx")
 
         # 찾은 파일명을 snapshot에 업데이트
         file_names = {}
@@ -104,7 +115,6 @@ class ExcelLoader:
         # 1. price_inventory 처리
         products_data: List[Dict] = []
         prices_data: List[Dict] = []
-        # features_map은 vendor_item_id 별로 유니크한 feature 레코드만 유지
         features_map: Dict[str, Dict] = {}
 
         if price_file and price_file.exists():
@@ -120,14 +130,8 @@ class ExcelLoader:
         else:
             print(f"⚠️  1. Price Inventory: 파일 없음\n")
 
-        # 2. UPC 처리 (products에 병합)
-        if upc_file and upc_file.exists():
-            print(f"📄 2. UPC: {upc_file.name}")
-            upc_data = self._load_upc(upc_file)
-            self._merge_upc_to_products(products_data, upc_data)
-            print(f"   ✓ UPC: {len(upc_data):,}개\n")
-        else:
-            print(f"⚠️  2. UPC: 파일 없음\n")
+        # 🔥 2. UPC 처리 - 완전 제거
+        print(f"ℹ️  2. UPC: load_upc_once.py로 별도 관리\n")
 
         # 3. Coupang_Price 처리 (추천가 + 지난 7일 판매/점유율)
         if reco_file and reco_file.exists():
@@ -314,7 +318,7 @@ class ExcelLoader:
                     "product_id": product_id if product_id != "nan" else None,
                     "item_id": item_id if item_id != "nan" else None,
                     "part_number": part_number if part_number != "nan" else None,
-                    "upc": None,
+                    "upc": None,  # 🔥 UPC는 더 이상 여기서 설정하지 않음
                     "name": name if pd.notna(name) else None,
                 }
             )
@@ -359,33 +363,7 @@ class ExcelLoader:
 
         return products_data, prices_data, features_data
 
-    def _load_upc(self, file_path: Path) -> List[Dict]:
-        """UPC 엑셀 읽기"""
-        df = pd.read_excel(file_path)
-        col_item_id = None
-        col_upc = None
-        for col in df.columns:
-            if "쿠팡 상품번호" in str(col) or "상품번호" in str(col):
-                col_item_id = col
-            if "UPC" in str(col).upper():
-                col_upc = col
-        if col_item_id is None or col_upc is None:
-            return []
-        upc_data = []
-        for _, row in df.iterrows():
-            item_id = str(row[col_item_id]).replace(".0", "")
-            upc = str(row[col_upc]).strip()
-            if item_id != "nan" and upc != "nan":
-                upc_data.append({"item_id": item_id, "upc": upc})
-        return upc_data
-
-    def _merge_upc_to_products(self, products_data: List[Dict], upc_data: List[Dict]):
-        """UPC를 products에 병합"""
-        upc_map = {u["item_id"]: u["upc"] for u in upc_data}
-        for p in products_data:
-            item_id = p.get("item_id")
-            if item_id and item_id in upc_map:
-                p["upc"] = upc_map[item_id]
+    # 🔥 _load_upc, _merge_upc_to_products 메서드 완전 삭제
 
     def _load_coupang_recommended_price(self, file_path: Path) -> List[Dict]:
         """Coupang_Price 엑셀 읽기 (추천가 + 지난 7일 판매/점유율)"""
@@ -393,7 +371,7 @@ class ExcelLoader:
 
         col_vid = "옵션ID"
         col_reco = "쿠팡추천가 (원)"
-        col_sales_amount = "나의 지난주 매출"      # 지금은 DB에 미반영
+        col_sales_amount = "나의 지난주 매출"
         col_sales_qty = "나의 지난주 판매개수"
         col_share = "내상품 판매 점유율 (지난 7일간)"
 
@@ -458,10 +436,8 @@ class ExcelLoader:
                 {
                     "vendor_item_id": vendor_id,
                     "iherb_recommended_price": reco_price,
-                    # 지난 7일 지표 (iHerb 기준이지만 쿠팡 판매/점유)
                     "iherb_sales_quantity_last_7d": sales_qty_7d,
                     "iherb_coupang_share_last_7d": share_7d,
-                    # 필요시 'iherb_revenue_last_7d': sales_amount_7d 등 확장 가능
                 }
             )
 
@@ -514,28 +490,3 @@ class ExcelLoader:
                 }
             )
         return features_data
-
-
-if __name__ == "__main__":
-    from database import IntegratedDatabase
-
-    script_dir = Path(__file__).resolve().parent
-    excel_dir = script_dir.parent / "data" / "iherb"
-    db_path = script_dir.parent / "data" / "rocket_iherb.db"
-
-    print(f"🔍 엑셀 디렉터리: {excel_dir}")
-
-    db = IntegratedDatabase(str(db_path))
-    db.init_database()
-
-    today = datetime.now().strftime("%Y-%m-%d")
-    snapshot_id = db.create_snapshot(snapshot_date=today)
-    print(f"✅ Snapshot 생성: ID={snapshot_id}, 날짜={today}")
-
-    loader = ExcelLoader(db)
-    result = loader.load_all_excel_files(snapshot_id, excel_dir)
-
-    print("\n🎉 완료!")
-    print(f"  상품: {result['products']:,}개")
-    print(f"  가격: {result['prices']:,}개")
-    print(f"  성과: {result['features']:,}개")

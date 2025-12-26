@@ -5,6 +5,10 @@
 Data Loaders
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 통합 DB에서 데이터 로드 - 현재 스키마에 최적화
+
+🔥 수정 사항:
+  - load_iherb_data()에 아이허브 할인율 계산 추가
+  - UPC/할인율 데이터 유무 진단 통계 추가
 """
 
 import sqlite3
@@ -19,13 +23,7 @@ class DataLoader:
         self.db_path = db_path
     
     def load_rocket_data(self, snapshot_id: int) -> pd.DataFrame:
-        """로켓직구 데이터 로드
-        
-        핵심 변경사항:
-        - snapshot의 카테고리 URL을 이용한 카테고리 판별 제거
-        - product_features.rocket_category 직접 사용
-        - 할인율 계산 유지
-        """
+        """로켓직구 데이터 로드"""
         conn = sqlite3.connect(self.db_path)
         
         query = """
@@ -83,18 +81,15 @@ class DataLoader:
                 for cat, count in category_counts.items():
                     if pd.notna(cat):
                         print(f"      • {cat}: {count:,}개")
-                    else:
-                        print(f"      • (NULL): {count:,}개")
         
         return df
     
     def load_iherb_data(self, snapshot_id: int) -> pd.DataFrame:
         """아이허브 데이터 로드
         
-        핵심 변경사항:
-        - iherb_category 컬럼 추가
-        - 정가(iherb_original_price) 통계 추가
-        - 최근 7일 지표(iherb_sales_quantity_last_7d, iherb_coupang_share_last_7d) 추가
+        🔥 핵심 수정:
+        - iherb_discount_rate 계산 추가
+        - UPC/할인율 데이터 진단 통계 추가
         """
         conn = sqlite3.connect(self.db_path)
         
@@ -141,10 +136,38 @@ class DataLoader:
             axis=1
         )
         
-        # 통계
+        # 🔥 아이허브 할인율 계산 추가
+        df['iherb_discount_rate'] = 0.0
+        valid_price = (df['iherb_price'] > 0) & (df['iherb_original_price'] > 0)
+        
+        if valid_price.sum() > 0:
+            df.loc[valid_price, 'iherb_discount_rate'] = (
+                (1 - df.loc[valid_price, 'iherb_price'] / 
+                 df.loc[valid_price, 'iherb_original_price']) * 100
+            ).round(1)
+        
+        # 🔥 진단 통계 출력
         print(f"   ✓ 아이허브: {len(df):,}개 상품")
         print(f"   ✓ Product ID 있음: {df['iherb_product_id'].notna().sum():,}개")
         print(f"   ✓ 정가 있음: {(df['iherb_original_price'] > 0).sum():,}개")
+        
+        # 할인율 계산 통계
+        discount_calculated = (df['iherb_discount_rate'] > 0).sum()
+        if discount_calculated > 0:
+            print(f"   ✓ 할인율 계산됨: {discount_calculated:,}개 ({discount_calculated/len(df)*100:.1f}%)")
+            avg_discount = df[df['iherb_discount_rate'] > 0]['iherb_discount_rate'].mean()
+            print(f"   ✓ 평균 할인율: {avg_discount:.1f}%")
+        else:
+            print(f"   ⚠️  할인율 계산 불가: iherb_original_price 데이터가 없습니다")
+            print(f"   💡 해결: price_inventory 엑셀의 '할인율기준가' 컬럼 확인 필요")
+        
+        # UPC 통계
+        upc_valid = df['iherb_upc'].notna().sum()
+        if upc_valid > 0:
+            print(f"   ✓ UPC 있음: {upc_valid:,}개 ({upc_valid/len(df)*100:.1f}%)")
+        else:
+            print(f"   ⚠️  UPC 데이터 없음")
+            print(f"   💡 해결: UPC 엑셀 파일(20251024_*.xlsx)을 로드해야 합니다")
         
         # 카테고리 분포
         if 'iherb_category' in df.columns:
@@ -156,17 +179,6 @@ class DataLoader:
                         print(f"      • {cat}: {count:,}개")
                 if len(category_counts) > 5:
                     print(f"      ... 외 {len(category_counts) - 5}개")
-        
-        # 7일 지표 간단 체크 (옵션)
-        if 'iherb_sales_quantity_last_7d' in df.columns:
-            non_null_7d = df['iherb_sales_quantity_last_7d'].notna().sum()
-            if non_null_7d > 0:
-                print(f"   ✓ 최근 7일 판매량 값 있음: {non_null_7d:,}개")
-        
-        if 'iherb_coupang_share_last_7d' in df.columns:
-            non_null_share = df['iherb_coupang_share_last_7d'].notna().sum()
-            if non_null_share > 0:
-                print(f"   ✓ 최근 7일 쿠팡점유율 값 있음: {non_null_share:,}개")
         
         return df
     
@@ -255,7 +267,7 @@ class DataLoader:
     @staticmethod
     def _compose_url(product_id, item_id, vendor_id) -> Optional[str]:
         """쿠팡 URL 생성"""
-        import pandas as pd  # lazy import 방지용
+        import pandas as pd
         
         if pd.notna(product_id) and pd.notna(item_id):
             url = f"https://www.coupang.com/vp/products/{product_id}?itemId={item_id}"
@@ -263,43 +275,3 @@ class DataLoader:
                 url += f"&vendorItemId={vendor_id}"
             return url
         return None
-
-
-def main():
-    """간단 테스트용"""
-    db_path = "/Users/brich/Desktop/iherb_price/coupang2/data/integrated/rocket_iherb.db"
-    
-    loader = DataLoader(db_path)
-    
-    # Snapshot 목록
-    print("\n📋 Snapshot 목록:")
-    print("=" * 80)
-    snapshots = loader.list_snapshots(5)
-    print(snapshots.to_string(index=False))
-    
-    # 최신 snapshot
-    latest_id = loader.get_latest_snapshot_id()
-    print(f"\n📌 최신 Snapshot ID: {latest_id}")
-    
-    if latest_id:
-        # Snapshot 정보
-        info = loader.get_snapshot_info(latest_id)
-        print(f"\n📅 Snapshot {latest_id} 정보:")
-        print(f"   날짜: {info['snapshot_date']}")
-        print(f"   파일:")
-        for key, val in info['file_names'].items():
-            if val:
-                print(f"      • {key}: {val}")
-        
-        # 데이터 로드
-        print(f"\n📥 데이터 로드 중...")
-        df_rocket = loader.load_rocket_data(latest_id)
-        df_iherb = loader.load_iherb_data(latest_id)
-        
-        print(f"\n✅ 로드 완료")
-        print(f"   로켓: {len(df_rocket):,}개")
-        print(f"   아이허브: {len(df_iherb):,}개")
-
-
-if __name__ == "__main__":
-    main()
